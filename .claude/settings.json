@@ -1,0 +1,27 @@
+{
+    "extraKnownMarketplaces": {
+        "superpowers-dev": {
+            "source": {
+                "source": "directory",
+                "path": "./.agents/plugins/superpowers"
+            }
+        },
+        "cloudflare-dev": {
+            "source": {
+                "source": "directory",
+                "path": "./.agents/plugins/cloudflare"
+            }
+        },
+        "caveman": {
+            "source": {
+                "source": "directory",
+                "path": "./.agents/plugins/caveman"
+            }
+        }
+    },
+    "enabledPlugins": {
+        "superpowers@superpowers-dev": true,
+        "cloudflare@cloudflare-dev": true,
+        "caveman@caveman": true
+    }
+}
