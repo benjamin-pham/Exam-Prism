@@ -1,16 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
 using Endpoints;
-using Microsoft.AspNetCore.Mvc.Testing;
+using Tests.Infrastructure;
 using Xunit;
 
 namespace Tests;
 
-public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
-    public HealthEndpointTests(WebApplicationFactory<Program> factory)
+    public HealthEndpointTests(CustomWebApplicationFactory factory)
     {
         _client = factory.CreateClient();
     }
