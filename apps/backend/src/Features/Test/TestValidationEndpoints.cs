@@ -1,4 +1,4 @@
-namespace ExamPrism.Endpoints.Test;
+namespace ExamPrism.Features.Test;
 
 using Common.Endpoints;
 using Common.Localization;

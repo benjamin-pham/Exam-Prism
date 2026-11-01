@@ -1,4 +1,4 @@
-namespace Endpoints;
+namespace ExamPrism.Features.Health;
 
 using Common.Endpoints;
 using Microsoft.AspNetCore.Builder;

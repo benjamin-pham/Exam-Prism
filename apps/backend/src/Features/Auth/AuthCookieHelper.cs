@@ -1,4 +1,4 @@
-namespace ExamPrism.Endpoints.Auth;
+namespace ExamPrism.Features.Auth;
 
 using ExamPrism.Infrastructure.Identity;
 using Microsoft.AspNetCore.Http;

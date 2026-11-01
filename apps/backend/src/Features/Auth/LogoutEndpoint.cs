@@ -1,4 +1,4 @@
-namespace ExamPrism.Endpoints.Auth;
+namespace ExamPrism.Features.Auth;
 
 using Common.Endpoints;
 using ExamPrism.Infrastructure.Identity;
