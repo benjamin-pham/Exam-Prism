@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using ExamPrism.Features.Health;
+using ExamPrism.Features.Health.GetHealth;
 using FluentAssertions;
 using Tests.Infrastructure;
 using Xunit;
@@ -25,7 +25,7 @@ public class HealthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.GetAsync(path);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadFromJsonAsync<HealthResponse>();
+        var content = await response.Content.ReadFromJsonAsync<GetHealthResult>();
         content.Should().NotBeNull();
         content!.Status.Should().Be("Healthy");
     }

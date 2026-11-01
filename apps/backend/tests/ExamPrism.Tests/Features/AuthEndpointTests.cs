@@ -6,7 +6,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
-using ExamPrism.Features.Auth;
+using ExamPrism.Endpoints.Auth;
+using ExamPrism.Features.Auth.GetMe;
+using ExamPrism.Features.Auth.Login;
+using ExamPrism.Features.Auth.Register;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
@@ -54,12 +57,12 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     public async Task Register_ValidInput_Returns201AndSetsCookiesAndCreatesUserInDb()
     {
         var email = $"newuser_{Guid.NewGuid()}@example.com";
-        var request = new RegisterRequest(email, "Password123!");
+        var request = new RegisterCommand(email, "Password123!");
 
         var response = await _client.PostAsJsonAsync("/api/auth/register", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var user = await response.Content.ReadFromJsonAsync<RegisterResponse>();
+        var user = await response.Content.ReadFromJsonAsync<RegisterResult>();
         user.Should().NotBeNull();
         user!.Email.Should().Be(email);
 
@@ -79,7 +82,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     public async Task Register_DuplicateEmail_Returns400ValidationProblem()
     {
         var email = $"duplicate_{Guid.NewGuid()}@example.com";
-        var request = new RegisterRequest(email, "Password123!");
+        var request = new RegisterCommand(email, "Password123!");
 
         var firstResponse = await _client.PostAsJsonAsync("/api/auth/register", request);
         firstResponse.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -93,12 +96,12 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     {
         var email = $"loginuser_{Guid.NewGuid()}@example.com";
         var password = "Password123!";
-        await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, password));
+        await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email, password));
 
-        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password));
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginCommand(email, password));
 
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var user = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var user = await loginResponse.Content.ReadFromJsonAsync<LoginResult>();
         user.Should().NotBeNull();
         user!.Email.Should().Be(email);
 
@@ -111,9 +114,9 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     public async Task Login_InvalidPassword_Returns401()
     {
         var email = $"loginfail_{Guid.NewGuid()}@example.com";
-        await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "Password123!"));
+        await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email, "Password123!"));
 
-        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, "WrongPassword!"));
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginCommand(email, "WrongPassword!"));
 
         loginResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -122,7 +125,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     public async Task Refresh_ValidCookie_RotatesTokensAndSetsNewCookies()
     {
         var email = $"refreshuser_{Guid.NewGuid()}@example.com";
-        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "Password123!"));
+        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email, "Password123!"));
         var (_, rawRefresh) = ExtractCookies(regResponse);
         rawRefresh.Should().NotBeNullOrWhiteSpace();
 
@@ -142,8 +145,8 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     public async Task Refresh_ReusedRevokedToken_TriggersCompromiseDetectionAndRevokesAllTokens()
     {
         var email = $"reuseuser_{Guid.NewGuid()}@example.com";
-        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "Password123!"));
-        var (user, rawRefresh1) = (await regResponse.Content.ReadFromJsonAsync<RegisterResponse>(), ExtractCookies(regResponse).RefreshToken);
+        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email, "Password123!"));
+        var (user, rawRefresh1) = (await regResponse.Content.ReadFromJsonAsync<RegisterResult>(), ExtractCookies(regResponse).RefreshToken);
 
         // First rotation: valid
         var req1 = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
@@ -177,7 +180,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     public async Task Logout_WithValidRefreshToken_RevokesTokenAndClearsCookies()
     {
         var email = $"logoutuser_{Guid.NewGuid()}@example.com";
-        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "Password123!"));
+        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email, "Password123!"));
         var (_, rawRefresh) = ExtractCookies(regResponse);
 
         var logoutRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
@@ -205,7 +208,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     public async Task GetMe_WithValidCookie_Returns200AndUser()
     {
         var email = $"getmeuser_{Guid.NewGuid()}@example.com";
-        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "Password123!"));
+        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email, "Password123!"));
         var (accessToken, _) = ExtractCookies(regResponse);
 
         var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
@@ -214,7 +217,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         var meResponse = await _client.SendAsync(meRequest);
 
         meResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var user = await meResponse.Content.ReadFromJsonAsync<GetMeResponse>();
+        var user = await meResponse.Content.ReadFromJsonAsync<GetMeResult>();
         user.Should().NotBeNull();
         user!.Email.Should().Be(email);
     }
@@ -223,7 +226,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     public async Task GetMe_WithBearerHeader_Returns200AndUser()
     {
         var email = $"beareruser_{Guid.NewGuid()}@example.com";
-        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "Password123!"));
+        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email, "Password123!"));
         var (accessToken, _) = ExtractCookies(regResponse);
 
         var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
@@ -232,7 +235,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         var meResponse = await _client.SendAsync(meRequest);
 
         meResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var user = await meResponse.Content.ReadFromJsonAsync<GetMeResponse>();
+        var user = await meResponse.Content.ReadFromJsonAsync<GetMeResult>();
         user.Should().NotBeNull();
         user!.Email.Should().Be(email);
     }
@@ -243,7 +246,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     [InlineData(null, "Password123!")]
     public async Task Register_WithEmptyOrNullInput_Returns400(string? email, string? password)
     {
-        var response = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email!, password!));
+        var response = await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email!, password!));
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -253,7 +256,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     [InlineData(null, "Password123!")]
     public async Task Login_WithEmptyOrNullInput_Returns401(string? email, string? password)
     {
-        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email!, password!));
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginCommand(email!, password!));
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -261,7 +264,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     public async Task Refresh_WithExpiredToken_Returns401AndClearsCookies()
     {
         var email = $"expiredrefresh_{Guid.NewGuid()}@example.com";
-        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "Password123!"));
+        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email, "Password123!"));
         var (_, rawRefresh) = ExtractCookies(regResponse);
 
         using (var scope = _factory.Services.CreateScope())

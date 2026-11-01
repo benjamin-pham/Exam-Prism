@@ -16,8 +16,6 @@
     <PackageVersion Include="Scalar.AspNetCore" Version="2.18.0" />
     <PackageVersion Include="WolverineFx" Version="4.8.0" />
     <PackageVersion Include="WolverineFx.FluentValidation" Version="4.8.0" />
-    <PackageVersion Include="WolverineFx.Http" Version="4.8.0" />
-    <PackageVersion Include="WolverineFx.Http.FluentValidation" Version="4.8.0" />
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="4.8.0" />
 
     <!-- Test Dependencies -->

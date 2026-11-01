@@ -2,7 +2,7 @@ namespace Tests.Infrastructure;
 
 using System.Net;
 using System.Net.Http.Json;
-using ExamPrism.Features.Health;
+using ExamPrism.Features.Health.GetHealth;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,7 +36,7 @@ public class DatabaseIntegrationTests : IClassFixture<CustomWebApplicationFactor
         var response = await _client.GetAsync("/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadFromJsonAsync<HealthResponse>();
+        var content = await response.Content.ReadFromJsonAsync<GetHealthResult>();
         content.Should().NotBeNull();
         content!.Status.Should().Be("Healthy");
     }
@@ -52,7 +52,7 @@ public class DatabaseIntegrationTests : IClassFixture<CustomWebApplicationFactor
         var response = await unreachableClient.GetAsync("/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        var content = await response.Content.ReadFromJsonAsync<HealthResponse>();
+        var content = await response.Content.ReadFromJsonAsync<GetHealthResult>();
         content.Should().NotBeNull();
         content!.Status.Should().Be("Unhealthy");
     }

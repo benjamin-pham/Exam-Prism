@@ -1,6 +1,6 @@
 namespace ExamPrism.Tests.Features;
 
-using ExamPrism.Features.Auth;
+using ExamPrism.Endpoints.Auth;
 using ExamPrism.Infrastructure.Identity;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;

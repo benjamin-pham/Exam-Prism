@@ -1,26 +1,19 @@
+using Common.Endpoints;
 using Common.Exceptions;
-using Common.Validation;
 using ExamPrism.Infrastructure;
 using FluentValidation;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
-using Wolverine.Http;
-using Wolverine.Http.FluentValidation;
+using Wolverine.FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseWolverine(opts =>
 {
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
-    if (!builder.Environment.IsDevelopment())
-    {
-        opts.Discovery.CustomizeHandlerDiscovery(actions =>
-        {
-            actions.Excludes.InNamespace("ExamPrism.Features.Test");
-        });
-    }
+    opts.UseFluentValidation();
     opts.UseEntityFrameworkCoreTransactions();
     opts.Policies.AutoApplyTransactions();
 });
@@ -47,8 +40,6 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddLocalization(options => options.ResourcesPath = "Common/Localization/Resources");
 builder.Services.AddProblemDetails();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddTransient(typeof(IProblemDetailSource<>), typeof(CustomProblemDetailSource<>));
-builder.Services.AddWolverineHttp();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
 
@@ -78,10 +69,7 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapWolverineEndpoints(opts =>
-{
-    opts.UseFluentValidationProblemDetailMiddleware();
-});
+app.MapEndpoints();
 
 app.Run();
 
