@@ -52,7 +52,7 @@
   - `ExamPrism.Infrastructure.Caching.ResilientDistributedCache(IDistributedCache inner, ILogger<ResilientDistributedCache> logger) : IBufferDistributedCache`
   - `ExamPrism.Infrastructure.Caching.RedisHealthCheck(IConnectionMultiplexer multiplexer) : IHealthCheck`
 
-- [ ] **Step 1: Add NuGet package versions and project references**
+- [x] **Step 1: Add NuGet package versions and project references**
 
 - In `apps/backend/Directory.Packages.props`:
   - Under `<!-- API Dependencies -->`, add:
@@ -64,7 +64,7 @@
 - In `apps/backend/src/ExamPrism.csproj`, add `<PackageReference>` items for `Microsoft.Extensions.Caching.Hybrid`, `Microsoft.Extensions.Caching.StackExchangeRedis`, and `StackExchange.Redis`.
 - In `apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj`, add `<PackageReference Include="Testcontainers.Redis" />`.
 
-- [ ] **Step 2: Write failing unit tests in `apps/backend/tests/ExamPrism.Tests/Infrastructure/HybridCacheServiceTests.cs`**
+- [x] **Step 2: Write failing unit tests in `apps/backend/tests/ExamPrism.Tests/Infrastructure/HybridCacheServiceTests.cs`**
 
 Create `HybridCacheServiceTests` (`namespace Tests.Infrastructure`) testing:
 - `GetOrCreateAsync_CachesFactoryValue_AndDoesNotReinvokeFactoryWithinTtl`: builds a `ServiceCollection` (`AddLogging()`, `Configure<CacheOptions>(_ => { })`, `AddHybridCache()`, `AddSingleton<ICacheService, HybridCacheService>()`), calls `GetOrCreateAsync("exam:1", ...)` twice, asserts factory invocation count is `1` and value matches.
@@ -74,12 +74,12 @@ Create `HybridCacheServiceTests` (`namespace Tests.Infrastructure`) testing:
 - `ResilientDistributedCache_WhenInnerThrowsRedisExceptionOrTimeout_FailsOpenOnBothStandardAndBufferPaths`: mocks an `IBufferDistributedCache` with `NSubstitute` throwing `new RedisConnectionException(ConnectionFailureType.UnableToConnect, "down")` and `new RedisTimeoutException("timeout", CommandStatus.Unknown)` across `GetAsync`, `TryGetAsync`, `SetAsync` (byte[] and `ReadOnlySequence<byte>`), and `RemoveAsync`; asserts `ResilientDistributedCache` does not throw, returns `null` / `false` on reads, and `HybridCacheService.GetOrCreateAsync` wired over that `ResilientDistributedCache` still executes the factory and returns the value.
 - `RedisHealthCheck_ReturnsHealthyOnPing_AndUnhealthyWhenPingThrows`: mocks `IConnectionMultiplexer` + `IDatabase`; when `PingAsync()` returns `TimeSpan.FromMilliseconds(1)` asserts `HealthStatus.Healthy`; when `PingAsync()` throws `RedisConnectionException` asserts `HealthStatus.Unhealthy`.
 
-- [ ] **Step 3: Run `HybridCacheServiceTests` to verify compilation failure**
+- [x] **Step 3: Run `HybridCacheServiceTests` to verify compilation failure**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~HybridCacheServiceTests"`
 Expected: FAIL (`ICacheService`, `CacheOptions`, `HybridCacheService`, `ResilientDistributedCache`, and `RedisHealthCheck` do not exist yet).
 
-- [ ] **Step 4: Implement `ICacheService`, `CacheOptions`, `HybridCacheService`, `ResilientDistributedCache`, and `RedisHealthCheck`**
+- [x] **Step 4: Implement `ICacheService`, `CacheOptions`, `HybridCacheService`, `ResilientDistributedCache`, and `RedisHealthCheck`**
 
 - Create `apps/backend/src/Common/Caching/ICacheService.cs` with the exact interface in Spec §4.1.
 - Create `apps/backend/src/Infrastructure/Caching/CacheOptions.cs` (`public sealed class CacheOptions` with `public const string SectionName = "Caching";`, `KeyPrefix = "examprism:"`, `DefaultExpirationMinutes = 30`, `DefaultLocalExpirationMinutes = 5`).
@@ -91,12 +91,12 @@ Expected: FAIL (`ICacheService`, `CacheOptions`, `HybridCacheService`, `Resilien
   - Forward buffer operations (`bool TryGet(string key, IBufferWriter<byte> destination)`, `ValueTask<bool> TryGetAsync(...)`, `void Set(string key, ReadOnlySequence<byte> value, ...)`, `ValueTask SetAsync(string key, ReadOnlySequence<byte> value, ...)`) to `_inner as IBufferDistributedCache` (or fallback byte-array conversion if `_inner` is plain `IDistributedCache`), wrapping every sync/async method in `try { ... } catch (Exception ex) when (ex is RedisException or TimeoutException)` that logs `_logger.LogWarning(ex, "Redis L2 cache operation failed for key {CacheKey}; failing open.", key)` and returns `null` / `false` / completes cleanly.
 - Create `apps/backend/src/Infrastructure/Caching/RedisHealthCheck.cs` implementing `IHealthCheck.CheckHealthAsync`: awaits `multiplexer.GetDatabase().PingAsync()` and returns `HealthCheckResult.Healthy()`, catching `Exception ex` (except `OperationCanceledException` when `cancellationToken.IsCancellationRequested`) and returning `HealthCheckResult.Unhealthy("Redis connection failed.", ex)`.
 
-- [ ] **Step 5: Run `HybridCacheServiceTests` to verify all tests pass**
+- [x] **Step 5: Run `HybridCacheServiceTests` to verify all tests pass**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~HybridCacheServiceTests"`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/backend/Directory.Packages.props apps/backend/src/ExamPrism.csproj apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj apps/backend/src/Common/Caching/ICacheService.cs apps/backend/src/Infrastructure/Caching apps/backend/tests/ExamPrism.Tests/Infrastructure/HybridCacheServiceTests.cs
@@ -123,7 +123,7 @@ git commit -m "feat(caching): add ICacheService, HybridCacheService, fail-open R
   - `ExamPrism.Infrastructure.RateLimiting.InMemoryFixedWindowRateLimiter(int permitLimit, TimeSpan window, TimeProvider timeProvider) : RateLimiter`
   - `ExamPrism.Infrastructure.RateLimiting.RedisFixedWindowRateLimiter(IConnectionMultiplexer multiplexer, string redisKeyPrefix, int permitLimit, TimeSpan window, TimeProvider timeProvider, ILogger logger) : RateLimiter`
 
-- [ ] **Step 1: Write failing unit tests in `apps/backend/tests/ExamPrism.Tests/Infrastructure/RateLimiterUnitTests.cs`**
+- [x] **Step 1: Write failing unit tests in `apps/backend/tests/ExamPrism.Tests/Infrastructure/RateLimiterUnitTests.cs`**
 
 Create `RateLimiterUnitTests` (`namespace Tests.Infrastructure`) testing:
 - `InMemoryFixedWindowRateLimiter_AcquiresUpToPermitLimit_RejectsWithPositiveRetryAfter_AndResetsOnWindowAdvance`: uses `FakeTimeProvider` at `2026-11-01T12:00:15Z` with `permitLimit: 2`, `window: TimeSpan.FromSeconds(60)`; asserts first 2 `AcquireAsync(1)` return `IsAcquired == true`, 3rd returns `IsAcquired == false` with `TryGetMetadata(MetadataName.RetryAfter, out var retry)` == `true` and `retry == TimeSpan.FromSeconds(45)`; advances `FakeTimeProvider` by `45` seconds and asserts next `AcquireAsync(1)` returns `IsAcquired == true`.
@@ -131,12 +131,12 @@ Create `RateLimiterUnitTests` (`namespace Tests.Infrastructure`) testing:
 - `RedisFixedWindowRateLimiter_EvaluatesAtomicLuaScript_EnforcesPermitLimit_AndResetsBucketOnTimeAdvance`: mocks `IConnectionMultiplexer` + `IDatabase.ScriptEvaluateAsync(...)` with `NSubstitute` returning `RedisResult.Create(1L)`, `RedisResult.Create(2L)`, then `RedisResult.Create(3L)` for `permitLimit: 2`, `window: TimeSpan.FromSeconds(60)` and `redisKeyPrefix: "examprism:ratelimit:auth:ip:127.0.0.1"`; verifies `KEYS[0]` includes the computed window bucket, `ARGV[1] == 60000`, 3rd call returns `IsAcquired == false` with `MetadataName.RetryAfter`, and advancing `FakeTimeProvider` by 60 seconds changes `KEYS[0]` to the next bucket.
 - `RedisFixedWindowRateLimiter_WhenRedisThrowsConnectionOrTimeoutException_FailsOpenAndAcquiresLease`: configures `IDatabase.ScriptEvaluateAsync` to throw `new RedisConnectionException(ConnectionFailureType.SocketFailure, "lost")` and `new RedisTimeoutException("timeout", CommandStatus.Unknown)`; asserts `AcquireAsync(1)` does not throw and returns `lease.IsAcquired == true`.
 
-- [ ] **Step 2: Run `RateLimiterUnitTests` to verify compilation failure**
+- [x] **Step 2: Run `RateLimiterUnitTests` to verify compilation failure**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~RateLimiterUnitTests"`
 Expected: FAIL (`InMemoryFixedWindowRateLimiter` and `RedisFixedWindowRateLimiter` do not exist yet).
 
-- [ ] **Step 3: Implement `RateLimitPolicies`, `RateLimitingOptions`, `InMemoryFixedWindowRateLimiter`, and `RedisFixedWindowRateLimiter`**
+- [x] **Step 3: Implement `RateLimitPolicies`, `RateLimitingOptions`, `InMemoryFixedWindowRateLimiter`, and `RedisFixedWindowRateLimiter`**
 
 - Create `apps/backend/src/Common/RateLimiting/RateLimitPolicies.cs` and `apps/backend/src/Infrastructure/RateLimiting/RateLimitingOptions.cs` per Spec §3.2 & §5.1.
 - Implement `apps/backend/src/Infrastructure/RateLimiting/InMemoryFixedWindowRateLimiter.cs`:
@@ -148,12 +148,12 @@ Expected: FAIL (`InMemoryFixedWindowRateLimiter` and `RedisFixedWindowRateLimite
   - Use the exact atomic Lua script in Spec §5.3 (`INCRBY` + conditional `PEXPIRE` when `current == tonumber(ARGV[1]) or redis.call('PTTL', KEYS[1]) < 0`).
   - In `AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)`: compute `bucket` and `retryAfter` from `_timeProvider.GetUtcNow().UtcTicks`, key `$"{_redisKeyPrefix}:{bucket}"`, `windowMs = Math.Max(1L, (long)Math.Ceiling(_window.TotalMilliseconds))`, evaluate script via `_multiplexer.GetDatabase().ScriptEvaluateAsync(...)`, return acquired lease when `(long)result <= _permitLimit` else rejected lease with `MetadataName.RetryAfter = retryAfter`; catch `(Exception ex) when (ex is RedisException or TimeoutException)` -> `_logger.LogWarning(ex, "Redis rate limiter failed for key {RateLimitKey}; failing open.", key)` and return acquired lease. (Implement `AttemptAcquireCore` symmetrically via synchronous `ScriptEvaluate` with the same `try`/`catch` fail-open guard.)
 
-- [ ] **Step 4: Run `RateLimiterUnitTests` to verify all tests pass**
+- [x] **Step 4: Run `RateLimiterUnitTests` to verify all tests pass**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~RateLimiterUnitTests"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/backend/src/Common/RateLimiting/RateLimitPolicies.cs apps/backend/src/Infrastructure/RateLimiting apps/backend/tests/ExamPrism.Tests/Infrastructure/RateLimiterUnitTests.cs
@@ -187,7 +187,7 @@ git commit -m "feat(rate-limiting): add TimeProvider-driven in-memory and fail-o
   - Updated `Program.cs` pipeline (`app.UseRateLimiter()` between `app.UseAuthentication()` and `app.UseAuthorization()`)
   - Rate-limit metadata on `GetHealthEndpoint` (`.DisableRateLimiting()`) and `LoginEndpoint` / `RegisterEndpoint` / `RefreshEndpoint` (`.RequireRateLimiting(RateLimitPolicies.Auth)`)
 
-- [ ] **Step 1: Write failing DI and HTTP integration tests in `DependencyInjectionTests.cs` and `RateLimitingIntegrationTests.cs`**
+- [x] **Step 1: Write failing DI and HTTP integration tests in `DependencyInjectionTests.cs` and `RateLimitingIntegrationTests.cs`**
 
 - In `apps/backend/tests/ExamPrism.Tests/Infrastructure/DependencyInjectionTests.cs`, add:
   - `AddInfrastructure_WhenRedisConnectionStringOmittedOrWhitespace_RegistersInMemoryHybridCacheOnly_WithoutRedisOrRedisHealthCheck` (`Theory` over `null`, `""`, `"   "`): asserts `provider.GetService<Common.Caching.ICacheService>()` is `HybridCacheService`, `provider.GetService<IConnectionMultiplexer>()` is `null`, `provider.GetService<IDistributedCache>()` is `null`, and `IOptions<HealthCheckServiceOptions>().Value.Registrations` contains `"database"` and does **not** contain `"redis"`.
@@ -197,12 +197,12 @@ git commit -m "feat(rate-limiting): add TimeProvider-driven in-memory and fail-o
   - `GlobalLimiter_PartitionsByAuthenticatedUserId_SeparatelyFromOtherUsersAndAnonymousIp`: registers User A and User B, calls `GET /api/auth/me` 3 times as User A (`200 OK`) and a 4th time as User A (`429`), then immediately calls `GET /api/auth/me` as User B -> asserts `200 OK` (proving `user:{userA}` did not exhaust `user:{userB}`'s quota, and `Register` under `"auth"` policy did not deduct from Global quota).
   - `HealthEndpoint_IsNeverRateLimited_EvenAfterAuthAndGlobalQuotasAreExhausted`: calls `GET /health` 10 times after `429` has already triggered on `/api/auth/login` and `/api/auth/me` -> asserts every `/health` response is `200 OK`.
 
-- [ ] **Step 2: Run the new DI and integration tests to verify they fail**
+- [x] **Step 2: Run the new DI and integration tests to verify they fail**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~AddInfrastructure_WhenRedis|FullyQualifiedName~RateLimitingIntegrationTests"`
 Expected: FAIL (`ICacheService` not registered in `AddInfrastructure` and rate limiting not wired).
 
-- [ ] **Step 3: Implement localization keys, `appsettings.json`, `RateLimitingSetup`, `DependencyInjection`, `Program.cs`, endpoint attributes, and `CustomWebApplicationFactory` test limits**
+- [x] **Step 3: Implement localization keys, `appsettings.json`, `RateLimitingSetup`, `DependencyInjection`, `Program.cs`, endpoint attributes, and `CustomWebApplicationFactory` test limits**
 
 - Add `<data name="RateLimitExceeded" xml:space="preserve">` to `SharedResources.resx` (`"Too many requests. Please try again later."`) and `SharedResources.vi.resx` (`"Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau."`).
 - Update `apps/backend/src/appsettings.json` with `"Redis": ""` under `"ConnectionStrings"`, plus `"Caching"` and `"RateLimiting"` sections matching Spec §3.
@@ -228,12 +228,12 @@ Expected: FAIL (`ICacheService` not registered in `AddInfrastructure` and rate l
 - Attach `.DisableRateLimiting()` in `GetHealthEndpoint.cs`, and `.RequireRateLimiting(RateLimitPolicies.Auth)` in `LoginEndpoint.cs`, `RegisterEndpoint.cs`, and `RefreshEndpoint.cs`.
 - In `apps/backend/tests/ExamPrism.Tests/Infrastructure/CustomWebApplicationFactory.cs`, add `builder.UseSetting("RateLimiting:Global:PermitLimit", "10000");` and `builder.UseSetting("RateLimiting:Auth:PermitLimit", "10000");` inside `ConfigureWebHost` so existing multi-request functional suites like `AuthEndpointTests` remain unthrottled by default.
 
-- [ ] **Step 4: Run DI tests, `RateLimitingIntegrationTests`, and `AuthEndpointTests` to verify they pass**
+- [x] **Step 4: Run DI tests, `RateLimitingIntegrationTests`, and `AuthEndpointTests` to verify they pass**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~DependencyInjectionTests|FullyQualifiedName~RateLimitingIntegrationTests|FullyQualifiedName~AuthEndpointTests|FullyQualifiedName~HealthEndpointTests"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/backend/src/Common/Localization/Resources apps/backend/src/appsettings.json apps/backend/src/Infrastructure apps/backend/src/Program.cs apps/backend/src/Endpoints apps/backend/tests/ExamPrism.Tests/Infrastructure/CustomWebApplicationFactory.cs apps/backend/tests/ExamPrism.Tests/Infrastructure/DependencyInjectionTests.cs apps/backend/tests/ExamPrism.Tests/Infrastructure/RateLimitingIntegrationTests.cs
@@ -253,7 +253,7 @@ git commit -m "feat(infrastructure): wire conditional Redis/in-memory HybridCach
   - `Tests.Infrastructure.RedisWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime` (boots `postgres:17-alpine` + `redis:7-alpine`, configures `ConnectionStrings:DefaultConnection`, `ConnectionStrings:Redis`, `RateLimiting:Auth:PermitLimit = 2`, `RateLimiting:Global:PermitLimit = 3`)
   - `Tests.Infrastructure.RedisIntegrationTests` verifying L2 Redis persistence, distributed Redis rate limiting, `/health` Redis monitoring, and live runtime fail-open when Redis disconnects
 
-- [ ] **Step 1: Write `RedisIntegrationTests` in `apps/backend/tests/ExamPrism.Tests/Infrastructure/RedisIntegrationTests.cs`**
+- [x] **Step 1: Write `RedisIntegrationTests` in `apps/backend/tests/ExamPrism.Tests/Infrastructure/RedisIntegrationTests.cs`**
 
 Create `RedisWebApplicationFactory` and `RedisIntegrationTests` (`IClassFixture<RedisWebApplicationFactory>`) testing:
 - `CacheService_WithRedisConfigured_PersistsEntriesToRedisL2WithConfiguredKeyPrefix`: resolves `ICacheService` and `IConnectionMultiplexer`, calls `await cache.SetAsync("quiz:42", new QuizCacheProbe("Math", 50))`, asserts `await multiplexer.GetDatabase().KeyExistsAsync("examprism:quiz:42")` is `true`, and `await cache.GetOrDefaultAsync<QuizCacheProbe>("quiz:42")` returns the expected record.
@@ -261,17 +261,17 @@ Create `RedisWebApplicationFactory` and `RedisIntegrationTests` (`IClassFixture<
 - `HealthEndpoint_WithRedisConfigured_Returns200HealthyWhenRedisUp`: calls `GET /health` and asserts `200 OK` with `Status == "Healthy"`.
 - `UnreachableRedis_ReportsUnhealthy503OnHealthEndpoint_WhileApiEndpointsFailOpenWithout500`: uses `WithWebHostBuilder` overriding `ConnectionStrings:Redis` to an unreachable local port (`"127.0.0.1:6399,connectTimeout=200,syncTimeout=200"`), asserts `GET /health` returns `503 ServiceUnavailable` with `Status == "Unhealthy"`, while `POST /api/auth/login` with wrong credentials still fails open through the Redis rate limiter and returns `401 Unauthorized` (never `500`), and `ICacheService.GetOrCreateAsync` still executes its factory and returns the value.
 
-- [ ] **Step 2: Run `RedisIntegrationTests` to verify real Redis L2 + Redis Lua rate-limiting + `/health` pass**
+- [x] **Step 2: Run `RedisIntegrationTests` to verify real Redis L2 + Redis Lua rate-limiting + `/health` pass**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~RedisIntegrationTests"`
 Expected: PASS.
 
-- [ ] **Step 3: Run `ArchitectureTests` and the entire test solution**
+- [x] **Step 3: Run `ArchitectureTests` and the entire test solution**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx`
 Expected: PASS across all unit, architecture, in-memory integration, and Redis Testcontainers integration tests with 0 warnings and 0 errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/backend/tests/ExamPrism.Tests/Infrastructure/RedisIntegrationTests.cs
