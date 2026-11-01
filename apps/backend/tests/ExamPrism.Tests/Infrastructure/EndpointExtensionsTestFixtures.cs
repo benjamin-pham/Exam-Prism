@@ -12,3 +12,4 @@ public class DevOnlyFixtureEndpoint : IEndpoint
         app.MapGet("/test-discovery/dev-only-fixture", () => Results.Ok("dev-only"));
     }
 }
+

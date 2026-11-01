@@ -43,3 +43,4 @@ public sealed class RefreshEndpoint : IEndpoint
         return Results.Ok();
     }
 }
+

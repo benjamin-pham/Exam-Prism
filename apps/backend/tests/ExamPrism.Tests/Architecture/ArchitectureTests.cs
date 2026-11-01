@@ -136,6 +136,16 @@ public class ArchitectureTests
 
         foreach (var type in featureTypes)
         {
+            if (type.BaseType != null && type.BaseType != typeof(object))
+            {
+                AssertNotForbidden(type.BaseType, type, "BaseType", forbiddenPrefixes);
+            }
+
+            foreach (var iface in type.GetInterfaces())
+            {
+                AssertNotForbidden(iface, type, $"Interface {iface.Name}", forbiddenPrefixes);
+            }
+
             var members = type.GetMembers(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
 
@@ -181,6 +191,18 @@ public class ArchitectureTests
             ep.Name.Should().Match(n => n.EndsWith("Endpoint") || n.EndsWith("Endpoints"),
                 $"{ep.FullName} must end with 'Endpoint' or 'Endpoints'");
 
+            var constructors = ep.GetConstructors(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+
+            foreach (var ctor in constructors)
+            {
+                foreach (var p in ctor.GetParameters())
+                {
+                    typeof(Microsoft.EntityFrameworkCore.DbContext).IsAssignableFrom(p.ParameterType).Should().BeFalse(
+                        $"{ep.FullName} constructor must not inject DbContext directly");
+                }
+            }
+
             var methods = ep.GetMethods(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
 
@@ -188,8 +210,8 @@ public class ArchitectureTests
             {
                 foreach (var p in m.GetParameters())
                 {
-                    p.ParameterType.Should().NotBe(typeof(AppDbContext),
-                        $"{ep.FullName}.{m.Name} must not inject AppDbContext directly");
+                    typeof(Microsoft.EntityFrameworkCore.DbContext).IsAssignableFrom(p.ParameterType).Should().BeFalse(
+                        $"{ep.FullName}.{m.Name} must not inject DbContext directly");
                 }
             }
         }

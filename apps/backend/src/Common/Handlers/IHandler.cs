@@ -8,3 +8,4 @@ using Wolverine;
 /// and automated architectural verification while preserving static method injection.
 /// </summary>
 public interface IHandler : IWolverineHandler;
+

@@ -31,3 +31,4 @@ public sealed class RegisterEndpoint : IEndpoint
         return Results.Created("/api/auth/me", result);
     }
 }
+

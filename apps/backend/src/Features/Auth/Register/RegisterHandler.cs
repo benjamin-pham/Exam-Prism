@@ -79,3 +79,4 @@ public sealed class RegisterHandler : IHandler
         return new RegisterResult(user.Id, user.Email!, accessToken, rawRefresh);
     }
 }
+

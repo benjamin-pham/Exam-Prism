@@ -58,4 +58,16 @@ public class BusValidationTests
 
         await host.StopAsync();
     }
+
+    [Fact]
+    public void ProductionAuthCommands_HaveRegisteredValidators()
+    {
+        var services = new ServiceCollection();
+        services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
+        var provider = services.BuildServiceProvider();
+
+        provider.GetService<IValidator<ExamPrism.Features.Auth.Register.RegisterCommand>>().Should().NotBeNull();
+        provider.GetService<IValidator<ExamPrism.Features.Auth.Login.LoginCommand>>().Should().NotBeNull();
+    }
 }
+

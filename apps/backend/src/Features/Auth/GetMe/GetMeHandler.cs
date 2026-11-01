@@ -28,3 +28,4 @@ public sealed class GetMeHandler : IHandler
         return new GetMeResult(user.Id, user.Email!);
     }
 }
+

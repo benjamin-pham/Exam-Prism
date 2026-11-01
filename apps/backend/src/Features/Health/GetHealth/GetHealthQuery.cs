@@ -8,3 +8,4 @@ public record GetHealthResult(
     string Status,
     DateTime Timestamp,
     [property: JsonIgnore] bool IsHealthy = true);
+

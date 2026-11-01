@@ -71,3 +71,4 @@ public sealed class RefreshTokenHandler : IHandler
         return new RefreshTokenResult(newAccessToken, newRaw);
     }
 }
+

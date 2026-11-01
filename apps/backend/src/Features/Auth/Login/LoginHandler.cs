@@ -50,3 +50,4 @@ public sealed class LoginHandler : IHandler
         return new LoginResult(user.Id, user.Email!, accessToken, rawRefresh);
     }
 }
+

@@ -25,3 +25,4 @@ public sealed class GetMeEndpoint : IEndpoint
         return Results.Ok(result);
     }
 }
+

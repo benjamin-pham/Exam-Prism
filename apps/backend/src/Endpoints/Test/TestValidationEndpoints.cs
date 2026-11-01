@@ -38,5 +38,9 @@ public sealed class TestValidationEndpoints : IEndpoint
 
         group.MapPost("/unvalidated", (UnvalidatedRequest request) =>
             Results.Ok(new { message = "Unvalidated", info = request.Info }));
+
+        group.MapPost("/multi-param", (TestValidationRequest request, [Microsoft.AspNetCore.Mvc.FromServices] Common.Security.IUserContext? userContext) =>
+            Results.Ok(new { message = "MultiParam", name = request.Name }));
     }
 }
+

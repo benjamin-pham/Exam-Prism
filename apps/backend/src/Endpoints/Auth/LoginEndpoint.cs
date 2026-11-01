@@ -31,3 +31,4 @@ public sealed class LoginEndpoint : IEndpoint
         return Results.Ok(result);
     }
 }
+

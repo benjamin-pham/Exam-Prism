@@ -15,3 +15,4 @@ public sealed class GetHealthHandler : IHandler
         return new GetHealthResult(report.Status.ToString(), DateTime.UtcNow, isHealthy);
     }
 }
+
