@@ -37,16 +37,13 @@ To support shared application strings (validation messages, common error descrip
 * `Common/Localization/Resources/SharedResources.resx`: Neutral / English fallback strings.
 * `Common/Localization/Resources/SharedResources.vi.resx`: Vietnamese localized strings.
 
-Initial localized keys:
-* `StudentIdsRequired`:
-  * `SharedResources.resx`: `"Student IDs list cannot be empty."`
-  * `SharedResources.vi.resx`: `"Danh sách mã sinh viên không được để trống."`
-* `DuplicateStudentIds`:
-  * `SharedResources.resx`: `"Duplicate student IDs are not allowed."`
-  * `SharedResources.vi.resx`: `"Danh sách chứa mã sinh viên trùng lặp."`
+Initial shared localized keys:
 * `InternalServerError`:
   * `SharedResources.resx`: `"An unexpected error occurred. Please try again later."`
   * `SharedResources.vi.resx`: `"Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau."`
+* `ValidationErrorOccurred`:
+  * `SharedResources.resx`: `"One or more validation errors occurred."`
+  * `SharedResources.vi.resx`: `"Một hoặc nhiều lỗi xác thực dữ liệu đã xảy ra."`
 
 ### 3.2. Service and Middleware Configuration
 In `Program.cs`:
@@ -67,22 +64,19 @@ app.UseRequestLocalization(localizationOptions);
 
 ## 4. FluentValidation & Automatic Endpoint Filter Architecture
 
-### 4.1. Validator Definition Pattern
-Validators inherit from `AbstractValidator<T>` and inject `IStringLocalizer<SharedResources>`:
+### 4.1. Validator Definition Pattern (Illustrative)
+Feature validators inherit from `AbstractValidator<T>` and inject `IStringLocalizer<SharedResources>` (or feature-specific localizers) to return localized messages alongside custom error codes:
 ```csharp
-public class RemoveStudentsValidator : AbstractValidator<RemoveStudentsRequest>
-{
-    public RemoveStudentsValidator(IStringLocalizer<SharedResources> localizer)
-    {
-        RuleFor(x => x.StudentIds)
-            .NotEmpty()
-            .WithErrorCode("STUDENT_IDS_REQUIRED")
-            .WithMessage(_ => localizer["StudentIdsRequired"]);
+public record ExampleRequest(string Name);
 
-        RuleFor(x => x.StudentIds)
-            .Must(ids => ids == null || ids.Distinct().Count() == ids.Count)
-            .WithErrorCode("DUPLICATE_STUDENT_IDS")
-            .WithMessage(_ => localizer["DuplicateStudentIds"]);
+public class ExampleRequestValidator : AbstractValidator<ExampleRequest>
+{
+    public ExampleRequestValidator(IStringLocalizer<SharedResources> localizer)
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty()
+            .WithErrorCode("NAME_REQUIRED")
+            .WithMessage(_ => localizer["NameRequired"]);
     }
 }
 ```
@@ -131,13 +125,13 @@ Validation failures return HTTP 400 with structured `errors` containing `field`,
   "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
   "title": "One or more validation errors occurred.",
   "status": 400,
-  "instance": "/api/students/remove",
+  "instance": "/api/example",
   "traceId": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
   "errors": [
     {
-      "field": "StudentIds",
-      "code": "STUDENT_IDS_REQUIRED",
-      "message": "Danh sách mã sinh viên không được để trống."
+      "field": "Name",
+      "code": "NAME_REQUIRED",
+      "message": "Tên không được để trống."
     }
   ]
 }
@@ -220,3 +214,4 @@ apps/backend/
    * Custom `NotFoundException` yields 404 status code with ProblemDetails.
 4. **Full Regression**:
    * Run `dotnet test` on the entire test solution to verify existing authentication and health endpoints remain unaffected.
+
