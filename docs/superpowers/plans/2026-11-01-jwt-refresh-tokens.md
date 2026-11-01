@@ -45,7 +45,7 @@
   - `RefreshToken` entity with `Guid Id`, `Guid UserId`, `ApplicationUser User`, `string TokenHash`, `DateTimeOffset ExpiresAt`, `DateTimeOffset CreatedAt`, `DateTimeOffset? RevokedAt`, `string? ReplacedByTokenHash`, `bool IsExpired(TimeProvider)`, `bool IsRevoked`, `bool IsActive(TimeProvider)`.
   - `AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>` with `DbSet<RefreshToken> RefreshTokens`.
 
-- [ ] **Step 1: Write failing unit test for `RefreshToken` lifecycle properties**
+- [x] **Step 1: Write failing unit test for `RefreshToken` lifecycle properties**
 
 Create `apps/backend/tests/ExamPrism.Tests/Identity/RefreshTokenTests.cs`:
 ```csharp
@@ -105,12 +105,12 @@ public class RefreshTokenTests
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails compilation**
+- [x] **Step 2: Run test to verify it fails compilation**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter FullyQualifiedName~RefreshTokenTests`  
 Expected: Compilation failure (types do not exist yet).
 
-- [ ] **Step 3: Add package dependencies in `Directory.Packages.props` and `ExamPrism.csproj`**
+- [x] **Step 3: Add package dependencies in `Directory.Packages.props` and `ExamPrism.csproj`**
 
 In `apps/backend/Directory.Packages.props`:
 Add:
@@ -131,7 +131,7 @@ Add:
 <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
 ```
 
-- [ ] **Step 4: Implement `ApplicationUser`, `RefreshToken`, and update `AppDbContext`**
+- [x] **Step 4: Implement `ApplicationUser`, `RefreshToken`, and update `AppDbContext`**
 
 Create `apps/backend/src/Infrastructure/Identity/ApplicationUser.cs`:
 ```csharp
@@ -200,12 +200,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 }
 ```
 
-- [ ] **Step 5: Run unit tests to verify they pass**
+- [x] **Step 5: Run unit tests to verify they pass**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter FullyQualifiedName~RefreshTokenTests`  
 Expected: PASS (3 tests passed).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/backend/Directory.Packages.props apps/backend/src/ExamPrism.csproj apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj apps/backend/src/Infrastructure/Identity/ apps/backend/src/Infrastructure/Persistence/AppDbContext.cs apps/backend/tests/ExamPrism.Tests/Identity/RefreshTokenTests.cs
@@ -231,7 +231,7 @@ git commit -m "feat(identity): add ApplicationUser, RefreshToken, and IdentityDb
     - `(string RawToken, string TokenHash) GenerateRefreshToken()`
     - `string HashToken(string rawToken)`
 
-- [ ] **Step 1: Write failing unit test for `TokenService`**
+- [x] **Step 1: Write failing unit test for `TokenService`**
 
 Create `apps/backend/tests/ExamPrism.Tests/Identity/TokenServiceTests.cs`:
 ```csharp
@@ -295,12 +295,12 @@ public class TokenServiceTests
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails compilation**
+- [x] **Step 2: Run test to verify it fails compilation**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter FullyQualifiedName~TokenServiceTests`  
 Expected: Compilation failure (types do not exist yet).
 
-- [ ] **Step 3: Implement `JwtOptions`, `ITokenService`, and `TokenService`**
+- [x] **Step 3: Implement `JwtOptions`, `ITokenService`, and `TokenService`**
 
 Create `apps/backend/src/Infrastructure/Identity/JwtOptions.cs`:
 ```csharp
@@ -395,12 +395,12 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter FullyQualifiedName~TokenServiceTests`  
 Expected: PASS (2 tests passed).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/backend/src/Infrastructure/Identity/JwtOptions.cs apps/backend/src/Infrastructure/Identity/ITokenService.cs apps/backend/src/Infrastructure/Identity/TokenService.cs apps/backend/tests/ExamPrism.Tests/Identity/TokenServiceTests.cs
@@ -426,7 +426,7 @@ git commit -m "feat(identity): implement JwtOptions and TokenService with CSPRNG
   - Authorization configured.
   - `Program.cs` calling `app.UseAuthentication()` and `app.UseAuthorization()`.
 
-- [ ] **Step 1: Write failing test in `DependencyInjectionTests.cs` for Identity and TokenService resolution**
+- [x] **Step 1: Write failing test in `DependencyInjectionTests.cs` for Identity and TokenService resolution**
 
 Update `apps/backend/tests/ExamPrism.Tests/Infrastructure/DependencyInjectionTests.cs`:
 Add tests asserting that `UserManager<ApplicationUser>` and `ITokenService` resolve from service provider.
@@ -455,12 +455,12 @@ public void AddInfrastructure_RegistersIdentityAndTokenService()
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter FullyQualifiedName~RegistersIdentityAndTokenService`  
 Expected: FAIL (Services not registered).
 
-- [ ] **Step 3: Update `DependencyInjection.cs`, `Program.cs`, and `appsettings.json`**
+- [x] **Step 3: Update `DependencyInjection.cs`, `Program.cs`, and `appsettings.json`**
 
 In `apps/backend/src/appsettings.json` and `appsettings.Development.json`:
 Add `"Jwt"` section:
@@ -541,12 +541,12 @@ app.UseAuthentication();
 app.UseAuthorization();
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj`  
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/backend/src/Infrastructure/DependencyInjection.cs apps/backend/src/Program.cs apps/backend/src/appsettings.json apps/backend/src/appsettings.Development.json apps/backend/tests/ExamPrism.Tests/Infrastructure/DependencyInjectionTests.cs
@@ -571,7 +571,7 @@ git commit -m "feat(auth): configure Identity, JwtBearer with cookie support, an
     - `SetAuthCookies(HttpResponse response, string accessToken, string rawRefreshToken, JwtOptions options, TimeProvider timeProvider)`
     - `ClearAuthCookies(HttpResponse response)`
 
-- [ ] **Step 1: Write failing unit test for `AuthCookieHelper`**
+- [x] **Step 1: Write failing unit test for `AuthCookieHelper`**
 
 Create `apps/backend/tests/ExamPrism.Tests/Endpoints/AuthCookieHelperTests.cs`:
 ```csharp
@@ -624,12 +624,12 @@ public class AuthCookieHelperTests
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails compilation**
+- [x] **Step 2: Run test to verify it fails compilation**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter FullyQualifiedName~AuthCookieHelperTests`  
 Expected: Compilation failure.
 
-- [ ] **Step 3: Implement `AuthDtos.cs` and `AuthCookieHelper.cs`**
+- [x] **Step 3: Implement `AuthDtos.cs` and `AuthCookieHelper.cs`**
 
 Create `apps/backend/src/Endpoints/Auth/AuthDtos.cs`:
 ```csharp
@@ -709,12 +709,12 @@ public static class AuthCookieHelper
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter FullyQualifiedName~AuthCookieHelperTests`  
 Expected: PASS (2 tests passed).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/backend/src/Endpoints/Auth/AuthDtos.cs apps/backend/src/Endpoints/Auth/AuthCookieHelper.cs apps/backend/tests/ExamPrism.Tests/Endpoints/AuthCookieHelperTests.cs
@@ -739,7 +739,7 @@ git commit -m "feat(auth): add AuthDtos and AuthCookieHelper"
     - `POST /logout`: Revokes token, deletes cookies, returns `204 No Content`.
     - `GET /me`: Authenticated endpoint, returns `200 OK` with `UserResponse`.
 
-- [ ] **Step 1: Implement `AuthEndpoints.cs`**
+- [x] **Step 1: Implement `AuthEndpoints.cs`**
 
 Create `apps/backend/src/Endpoints/Auth/AuthEndpoints.cs`:
 ```csharp
@@ -979,12 +979,12 @@ public class AuthEndpoints : IEndpoint
 }
 ```
 
-- [ ] **Step 2: Build solution to ensure clean compilation**
+- [x] **Step 2: Build solution to ensure clean compilation**
 
 Run: `dotnet build apps/backend/ExamPrism.slnx`  
 Expected: Build succeeded with 0 errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/backend/src/Endpoints/Auth/AuthEndpoints.cs
@@ -1008,11 +1008,11 @@ git commit -m "feat(auth): implement register, login, refresh with rotation, log
   - Review Focus 4: Duplicate email returns 400.
   - Review Focus 5: Logout clears cookies and marks token revoked.
 
-- [ ] **Step 1: Ensure DB schema creation in `CustomWebApplicationFactory`**
+- [x] **Step 1: Ensure DB schema creation in `CustomWebApplicationFactory`**
 
 Verify and ensure `CustomWebApplicationFactory` calls `context.Database.EnsureCreatedAsync()` after starting the container so Identity and `RefreshToken` tables exist during test execution.
 
-- [ ] **Step 2: Write tests in `apps/backend/tests/ExamPrism.Tests/Endpoints/AuthEndpointTests.cs`**
+- [x] **Step 2: Write tests in `apps/backend/tests/ExamPrism.Tests/Endpoints/AuthEndpointTests.cs`**
 
 Write test methods:
 1. `Register_ValidInput_Returns201AndSetsCookiesAndCreatesUserInDb`
@@ -1026,19 +1026,20 @@ Write test methods:
 9. `GetMe_WithValidCookie_Returns200AndUser`
 10. `GetMe_WithBearerHeader_Returns200AndUser`
 
-- [ ] **Step 3: Run integration test suite**
+- [x] **Step 3: Run integration test suite**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter FullyQualifiedName~AuthEndpointTests`  
 Expected: PASS (all tests pass on PostgreSQL testcontainer).
 
-- [ ] **Step 4: Run full backend test suite**
+- [x] **Step 4: Run full backend test suite**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj`  
 Expected: All tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/backend/tests/ExamPrism.Tests/apps/backend/tests/ExamPrism.Tests/Infrastructure/CustomWebApplicationFactory.cs apps/backend/tests/ExamPrism.Tests/Endpoints/AuthEndpointTests.cs
 git commit -m "test(auth): add integration tests for auth endpoints and token rotation on PostgreSQL"
 ```
+

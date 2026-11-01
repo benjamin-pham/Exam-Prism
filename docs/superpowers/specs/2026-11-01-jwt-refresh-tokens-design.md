@@ -214,3 +214,4 @@ Group: `/api/auth` (registered via `IEndpoint`)
   9. `GetMe_Unauthenticated_Returns401`
   10. `GetMe_WithValidCookie_Returns200AndUserData`
   11. `GetMe_WithBearerHeader_Returns200AndUserData`
+
