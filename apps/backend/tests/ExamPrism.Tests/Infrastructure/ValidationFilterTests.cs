@@ -115,7 +115,7 @@ public class ValidationFilterTests : IClassFixture<CustomWebApplicationFactory>
             RequestServices = scope.ServiceProvider
         };
 
-        var endpointMethod = ((Delegate)((ExamPrism.Endpoints.Test.TestValidationRequest req) => Microsoft.AspNetCore.Http.Results.Ok())).Method;
+        var endpointMethod = ((Delegate)((ExamPrism.Features.Test.TestValidationRequest req) => Microsoft.AspNetCore.Http.Results.Ok())).Method;
         var factoryContext = new Microsoft.AspNetCore.Http.EndpointFilterFactoryContext
         {
             MethodInfo = endpointMethod,

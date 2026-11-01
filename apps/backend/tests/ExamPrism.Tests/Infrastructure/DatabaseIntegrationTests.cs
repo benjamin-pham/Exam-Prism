@@ -2,7 +2,7 @@ namespace Tests.Infrastructure;
 
 using System.Net;
 using System.Net.Http.Json;
-using Endpoints;
+using ExamPrism.Features.Health;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;

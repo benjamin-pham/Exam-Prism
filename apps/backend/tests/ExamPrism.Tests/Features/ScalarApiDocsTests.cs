@@ -1,4 +1,4 @@
-namespace ExamPrism.Tests.Endpoints;
+namespace ExamPrism.Tests.Features;
 
 using System.Net;
 using System.Text.Json.Nodes;

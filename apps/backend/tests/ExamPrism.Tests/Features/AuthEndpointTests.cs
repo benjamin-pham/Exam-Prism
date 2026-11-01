@@ -1,4 +1,4 @@
-namespace ExamPrism.Tests.Endpoints;
+namespace ExamPrism.Tests.Features;
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
@@ -6,7 +6,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
-using ExamPrism.Endpoints.Auth;
+using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;

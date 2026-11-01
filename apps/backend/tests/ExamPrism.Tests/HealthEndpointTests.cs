@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using Endpoints;
+using ExamPrism.Features.Health;
 using FluentAssertions;
 using Tests.Infrastructure;
 using Xunit;
