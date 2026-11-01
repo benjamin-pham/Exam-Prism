@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using ExamPrism.Api.Endpoints;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -14,10 +15,13 @@ public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         _client = factory.CreateClient();
     }
 
-    [Fact]
-    public async Task GetHealth_ReturnsOk_WithHealthyStatus()
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/Health")]
+    [InlineData("/HEALTH")]
+    public async Task GetHealth_HandlesCaseVariations(string path)
     {
-        var response = await _client.GetAsync("/health");
+        var response = await _client.GetAsync(path);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var content = await response.Content.ReadFromJsonAsync<HealthResponse>();
@@ -25,6 +29,13 @@ public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal("Healthy", content.Status);
     }
 
-    private record HealthResponse(string Status, DateTime Timestamp);
-}
+    [Fact]
+    public async Task GetOpenApi_ReturnsOk_InDevelopment()
+    {
+        var response = await _client.GetAsync("/openapi/v1.json");
 
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var json = await response.Content.ReadAsStringAsync();
+        Assert.Contains("openapi", json, StringComparison.OrdinalIgnoreCase);
+    }
+}
