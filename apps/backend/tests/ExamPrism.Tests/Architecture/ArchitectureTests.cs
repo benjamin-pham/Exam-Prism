@@ -3,11 +3,14 @@ namespace ExamPrism.Tests.Architecture;
 using System.Reflection;
 using Common.Endpoints;
 using Common.Handlers;
+using Common.Results;
 using ExamPrism.Features.Auth;
 using ExamPrism.Features.Health;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 public class ArchitectureTests
@@ -18,7 +21,7 @@ public class ArchitectureTests
         .Where(t => !t.IsNested && !t.Name.Contains('<'));
 
     [Fact]
-    public void Handlers_ImplementingIHandler_MustBePublicSealedInFeaturesAndEndWithHandler()
+    public void Handlers_ImplementingIHandler_MustBePublicSealedInFeaturesEndWithHandlerAndImplementGenericIHandler()
     {
         var handlerTypes = AppTypes
             .Where(t => typeof(IHandler).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
@@ -32,6 +35,14 @@ public class ArchitectureTests
             handler.IsSealed.Should().BeTrue($"{handler.FullName} must be sealed");
             handler.Namespace.Should().StartWith("ExamPrism.Features", $"{handler.FullName} must be in ExamPrism.Features");
             handler.Name.Should().EndWith("Handler", $"{handler.FullName} must end with 'Handler'");
+
+            var implementsGenericHandler = handler.GetInterfaces().Any(i =>
+                i.IsGenericType &&
+                (i.GetGenericTypeDefinition() == typeof(IHandler<>) ||
+                 i.GetGenericTypeDefinition() == typeof(IHandler<,>)));
+
+            implementsGenericHandler.Should().BeTrue(
+                $"{handler.FullName} must implement closed generic IHandler<TRequest> or IHandler<TRequest, TResponse>");
         }
 
         var featureHandlerClasses = AppTypes
@@ -49,74 +60,96 @@ public class ArchitectureTests
     }
 
     [Fact]
-    public void Handlers_MustDeclareSinglePublicStaticHandleEntry_WithValidMessageInputAndResultReturn()
+    public void Handlers_MustUseNonDefaultedConstructorInjection_AndDeclareSingleInstanceHandleWithRecordInputAndResultReturn()
     {
         var handlerTypes = AppTypes
             .Where(t => typeof(IHandler).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
             .ToList();
 
-        var allowedOtherPublicMethods = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "Load", "LoadAsync",
-            "Before", "BeforeAsync",
-            "After", "AfterAsync",
-            "Validate", "ValidateAsync"
-        };
-
         foreach (var handler in handlerTypes)
         {
-            var declaredMethods = handler.GetMethods(
+            var constructors = handler.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+            constructors.Should().NotBeEmpty($"{handler.FullName} must declare a public instance constructor");
+
+            foreach (var ctor in constructors)
+            {
+                foreach (var param in ctor.GetParameters())
+                {
+                    param.HasDefaultValue.Should().BeFalse(
+                        $"{handler.FullName} constructor parameter '{param.Name}' must not have a default value to ensure clean Wolverine DI binding");
+                }
+            }
+
+            var declaredPublicMethods = handler.GetMethods(
                 BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
                 .Where(m => !m.IsSpecialName)
                 .ToList();
 
-            var handleMethods = declaredMethods
-                .Where(m => m.IsStatic && (m.Name == "Handle" || m.Name == "HandleAsync"))
-                .ToList();
+            declaredPublicMethods.Should().ContainSingle(
+                $"{handler.FullName} must declare exactly one public method");
 
-            handleMethods.Should().ContainSingle(
-                $"{handler.FullName} must declare exactly one public static Handle or HandleAsync entry method");
-
-            var handleMethod = handleMethods.Single();
-
-            var otherPublicMethods = declaredMethods.Except(handleMethods);
-            foreach (var other in otherPublicMethods)
-            {
-                allowedOtherPublicMethods.Should().Contain(
-                    other.Name,
-                    $"{handler.FullName} method {other.Name} is not an allowed Wolverine lifecycle method");
-            }
+            var handleMethod = declaredPublicMethods.Single();
+            handleMethod.Name.Should().Be("Handle", $"{handler.FullName} entry method must be named 'Handle'");
+            handleMethod.IsStatic.Should().BeFalse($"{handler.FullName}.Handle must be an instance method");
 
             var parameters = handleMethod.GetParameters();
-            parameters.Should().NotBeEmpty($"{handler.FullName}.{handleMethod.Name} must accept at least one parameter");
+            (parameters.Length is 1 or 2).Should().BeTrue(
+                $"{handler.FullName}.Handle must accept either 1 parameter (message) or 2 parameters (message, CancellationToken)");
 
             var messageParam = parameters[0];
-            var paramTypeName = messageParam.ParameterType.Name;
-            var isValidMessage = paramTypeName.EndsWith("Command") ||
-                                 paramTypeName.EndsWith("Query") ||
-                                 paramTypeName.EndsWith("Event");
+            var messageType = messageParam.ParameterType;
+            IsRecordType(messageType).Should().BeTrue(
+                $"{handler.FullName}.Handle message parameter type '{messageType.Name}' must be a C# record");
 
-            isValidMessage.Should().BeTrue(
-                $"{handler.FullName}.{handleMethod.Name} first parameter type '{paramTypeName}' must end with Command, Query, or Event");
+            var paramTypeName = messageType.Name;
+            var isValidMessageName = paramTypeName.EndsWith("Command") ||
+                                     paramTypeName.EndsWith("Query") ||
+                                     paramTypeName.EndsWith("Event");
+
+            isValidMessageName.Should().BeTrue(
+                $"{handler.FullName}.Handle first parameter type '{paramTypeName}' must end with Command, Query, or Event");
+
+            if (parameters.Length == 2)
+            {
+                parameters[1].ParameterType.Should().Be(
+                    typeof(CancellationToken),
+                    $"{handler.FullName}.Handle optional second parameter must be CancellationToken");
+            }
 
             IsValidHandlerReturnType(handleMethod.ReturnType).Should().BeTrue(
-                $"{handler.FullName}.{handleMethod.Name} return type '{handleMethod.ReturnType.Name}' must be void, Task, ValueTask, or end with Result");
+                $"{handler.FullName}.Handle return type '{handleMethod.ReturnType.Name}' must be Task<Result> or Task<Result<TResult>>");
         }
     }
 
     [Theory]
-    [InlineData(typeof(void), true)]
-    [InlineData(typeof(Task), true)]
-    [InlineData(typeof(ValueTask), true)]
-    [InlineData(typeof(Task<RefreshTokenResult?>), true)]
-    [InlineData(typeof(Task<RegisterResult>), true)]
-    [InlineData(typeof(GetHealthResult), true)]
-    [InlineData(typeof(Task<IResult>), false)]
-    [InlineData(typeof(Task<string>), false)]
+    [InlineData(typeof(Task<Result>), true)]
+    [InlineData(typeof(Task<Result<RegisterResult>>), true)]
+    [InlineData(typeof(Task<Result<GetHealthResult>>), true)]
+    [InlineData(typeof(Task), false)]
+    [InlineData(typeof(void), false)]
+    [InlineData(typeof(Task<RegisterResult>), false)]
+    [InlineData(typeof(Task<Result<string>>), false)]
+    [InlineData(typeof(Task<Result<IResult>>), false)]
     [InlineData(typeof(int), false)]
     public void IsValidHandlerReturnType_ValidatesExpectedReturnTypes(Type type, bool expected)
     {
         IsValidHandlerReturnType(type).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(typeof(RegisterCommand), true)]
+    [InlineData(typeof(GetMeQuery), true)]
+    [InlineData(typeof(RegisterHandler), false)]
+    [InlineData(typeof(string), false)]
+    public void IsRecordType_DetectsRecordsVersusClasses(Type type, bool expected)
+    {
+        IsRecordType(type).Should().Be(expected);
+    }
+
+    [Fact]
+    public void HasDbContextReference_DetectsDbContextInsideNestedInlineLambdaClosure()
+    {
+        HasDbContextReference(typeof(ProbeEndpointWithLambdaDbContext)).Should().BeTrue();
     }
 
     [Fact]
@@ -174,7 +207,7 @@ public class ArchitectureTests
     }
 
     [Fact]
-    public void Endpoints_ImplementingIEndpoint_MustBePublicSealedInEndpointsAndNotInjectAppDbContext()
+    public void Endpoints_ImplementingIEndpoint_MustBeInlineWithoutHandleMethod_AndNeverInjectDbContextIncludingNestedLambdas()
     {
         var endpointTypes = AppTypes
             .Where(t => typeof(IEndpoint).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
@@ -190,29 +223,18 @@ public class ArchitectureTests
             ep.Name.Should().Match(n => n.EndsWith("Endpoint") || n.EndsWith("Endpoints"),
                 $"{ep.FullName} must end with 'Endpoint' or 'Endpoints'");
 
-            var constructors = ep.GetConstructors(
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
-
-            foreach (var ctor in constructors)
-            {
-                foreach (var p in ctor.GetParameters())
-                {
-                    typeof(Microsoft.EntityFrameworkCore.DbContext).IsAssignableFrom(p.ParameterType).Should().BeFalse(
-                        $"{ep.FullName} constructor must not inject DbContext directly");
-                }
-            }
-
-            var methods = ep.GetMethods(
+            var declaredMethods = ep.GetMethods(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
 
-            foreach (var m in methods)
-            {
-                foreach (var p in m.GetParameters())
-                {
-                    typeof(Microsoft.EntityFrameworkCore.DbContext).IsAssignableFrom(p.ParameterType).Should().BeFalse(
-                        $"{ep.FullName}.{m.Name} must not inject DbContext directly");
-                }
-            }
+            var handleMethods = declaredMethods
+                .Where(m => m.Name is "Handle" or "HandleAsync")
+                .ToList();
+
+            handleMethods.Should().BeEmpty(
+                $"{ep.FullName} must not declare Handle/HandleAsync methods; route logic must be executed inline inside MapEndpoint");
+
+            HasDbContextReference(ep).Should().BeFalse(
+                $"{ep.FullName} (or one of its nested lambda closures) must not inject or reference DbContext directly");
         }
 
         var endpointClasses = AppTypes
@@ -231,30 +253,62 @@ public class ArchitectureTests
 
     public static bool IsValidHandlerReturnType(Type returnType)
     {
-        if (returnType == typeof(void) || returnType == typeof(Task) || returnType == typeof(ValueTask))
+        if (returnType == typeof(Task<Result>))
         {
             return true;
         }
 
-        if (returnType.IsGenericType &&
-            (returnType.GetGenericTypeDefinition() == typeof(Task<>) ||
-             returnType.GetGenericTypeDefinition() == typeof(ValueTask<>)))
+        if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>))
         {
-            var inner = returnType.GetGenericArguments()[0];
-            var unwrapped = Nullable.GetUnderlyingType(inner) ?? inner;
-            if (unwrapped == typeof(IResult) || typeof(IResult).IsAssignableFrom(unwrapped))
+            var taskInner = returnType.GetGenericArguments()[0];
+            if (taskInner.IsGenericType && taskInner.GetGenericTypeDefinition() == typeof(Result<>))
             {
-                return false;
+                var resultInner = taskInner.GetGenericArguments()[0];
+                var unwrapped = Nullable.GetUnderlyingType(resultInner) ?? resultInner;
+                if (unwrapped == typeof(IResult) || typeof(IResult).IsAssignableFrom(unwrapped))
+                {
+                    return false;
+                }
+                return unwrapped.Name.EndsWith("Result");
             }
-            return unwrapped.Name.EndsWith("Result");
         }
 
-        var nonGenericUnwrapped = Nullable.GetUnderlyingType(returnType) ?? returnType;
-        if (nonGenericUnwrapped == typeof(IResult) || typeof(IResult).IsAssignableFrom(nonGenericUnwrapped))
+        return false;
+    }
+
+    public static bool IsRecordType(Type type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        return type.GetMethod("<Clone>$", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance) is not null;
+    }
+
+    public static bool HasDbContextReference(Type type)
+    {
+        var typesToCheck = new List<Type> { type };
+        typesToCheck.AddRange(type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
+
+        foreach (var t in typesToCheck)
         {
-            return false;
+            var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+            if (fields.Any(f => typeof(DbContext).IsAssignableFrom(f.FieldType)))
+            {
+                return true;
+            }
+
+            var constructors = t.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+            if (constructors.Any(c => c.GetParameters().Any(p => typeof(DbContext).IsAssignableFrom(p.ParameterType))))
+            {
+                return true;
+            }
+
+            var methods = t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
+            if (methods.Any(m => m.GetParameters().Any(p => typeof(DbContext).IsAssignableFrom(p.ParameterType))))
+            {
+                return true;
+            }
         }
-        return nonGenericUnwrapped.Name.EndsWith("Result");
+
+        return false;
     }
 
     private static void AssertNotForbidden(Type type, Type declaringType, string memberName, string[] forbiddenPrefixes)
@@ -293,6 +347,15 @@ public class ArchitectureTests
             {
                 yield return inner;
             }
+        }
+    }
+
+    private sealed class ProbeEndpointWithLambdaDbContext : IEndpoint
+    {
+        public static void MapEndpoint(IEndpointRouteBuilder app)
+        {
+            var action = (AppDbContext db) => db.ToString();
+            _ = action;
         }
     }
 }
