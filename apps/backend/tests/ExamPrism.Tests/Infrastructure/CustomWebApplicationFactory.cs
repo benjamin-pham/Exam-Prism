@@ -25,7 +25,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
 
     public new async Task DisposeAsync()
     {
-        await _dbContainer.StopAsync();
-        await _dbContainer.DisposeAsync();
+        try
+        {
+            await base.DisposeAsync();
+        }
+        finally
+        {
+            await _dbContainer.DisposeAsync();
+        }
     }
 }
+

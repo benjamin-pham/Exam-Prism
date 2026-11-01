@@ -39,5 +39,21 @@ public class DatabaseIntegrationTests : IClassFixture<CustomWebApplicationFactor
         Assert.NotNull(content);
         Assert.Equal("Healthy", content.Status);
     }
+
+    [Fact]
+    public async Task HealthEndpoint_WithUnreachableDatabase_ReturnsServiceUnavailable()
+    {
+        var unreachableClient = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=127.0.0.1;Port=5433;Database=nonexistent;Timeout=2;CommandTimeout=2;Username=postgres;Password=postgres");
+        }).CreateClient();
+
+        var response = await unreachableClient.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        var content = await response.Content.ReadFromJsonAsync<HealthResponse>();
+        Assert.NotNull(content);
+        Assert.Equal("Unhealthy", content.Status);
+    }
 }
 
