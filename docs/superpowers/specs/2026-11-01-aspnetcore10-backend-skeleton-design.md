@@ -110,3 +110,4 @@ apps/backend/
 2. `dotnet test apps/backend/ExamPrism.sln*` runs all tests and passes.
 3. Clean directory structure with no temporary boilerplate or unused files.
 4. Git commit tracking the scaffolded backend structure.
+
