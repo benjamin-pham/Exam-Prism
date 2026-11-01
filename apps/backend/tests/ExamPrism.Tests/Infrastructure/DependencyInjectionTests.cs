@@ -140,4 +140,20 @@ public class DependencyInjectionTests
         await jwtOptions.Events.OnMessageReceived(contextWithExisting);
         contextWithExisting.Token.Should().Be("existing-bearer-token");
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("short-key")]
+    public void AddInfrastructure_WithShortOrEmptyJwtSecretKey_ThrowsInvalidOperationException(string secretKey)
+    {
+        var settings = CreateValidSettings();
+        settings["Jwt:SecretKey"] = secretKey;
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        var services = new ServiceCollection();
+
+        var act = () => services.AddInfrastructure(configuration);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Jwt:SecretKey*");
+    }
 }

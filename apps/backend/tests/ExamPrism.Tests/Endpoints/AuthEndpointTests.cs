@@ -1,13 +1,18 @@
 namespace ExamPrism.Tests.Endpoints;
 
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text;
 using ExamPrism.Endpoints.Auth;
+using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using global::Tests.Infrastructure;
 using Xunit;
 
@@ -230,5 +235,76 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         var user = await meResponse.Content.ReadFromJsonAsync<UserResponse>();
         user.Should().NotBeNull();
         user!.Email.Should().Be(email);
+    }
+
+    [Theory]
+    [InlineData("", "Password123!")]
+    [InlineData("test@example.com", "")]
+    [InlineData(null, "Password123!")]
+    public async Task Register_WithEmptyOrNullInput_Returns400(string? email, string? password)
+    {
+        var response = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email!, password!));
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory]
+    [InlineData("", "Password123!")]
+    [InlineData("test@example.com", "")]
+    [InlineData(null, "Password123!")]
+    public async Task Login_WithEmptyOrNullInput_Returns401(string? email, string? password)
+    {
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email!, password!));
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Refresh_WithExpiredToken_Returns401AndClearsCookies()
+    {
+        var email = $"expiredrefresh_{Guid.NewGuid()}@example.com";
+        var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "Password123!"));
+        var (_, rawRefresh) = ExtractCookies(regResponse);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
+            var hash = tokenService.HashToken(rawRefresh!);
+            var dbToken = await db.RefreshTokens.FirstAsync(t => t.TokenHash == hash);
+            dbToken.ExpiresAt = DateTimeOffset.UtcNow.AddDays(-1);
+            await db.SaveChangesAsync();
+        }
+
+        var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
+        refreshRequest.Headers.Add("Cookie", $"refresh_token={rawRefresh}");
+
+        var refreshResponse = await _client.SendAsync(refreshRequest);
+
+        refreshResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        refreshResponse.Headers.TryGetValues("Set-Cookie", out var setCookies).Should().BeTrue();
+        var cookieList = setCookies!.ToList();
+        cookieList.Should().Contain(c => c.StartsWith("access_token=") && (c.Contains("max-age=0") || c.Contains("expires=")));
+        cookieList.Should().Contain(c => c.StartsWith("refresh_token=") && (c.Contains("max-age=0") || c.Contains("expires=")));
+    }
+
+    [Fact]
+    public async Task GetMe_WithExpiredAccessToken_Returns401()
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("SuperSecretKeyForDevJwtTokensMin256BitsLongExamPrismDevOnly!"));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var expiredJwt = new JwtSecurityToken(
+            issuer: "ExamPrism",
+            audience: "ExamPrism",
+            claims: [new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString())],
+            notBefore: DateTime.UtcNow.AddHours(-2),
+            expires: DateTime.UtcNow.AddHours(-1),
+            signingCredentials: creds);
+        var expiredToken = new JwtSecurityTokenHandler().WriteToken(expiredJwt);
+
+        var meRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
+        meRequest.Headers.Add("Cookie", $"access_token={expiredToken}");
+
+        var meResponse = await _client.SendAsync(meRequest);
+
+        meResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

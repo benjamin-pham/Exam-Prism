@@ -33,6 +33,14 @@ public sealed class AuthEndpoints : IEndpoint
         TimeProvider timeProvider,
         HttpResponse response)
     {
+        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                { "Request", ["Email and password are required."] }
+            });
+        }
+
         var existing = await userManager.FindByEmailAsync(request.Email);
         if (existing is not null)
         {
@@ -76,7 +84,7 @@ public sealed class AuthEndpoints : IEndpoint
 
         AuthCookieHelper.SetAuthCookies(response, accessToken, rawRefresh, jwtOptions.Value, timeProvider);
 
-        return Results.Created($"/api/auth/me", new UserResponse(user.Id, user.Email!));
+        return Results.Created("/api/auth/me", new UserResponse(user.Id, user.Email!));
     }
 
     private static async Task<IResult> LoginAsync(
@@ -88,6 +96,11 @@ public sealed class AuthEndpoints : IEndpoint
         TimeProvider timeProvider,
         HttpResponse response)
     {
+        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+        {
+            return Results.Unauthorized();
+        }
+
         var user = await userManager.FindByEmailAsync(request.Email);
         if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
         {
@@ -145,16 +158,10 @@ public sealed class AuthEndpoints : IEndpoint
         // Compromised reuse detection
         if (token.IsRevoked || token.ReplacedByTokenHash != null)
         {
-            var activeTokens = await db.RefreshTokens
+            await db.RefreshTokens
                 .Where(t => t.UserId == token.UserId && t.RevokedAt == null)
-                .ToListAsync();
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now));
 
-            foreach (var t in activeTokens)
-            {
-                t.RevokedAt = now;
-            }
-
-            await db.SaveChangesAsync();
             AuthCookieHelper.ClearAuthCookies(response);
             return Results.Unauthorized();
         }
