@@ -89,3 +89,4 @@ public sealed class RegisterEndpoint : IEndpoint
         return Results.Created("/api/auth/me", new RegisterResponse(user.Id, user.Email!));
     }
 }
+

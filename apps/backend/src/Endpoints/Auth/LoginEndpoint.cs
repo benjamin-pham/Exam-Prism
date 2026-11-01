@@ -67,3 +67,4 @@ public sealed class LoginEndpoint : IEndpoint
         return Results.Ok(new LoginResponse(user.Id, user.Email!));
     }
 }
+

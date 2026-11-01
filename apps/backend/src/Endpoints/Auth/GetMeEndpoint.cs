@@ -40,3 +40,4 @@ public sealed class GetMeEndpoint : IEndpoint
         return Results.Ok(new GetMeResponse(user.Id, user.Email!));
     }
 }
+

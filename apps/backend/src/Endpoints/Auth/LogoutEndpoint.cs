@@ -41,3 +41,4 @@ public sealed class LogoutEndpoint : IEndpoint
         return Results.NoContent();
     }
 }
+
