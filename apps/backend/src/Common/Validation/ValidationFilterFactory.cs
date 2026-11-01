@@ -159,6 +159,11 @@ public static class ValidationFilterFactory
 
     private static bool IsFrameworkOrInfrastructureType(ParameterInfo parameter, Type type)
     {
+        if (type.IsByRef || type.IsPointer || type.ContainsGenericParameters)
+        {
+            return true;
+        }
+
         if (typeof(HttpContext).IsAssignableFrom(type) ||
             typeof(HttpRequest).IsAssignableFrom(type) ||
             typeof(HttpResponse).IsAssignableFrom(type) ||

@@ -135,4 +135,20 @@ public class ValidationFilterTests : IClassFixture<CustomWebApplicationFactory>
             e.Code == "REQUIRED" &&
             e.Message == expectedMessage);
     }
+
+    [Fact]
+    public void ValidationFilter_MethodWithGenericOrSpecialParameters_DoesNotThrow()
+    {
+        var method = typeof(ValidationFilterTests).GetMethod(nameof(GenericMethodHelper), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var factoryContext = new Microsoft.AspNetCore.Http.EndpointFilterFactoryContext
+        {
+            MethodInfo = method,
+            ApplicationServices = _factory.Services
+        };
+
+        var filter = ValidationFilterFactory.Create(factoryContext, ctx => ValueTask.FromResult<object?>(Microsoft.AspNetCore.Http.Results.Ok()));
+        filter.Should().NotBeNull();
+    }
+
+    private static void GenericMethodHelper<T>(ref int x, T item) { }
 }

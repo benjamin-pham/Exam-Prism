@@ -9,9 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 /// </summary>
 public class ValidationProblemResponse : ProblemDetails
 {
-    private IReadOnlyList<ValidationError> _errors = [];
-    private string? _traceId;
-
     public ValidationProblemResponse()
     {
         Status = StatusCodes.Status400BadRequest;
@@ -20,31 +17,8 @@ public class ValidationProblemResponse : ProblemDetails
     }
 
     [JsonPropertyName("traceId")]
-    public string? TraceId
-    {
-        get => _traceId;
-        set
-        {
-            _traceId = value;
-            if (value is not null)
-            {
-                Extensions["traceId"] = value;
-            }
-            else
-            {
-                Extensions.Remove("traceId");
-            }
-        }
-    }
+    public string? TraceId { get; set; }
 
     [JsonPropertyName("errors")]
-    public IReadOnlyList<ValidationError> Errors
-    {
-        get => _errors;
-        set
-        {
-            _errors = value ?? [];
-            Extensions["errors"] = _errors;
-        }
-    }
+    public IReadOnlyList<ValidationError> Errors { get; set; } = [];
 }

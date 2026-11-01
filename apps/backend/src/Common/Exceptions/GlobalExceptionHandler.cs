@@ -111,7 +111,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 {
                     Status = statusCode,
                     Title = "Resource Not Found",
-                    Detail = keyNotFoundException.Message,
+                    Detail = _environment.IsDevelopment() ? keyNotFoundException.Message : "The requested resource was not found.",
                     Instance = path,
                     Type = "https://tools.ietf.org/html/rfc7231#section-6.5.4"
                 };
@@ -127,7 +127,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                     Title = "Domain Error",
                     Detail = domainEx.Message,
                     Instance = path,
-                    Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1"
+                    Type = GetRfcTypeForStatusCode(statusCode)
                 };
                 problemDetails.Extensions["traceId"] = traceId;
                 if (!string.IsNullOrWhiteSpace(domainEx.ErrorCode))
@@ -192,4 +192,15 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         await httpContext.Response.WriteAsJsonAsync(problemDetails, problemDetails.GetType(), cancellationToken: cancellationToken);
         return true;
     }
+
+    private static string GetRfcTypeForStatusCode(int statusCode) => statusCode switch
+    {
+        StatusCodes.Status400BadRequest => "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+        StatusCodes.Status401Unauthorized => "https://tools.ietf.org/html/rfc7235#section-3.1",
+        StatusCodes.Status403Forbidden => "https://tools.ietf.org/html/rfc7231#section-6.5.3",
+        StatusCodes.Status404NotFound => "https://tools.ietf.org/html/rfc7231#section-6.5.4",
+        StatusCodes.Status409Conflict => "https://tools.ietf.org/html/rfc7231#section-6.5.8",
+        StatusCodes.Status422UnprocessableEntity => "https://tools.ietf.org/html/rfc4918#section-11.2",
+        _ => "https://tools.ietf.org/html/rfc7231#section-6.5.1"
+    };
 }
