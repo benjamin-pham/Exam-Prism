@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Routing;
 
 public record HealthResponse(string Status, DateTime Timestamp);
 
-public class HealthEndpoints : IEndpoint
+public sealed class HealthEndpoints : IEndpoint
 {
     public static void MapEndpoint(IEndpointRouteBuilder app)
     {
