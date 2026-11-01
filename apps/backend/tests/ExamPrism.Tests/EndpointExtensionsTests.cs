@@ -2,6 +2,7 @@ namespace Tests;
 
 using System.Reflection;
 using Common.Endpoints;
+using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Xunit;
@@ -93,9 +94,9 @@ public class EndpointExtensionsTests : IDisposable
 
         builder.MapEndpoints(typeof(EndpointExtensionsTests).Assembly);
 
-        Assert.Equal(1, StandardTestEndpoint.InvocationCount);
-        Assert.Equal(1, ExplicitTestEndpoint.InvocationCount);
-        Assert.Equal(1, InternalTestEndpoint.InvocationCount);
+        StandardTestEndpoint.InvocationCount.Should().Be(1);
+        ExplicitTestEndpoint.InvocationCount.Should().Be(1);
+        InternalTestEndpoint.InvocationCount.Should().Be(1);
     }
 
     [Fact]
@@ -105,9 +106,9 @@ public class EndpointExtensionsTests : IDisposable
 
         builder.MapEndpoints();
 
-        Assert.Equal(1, StandardTestEndpoint.InvocationCount);
-        Assert.Equal(1, ExplicitTestEndpoint.InvocationCount);
-        Assert.Equal(1, InternalTestEndpoint.InvocationCount);
+        StandardTestEndpoint.InvocationCount.Should().Be(1);
+        ExplicitTestEndpoint.InvocationCount.Should().Be(1);
+        InternalTestEndpoint.InvocationCount.Should().Be(1);
     }
 
     [Fact]
@@ -118,9 +119,9 @@ public class EndpointExtensionsTests : IDisposable
 
         builder.MapEndpoints(asm, asm);
 
-        Assert.Equal(1, StandardTestEndpoint.InvocationCount);
-        Assert.Equal(1, ExplicitTestEndpoint.InvocationCount);
-        Assert.Equal(1, InternalTestEndpoint.InvocationCount);
+        StandardTestEndpoint.InvocationCount.Should().Be(1);
+        ExplicitTestEndpoint.InvocationCount.Should().Be(1);
+        InternalTestEndpoint.InvocationCount.Should().Be(1);
     }
 
     [Fact]
@@ -130,23 +131,27 @@ public class EndpointExtensionsTests : IDisposable
 
         builder.MapEndpoints<EndpointExtensionsTests>();
 
-        Assert.Equal(1, StandardTestEndpoint.InvocationCount);
-        Assert.Equal(1, ExplicitTestEndpoint.InvocationCount);
-        Assert.Equal(1, InternalTestEndpoint.InvocationCount);
+        StandardTestEndpoint.InvocationCount.Should().Be(1);
+        ExplicitTestEndpoint.InvocationCount.Should().Be(1);
+        InternalTestEndpoint.InvocationCount.Should().Be(1);
     }
 
     [Fact]
     public void MapEndpoints_NullApp_ThrowsArgumentNullException()
     {
         IEndpointRouteBuilder builder = null!;
-        Assert.Throws<ArgumentNullException>(() => builder.MapEndpoints());
+        Action act = () => builder.MapEndpoints();
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("app");
     }
 
     [Fact]
     public void MapEndpoints_NullAssembliesArray_ThrowsArgumentNullException()
     {
         var builder = new MockEndpointRouteBuilder();
-        Assert.Throws<ArgumentNullException>(() => builder.MapEndpoints(assemblies: null!));
+        Action act = () => builder.MapEndpoints(assemblies: null!);
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("assemblies");
     }
 
     [Fact]
@@ -157,8 +162,9 @@ public class EndpointExtensionsTests : IDisposable
             ThrowingTestEndpoint.ShouldThrow = true;
             var builder = new MockEndpointRouteBuilder();
 
-            var ex = Assert.Throws<InvalidOperationException>(() => builder.MapEndpoints(typeof(EndpointExtensionsTests).Assembly));
-            Assert.Equal("Endpoint registration failure", ex.Message);
+            Action act = () => builder.MapEndpoints(typeof(EndpointExtensionsTests).Assembly);
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("Endpoint registration failure");
         }
         finally
         {

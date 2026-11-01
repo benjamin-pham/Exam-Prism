@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Endpoints;
 using ExamPrism.Infrastructure.Persistence;
+using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -26,7 +27,7 @@ public class DatabaseIntegrationTests : IClassFixture<CustomWebApplicationFactor
 
         var canConnect = await dbContext.Database.CanConnectAsync();
 
-        Assert.True(canConnect);
+        canConnect.Should().BeTrue();
     }
 
     [Fact]
@@ -34,10 +35,10 @@ public class DatabaseIntegrationTests : IClassFixture<CustomWebApplicationFactor
     {
         var response = await _client.GetAsync("/health");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadFromJsonAsync<HealthResponse>();
-        Assert.NotNull(content);
-        Assert.Equal("Healthy", content.Status);
+        content.Should().NotBeNull();
+        content!.Status.Should().Be("Healthy");
     }
 
     [Fact]
@@ -50,10 +51,10 @@ public class DatabaseIntegrationTests : IClassFixture<CustomWebApplicationFactor
 
         var response = await unreachableClient.GetAsync("/health");
 
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
         var content = await response.Content.ReadFromJsonAsync<HealthResponse>();
-        Assert.NotNull(content);
-        Assert.Equal("Unhealthy", content.Status);
+        content.Should().NotBeNull();
+        content!.Status.Should().Be("Unhealthy");
     }
 }
 

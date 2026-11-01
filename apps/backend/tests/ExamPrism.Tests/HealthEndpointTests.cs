@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Endpoints;
+using FluentAssertions;
 using Tests.Infrastructure;
 using Xunit;
 
@@ -23,10 +24,10 @@ public class HealthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     {
         var response = await _client.GetAsync(path);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await response.Content.ReadFromJsonAsync<HealthResponse>();
-        Assert.NotNull(content);
-        Assert.Equal("Healthy", content.Status);
+        content.Should().NotBeNull();
+        content!.Status.Should().Be("Healthy");
     }
 
     [Fact]
@@ -34,8 +35,8 @@ public class HealthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     {
         var response = await _client.GetAsync("/openapi/v1.json");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadAsStringAsync();
-        Assert.Contains("openapi", json, StringComparison.OrdinalIgnoreCase);
+        json.Should().ContainEquivalentOf("openapi");
     }
 }

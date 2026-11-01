@@ -2,6 +2,7 @@ namespace Tests.Infrastructure;
 
 using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Persistence;
+using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -14,10 +15,10 @@ public class DependencyInjectionTests
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().Build();
 
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            services.AddInfrastructure(configuration));
+        Action act = () => services.AddInfrastructure(configuration);
 
-        Assert.Contains("Connection string 'DefaultConnection' not found", exception.Message);
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Connection string 'DefaultConnection' not found*");
     }
 
     [Fact]
@@ -34,9 +35,8 @@ public class DependencyInjectionTests
 
         services.AddInfrastructure(configuration);
 
-        var serviceDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(AppDbContext));
-        Assert.NotNull(serviceDescriptor);
-        Assert.Equal(ServiceLifetime.Scoped, serviceDescriptor.Lifetime);
+        services.Should().ContainSingle(s => s.ServiceType == typeof(AppDbContext))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
     }
 
     [Fact]
@@ -53,13 +53,12 @@ public class DependencyInjectionTests
 
         services.AddInfrastructure(configuration);
 
-        var serviceDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(TimeProvider));
-        Assert.NotNull(serviceDescriptor);
-        Assert.Equal(ServiceLifetime.Singleton, serviceDescriptor.Lifetime);
+        services.Should().ContainSingle(s => s.ServiceType == typeof(TimeProvider))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Singleton);
 
         var serviceProvider = services.BuildServiceProvider();
         var timeProvider = serviceProvider.GetService<TimeProvider>();
-        Assert.NotNull(timeProvider);
-        Assert.Same(TimeProvider.System, timeProvider);
+        timeProvider.Should().NotBeNull();
+        timeProvider.Should().BeSameAs(TimeProvider.System);
     }
 }
