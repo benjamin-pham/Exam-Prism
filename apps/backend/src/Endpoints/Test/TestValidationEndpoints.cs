@@ -35,7 +35,7 @@ public sealed class TestValidationEndpoints : IEndpoint
         var env = (app as WebApplication)?.Environment
             ?? app.ServiceProvider?.GetService<IHostEnvironment>();
 
-        if (env is not null && !env.IsDevelopment())
+        if (env is null || !env.IsDevelopment())
         {
             return;
         }

@@ -98,6 +98,10 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                     Type = "https://tools.ietf.org/html/rfc7231#section-6.5.4"
                 };
                 problemDetails.Extensions["traceId"] = traceId;
+                if (!string.IsNullOrWhiteSpace(notFoundException.ErrorCode))
+                {
+                    problemDetails.Extensions["errorCode"] = notFoundException.ErrorCode;
+                }
                 _logger.LogWarning(notFoundException, "Resource not found at {Path} (TraceId: {TraceId})", path, traceId);
                 break;
 
@@ -113,6 +117,24 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 };
                 problemDetails.Extensions["traceId"] = traceId;
                 _logger.LogWarning(keyNotFoundException, "Key not found at {Path} (TraceId: {TraceId})", path, traceId);
+                break;
+
+            case DomainException domainEx:
+                statusCode = domainEx.StatusCode > 0 ? domainEx.StatusCode : StatusCodes.Status400BadRequest;
+                problemDetails = new ProblemDetails
+                {
+                    Status = statusCode,
+                    Title = "Domain Error",
+                    Detail = domainEx.Message,
+                    Instance = path,
+                    Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1"
+                };
+                problemDetails.Extensions["traceId"] = traceId;
+                if (!string.IsNullOrWhiteSpace(domainEx.ErrorCode))
+                {
+                    problemDetails.Extensions["errorCode"] = domainEx.ErrorCode;
+                }
+                _logger.LogWarning(domainEx, "Domain exception occurred at {Path} (TraceId: {TraceId})", path, traceId);
                 break;
 
             case UnauthorizedAccessException unauthorizedAccessException:

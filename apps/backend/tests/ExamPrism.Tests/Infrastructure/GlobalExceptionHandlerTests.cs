@@ -71,6 +71,37 @@ public class GlobalExceptionHandlerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
+    public async Task Get_DomainException_WithCustomStatusAndErrorCode_ReturnsExpectedProblemDetails()
+    {
+        var response = await _client.GetAsync("/api/test/exception/domain");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().Should().Be(409);
+        body.GetProperty("title").GetString().Should().Be("Domain Error");
+        body.GetProperty("detail").GetString().Should().Be("Operation cannot be performed due to business conflict.");
+        body.GetProperty("errorCode").GetString().Should().Be("BUSINESS_CONFLICT");
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public async Task Get_DomainException_WithDefaultStatus_Returns400BadRequestAndErrorCode()
+    {
+        var response = await _client.GetAsync("/api/test/exception/domain-default");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().Should().Be(400);
+        body.GetProperty("title").GetString().Should().Be("Domain Error");
+        body.GetProperty("detail").GetString().Should().Be("Invalid state transition.");
+        body.GetProperty("errorCode").GetString().Should().Be("INVALID_STATE");
+        body.GetProperty("traceId").GetString().Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
     public async Task Get_FluentValidationException_Returns400WithStructuredValidationErrors()
     {
         var response = await _client.GetAsync("/api/test/exception/validation");
@@ -187,5 +218,36 @@ public class GlobalExceptionHandlerTests : IClassFixture<CustomWebApplicationFac
         logger.ReceivedCalls().Should().Contain(call =>
             call.GetMethodInfo().Name == "Log" &&
             call.GetArguments().Any(arg => arg != null && arg.ToString()!.Contains("/api/test/fail") && arg.ToString()!.Contains("trace-test-123")));
+    }
+
+    [Fact]
+    public async Task TryHandleAsync_DomainException_WithoutErrorCode_DoesNotIncludeErrorCodeExtension()
+    {
+        var logger = Substitute.For<ILogger<GlobalExceptionHandler>>();
+        var env = Substitute.For<IHostEnvironment>();
+        var localizer = Substitute.For<IStringLocalizer<SharedResources>>();
+
+        var handler = new GlobalExceptionHandler(
+            logger,
+            env,
+            localizer,
+            problemDetailsService: null);
+
+        var httpContext = new DefaultHttpContext();
+        httpContext.Response.Body = new MemoryStream();
+
+        var exception = new DomainException("Simple domain business error");
+        var handled = await handler.TryHandleAsync(httpContext, exception, CancellationToken.None);
+
+        handled.Should().BeTrue();
+        httpContext.Response.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+
+        httpContext.Response.Body.Seek(0, SeekOrigin.Begin);
+        var body = await JsonSerializer.DeserializeAsync<JsonElement>(httpContext.Response.Body);
+
+        body.GetProperty("status").GetInt32().Should().Be(400);
+        body.GetProperty("title").GetString().Should().Be("Domain Error");
+        body.GetProperty("detail").GetString().Should().Be("Simple domain business error");
+        body.TryGetProperty("errorCode", out _).Should().BeFalse();
     }
 }

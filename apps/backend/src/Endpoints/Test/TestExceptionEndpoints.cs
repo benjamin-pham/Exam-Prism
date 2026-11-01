@@ -17,7 +17,7 @@ public sealed class TestExceptionEndpoints : IEndpoint
         var env = (app as WebApplication)?.Environment
             ?? app.ServiceProvider?.GetService<IHostEnvironment>();
 
-        if (env is not null && !env.IsDevelopment())
+        if (env is null || !env.IsDevelopment())
         {
             return;
         }
@@ -35,6 +35,16 @@ public sealed class TestExceptionEndpoints : IEndpoint
         app.MapGet("/api/test/exception/key-not-found", () =>
         {
             throw new KeyNotFoundException("The specified key was not found.");
+        });
+
+        app.MapGet("/api/test/exception/domain", () =>
+        {
+            throw new DomainException("Operation cannot be performed due to business conflict.", "BUSINESS_CONFLICT", StatusCodes.Status409Conflict);
+        });
+
+        app.MapGet("/api/test/exception/domain-default", () =>
+        {
+            throw new DomainException("Invalid state transition.", "INVALID_STATE");
         });
 
         app.MapGet("/api/test/exception/validation", () =>
