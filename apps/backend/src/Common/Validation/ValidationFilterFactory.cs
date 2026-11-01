@@ -105,6 +105,7 @@ public static class ValidationFilterFactory
             List<ValidationError>? errors = null;
             var serviceProvider = invocationContext.HttpContext.RequestServices;
             var cancellationToken = invocationContext.HttpContext.RequestAborted;
+            var localizer = serviceProvider.GetService<IStringLocalizer<SharedResources>>();
 
             for (var i = 0; i < validatorArray.Length; i++)
             {
@@ -118,7 +119,8 @@ public static class ValidationFilterFactory
                     if (!descriptor.IsOptional)
                     {
                         errors ??= [];
-                        errors.Add(new ValidationError(descriptor.ParameterName, "REQUIRED", "Request body cannot be null."));
+                        var nullMessage = localizer?["RequestBodyRequired"].Value ?? "Request body cannot be null.";
+                        errors.Add(new ValidationError(descriptor.ParameterName, "REQUIRED", nullMessage));
                     }
                     continue;
                 }
@@ -137,7 +139,6 @@ public static class ValidationFilterFactory
 
             if (errors is not null && errors.Count > 0)
             {
-                var localizer = serviceProvider.GetService<IStringLocalizer<SharedResources>>();
                 var title = localizer?["ValidationErrorOccurred"].Value ?? "One or more validation errors occurred.";
                 var traceId = Activity.Current?.Id ?? invocationContext.HttpContext.TraceIdentifier;
 

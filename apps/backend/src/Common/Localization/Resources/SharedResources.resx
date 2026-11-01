@@ -67,4 +67,7 @@
   <data name="NameRequired" xml:space="preserve">
     <value>Name is required.</value>
   </data>
+  <data name="RequestBodyRequired" xml:space="preserve">
+    <value>Request body cannot be null.</value>
+  </data>
 </root>

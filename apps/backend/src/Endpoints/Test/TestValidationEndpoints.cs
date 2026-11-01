@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Localization;
 
 public record TestValidationRequest(string Name);
@@ -30,6 +32,14 @@ public sealed class TestValidationEndpoints : IEndpoint
 {
     public static void MapEndpoint(IEndpointRouteBuilder app)
     {
+        var env = (app as WebApplication)?.Environment
+            ?? app.ServiceProvider?.GetService<IHostEnvironment>();
+
+        if (env is not null && !env.IsDevelopment())
+        {
+            return;
+        }
+
         app.MapPost("/api/test/validation", (TestValidationRequest request) =>
             Results.Ok(new { message = "Valid", name = request.Name }));
 

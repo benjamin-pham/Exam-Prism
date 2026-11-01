@@ -33,7 +33,7 @@ public static class EndpointExtensions
         var targetAssemblies = assemblies.Length > 0
             ? assemblies.Where(a => a is not null)
             : new[] { Assembly.GetCallingAssembly(), Assembly.GetExecutingAssembly(), Assembly.GetEntryAssembly() }
-                .Concat(AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic && a.FullName?.StartsWith("ExamPrism") == true))
+                .Concat(AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic && a.FullName?.StartsWith("ExamPrism") == true && !a.FullName.Contains(".Tests")))
                 .Where(a => a is not null);
 
         var endpointTypes = targetAssemblies
