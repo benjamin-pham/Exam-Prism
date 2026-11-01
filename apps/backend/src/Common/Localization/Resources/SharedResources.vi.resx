@@ -64,4 +64,7 @@
   <data name="ValidationErrorOccurred" xml:space="preserve">
     <value>Một hoặc nhiều lỗi xác thực dữ liệu đã xảy ra.</value>
   </data>
+  <data name="NameRequired" xml:space="preserve">
+    <value>Tên không được để trống.</value>
+  </data>
 </root>

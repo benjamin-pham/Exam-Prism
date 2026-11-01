@@ -1,5 +1,6 @@
 using Common.Endpoints;
 using ExamPrism.Infrastructure;
+using FluentValidation;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 
@@ -25,6 +26,7 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddLocalization(options => options.ResourcesPath = "Common/Localization/Resources");
+builder.Services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
 
 var supportedCultures = new[] { "vi-VN", "vi", "en-US", "en" };
 builder.Services.Configure<RequestLocalizationOptions>(options =>

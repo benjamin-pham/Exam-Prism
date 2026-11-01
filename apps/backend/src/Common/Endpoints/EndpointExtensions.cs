@@ -3,6 +3,8 @@ namespace Common.Endpoints;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
+using Common.Validation;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 
 /// <summary>
@@ -31,6 +33,7 @@ public static class EndpointExtensions
         var targetAssemblies = assemblies.Length > 0
             ? assemblies.Where(a => a is not null)
             : new[] { Assembly.GetCallingAssembly(), Assembly.GetExecutingAssembly(), Assembly.GetEntryAssembly() }
+                .Concat(AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic && a.FullName?.StartsWith("ExamPrism") == true))
                 .Where(a => a is not null);
 
         var endpointTypes = targetAssemblies
@@ -38,6 +41,8 @@ public static class EndpointExtensions
             .SelectMany(GetTypesSafely)
             .Where(t => !t.IsAbstract && !t.IsInterface && !t.IsGenericTypeDefinition && !t.ContainsGenericParameters && typeof(IEndpoint).IsAssignableFrom(t))
             .Distinct();
+
+        var validationGroup = app.MapGroup("").AddEndpointFilterFactory(ValidationFilterFactory.Create);
 
         foreach (var type in endpointTypes)
         {
@@ -55,7 +60,7 @@ public static class EndpointExtensions
 
             try
             {
-                mapMethod.Invoke(null, [app]);
+                mapMethod.Invoke(null, [validationGroup]);
             }
             catch (TargetInvocationException ex) when (ex.InnerException is not null)
             {

@@ -64,4 +64,7 @@
   <data name="ValidationErrorOccurred" xml:space="preserve">
     <value>One or more validation errors occurred.</value>
   </data>
+  <data name="NameRequired" xml:space="preserve">
+    <value>Name is required.</value>
+  </data>
 </root>
