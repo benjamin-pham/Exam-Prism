@@ -21,3 +21,4 @@ public sealed class GetHealthHandler(HealthCheckService healthCheckService) : IH
         return new GetHealthResult(report.Status.ToString(), DateTime.UtcNow, isHealthy);
     }
 }
+

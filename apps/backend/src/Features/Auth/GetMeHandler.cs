@@ -30,3 +30,4 @@ public sealed class GetMeHandler(
         return new GetMeResult(user.Id, user.Email!);
     }
 }
+

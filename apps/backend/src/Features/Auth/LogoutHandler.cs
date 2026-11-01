@@ -31,3 +31,4 @@ public sealed class LogoutHandler(
         return Result.Success();
     }
 }
+

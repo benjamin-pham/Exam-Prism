@@ -48,3 +48,4 @@ public sealed record Error(
     public static Error Validation(string field, string code, string message) =>
         Validation([new ValidationError(field, code, message)], message);
 }
+

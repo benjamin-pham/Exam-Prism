@@ -284,11 +284,20 @@ public class ArchitectureTests
 
     public static bool HasDbContextReference(Type type)
     {
-        var typesToCheck = new List<Type> { type };
-        typesToCheck.AddRange(type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
+        var visited = new HashSet<Type>();
+        var queue = new Queue<Type>();
+        queue.Enqueue(type);
 
-        foreach (var t in typesToCheck)
+        while (queue.Count > 0)
         {
+            var t = queue.Dequeue();
+            if (!visited.Add(t)) continue;
+
+            foreach (var nested in t.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                queue.Enqueue(nested);
+            }
+
             var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
             if (fields.Any(f => typeof(DbContext).IsAssignableFrom(f.FieldType)))
             {
