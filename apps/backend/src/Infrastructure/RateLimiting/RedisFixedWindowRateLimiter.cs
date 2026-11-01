@@ -20,6 +20,7 @@ return current
     private readonly TimeSpan _window;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
+    private long _lastAcquiredTicks;
 
     public RedisFixedWindowRateLimiter(
         IConnectionMultiplexer multiplexer,
@@ -44,13 +45,17 @@ return current
         _logger = logger;
     }
 
-    public override TimeSpan? IdleDuration => null;
+    public override TimeSpan? IdleDuration => _lastAcquiredTicks == 0
+        ? TimeSpan.Zero
+        : TimeSpan.FromTicks(Math.Max(0, _timeProvider.GetUtcNow().UtcTicks - Volatile.Read(ref _lastAcquiredTicks)));
 
     public override RateLimiterStatistics? GetStatistics() => null;
 
     protected override RateLimitLease AttemptAcquireCore(int permitCount)
     {
         var nowTicks = _timeProvider.GetUtcNow().UtcTicks;
+        Interlocked.Exchange(ref _lastAcquiredTicks, nowTicks);
+
         var windowTicks = _window.Ticks;
         var bucket = nowTicks / windowTicks;
         var retryAfter = TimeSpan.FromTicks(Math.Max(1, windowTicks - (nowTicks % windowTicks)));
@@ -70,7 +75,7 @@ return current
                 ? SuccessfulLease.Instance
                 : new FailedLease(retryAfter);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis rate limiter failed for key {RateLimitKey}; failing open.", key);
             return SuccessfulLease.Instance;
@@ -80,6 +85,8 @@ return current
     protected override async ValueTask<RateLimitLease> AcquireAsyncCore(int permitCount, CancellationToken cancellationToken)
     {
         var nowTicks = _timeProvider.GetUtcNow().UtcTicks;
+        Interlocked.Exchange(ref _lastAcquiredTicks, nowTicks);
+
         var windowTicks = _window.Ticks;
         var bucket = nowTicks / windowTicks;
         var retryAfter = TimeSpan.FromTicks(Math.Max(1, windowTicks - (nowTicks % windowTicks)));
@@ -99,7 +106,7 @@ return current
                 ? SuccessfulLease.Instance
                 : new FailedLease(retryAfter);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis rate limiter failed for key {RateLimitKey}; failing open.", key);
             return SuccessfulLease.Instance;
@@ -140,3 +147,4 @@ return current
         }
     }
 }
+

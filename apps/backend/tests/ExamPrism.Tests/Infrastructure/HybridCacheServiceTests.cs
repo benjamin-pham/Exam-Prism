@@ -190,6 +190,29 @@ public class HybridCacheServiceTests
     }
 
     [Fact]
+    public async Task ResilientDistributedCache_WhenInnerThrowsObjectDisposedException_FailsOpen()
+    {
+        var inner = Substitute.For<IDistributedCache>();
+        var disposedEx = new ObjectDisposedException("RedisCache");
+
+        inner.GetAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).ThrowsAsync(disposedEx);
+        inner.SetAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<DistributedCacheEntryOptions>(), Arg.Any<CancellationToken>()).ThrowsAsync(disposedEx);
+        inner.RemoveAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).ThrowsAsync(disposedEx);
+
+        var logger = NullLogger<ResilientDistributedCache>.Instance;
+        var resilientCache = new ResilientDistributedCache(inner, logger);
+
+        var bytes = await resilientCache.GetAsync("k1");
+        bytes.Should().BeNull();
+
+        Func<Task> actSet = async () => await resilientCache.SetAsync("k1", [1, 2, 3], new DistributedCacheEntryOptions());
+        await actSet.Should().NotThrowAsync();
+
+        Func<Task> actRemove = async () => await resilientCache.RemoveAsync("k1");
+        await actRemove.Should().NotThrowAsync();
+    }
+
+    [Fact]
     public async Task RedisHealthCheck_ReturnsHealthyOnPing_AndUnhealthyWhenPingThrows()
     {
         var multiplexer = Substitute.For<IConnectionMultiplexer>();

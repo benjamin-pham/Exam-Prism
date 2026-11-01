@@ -8,3 +8,4 @@ public sealed class CacheOptions
     public int DefaultExpirationMinutes { get; set; } = 30;
     public int DefaultLocalExpirationMinutes { get; set; } = 5;
 }
+

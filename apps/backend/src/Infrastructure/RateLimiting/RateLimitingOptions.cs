@@ -9,3 +9,4 @@ public sealed class RateLimitingOptions
 }
 
 public sealed record FixedWindowPolicyOptions(int PermitLimit, int WindowSeconds);
+

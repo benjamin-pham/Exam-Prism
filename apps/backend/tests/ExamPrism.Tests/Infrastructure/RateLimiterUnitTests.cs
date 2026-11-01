@@ -169,4 +169,52 @@ public class RateLimiterUnitTests
         using var lease2 = await limiter.AcquireAsync(1);
         lease2.IsAcquired.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task InMemoryFixedWindowRateLimiter_IdleDuration_TracksLastAcquiredTime()
+    {
+        var fakeTime = new FakeTimeProvider(new DateTimeOffset(2026, 11, 1, 12, 0, 0, TimeSpan.Zero));
+        using var limiter = new InMemoryFixedWindowRateLimiter(permitLimit: 2, window: TimeSpan.FromSeconds(60), fakeTime);
+
+        limiter.IdleDuration.Should().Be(TimeSpan.Zero);
+
+        using var lease = await limiter.AcquireAsync(1);
+        lease.IsAcquired.Should().BeTrue();
+
+        fakeTime.Advance(TimeSpan.FromSeconds(25));
+        limiter.IdleDuration.Should().Be(TimeSpan.FromSeconds(25));
+    }
+
+    [Fact]
+    public async Task RedisFixedWindowRateLimiter_WhenRedisThrowsObjectDisposedException_FailsOpenAndTracksIdleDuration()
+    {
+        var fakeTime = new FakeTimeProvider(new DateTimeOffset(2026, 11, 1, 12, 0, 0, TimeSpan.Zero));
+        var multiplexer = Substitute.For<IConnectionMultiplexer>();
+        var db = Substitute.For<IDatabase>();
+        multiplexer.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(db);
+
+        db.ScriptEvaluateAsync(
+            Arg.Any<string>(),
+            Arg.Any<RedisKey[]>(),
+            Arg.Any<RedisValue[]>(),
+            Arg.Any<CommandFlags>())
+            .ThrowsAsync(new ObjectDisposedException("ConnectionMultiplexer"));
+
+        using var limiter = new RedisFixedWindowRateLimiter(
+            multiplexer,
+            redisKeyPrefix: "examprism:ratelimit:auth:ip:127.0.0.1",
+            permitLimit: 2,
+            window: TimeSpan.FromSeconds(60),
+            fakeTime,
+            NullLogger.Instance);
+
+        limiter.IdleDuration.Should().Be(TimeSpan.Zero);
+
+        using var lease = await limiter.AcquireAsync(1);
+        lease.IsAcquired.Should().BeTrue();
+
+        fakeTime.Advance(TimeSpan.FromSeconds(10));
+        limiter.IdleDuration.Should().Be(TimeSpan.FromSeconds(10));
+    }
 }
+

@@ -24,7 +24,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
         {
             return _inner.Get(key);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation Get failed for key {CacheKey}; failing open.", key);
             return null;
@@ -37,7 +37,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
         {
             return await _inner.GetAsync(key, token);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation GetAsync failed for key {CacheKey}; failing open.", key);
             return null;
@@ -50,7 +50,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
         {
             _inner.Set(key, value, options);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation Set failed for key {CacheKey}; failing open.", key);
         }
@@ -62,7 +62,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
         {
             await _inner.SetAsync(key, value, options, token);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation SetAsync failed for key {CacheKey}; failing open.", key);
         }
@@ -74,7 +74,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
         {
             _inner.Refresh(key);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation Refresh failed for key {CacheKey}; failing open.", key);
         }
@@ -86,7 +86,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
         {
             await _inner.RefreshAsync(key, token);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation RefreshAsync failed for key {CacheKey}; failing open.", key);
         }
@@ -98,7 +98,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
         {
             _inner.Remove(key);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation Remove failed for key {CacheKey}; failing open.", key);
         }
@@ -110,7 +110,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
         {
             await _inner.RemoveAsync(key, token);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation RemoveAsync failed for key {CacheKey}; failing open.", key);
         }
@@ -134,7 +134,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
             destination.Write(bytes);
             return true;
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation TryGet failed for key {CacheKey}; failing open.", key);
             return false;
@@ -159,7 +159,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
             destination.Write(bytes);
             return true;
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation TryGetAsync failed for key {CacheKey}; failing open.", key);
             return false;
@@ -178,7 +178,7 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
 
             _inner.Set(key, value.ToArray(), options);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation buffer Set failed for key {CacheKey}; failing open.", key);
         }
@@ -196,9 +196,10 @@ public sealed class ResilientDistributedCache : IBufferDistributedCache
 
             await _inner.SetAsync(key, value.ToArray(), options, token);
         }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
+        catch (Exception ex) when (ex is RedisException or TimeoutException or ObjectDisposedException)
         {
             _logger.LogWarning(ex, "Redis L2 cache operation buffer SetAsync failed for key {CacheKey}; failing open.", key);
         }
     }
 }
+

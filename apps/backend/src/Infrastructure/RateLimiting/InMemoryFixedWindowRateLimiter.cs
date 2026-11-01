@@ -11,6 +11,7 @@ public sealed class InMemoryFixedWindowRateLimiter : RateLimiter
 
     private long _windowBucket = -1;
     private int _count;
+    private long _lastAcquiredTicks;
 
     public InMemoryFixedWindowRateLimiter(int permitLimit, TimeSpan window, TimeProvider timeProvider)
     {
@@ -23,20 +24,24 @@ public sealed class InMemoryFixedWindowRateLimiter : RateLimiter
         _timeProvider = timeProvider;
     }
 
-    public override TimeSpan? IdleDuration => null;
+    public override TimeSpan? IdleDuration => _lastAcquiredTicks == 0
+        ? TimeSpan.Zero
+        : TimeSpan.FromTicks(Math.Max(0, _timeProvider.GetUtcNow().UtcTicks - Volatile.Read(ref _lastAcquiredTicks)));
 
     public override RateLimiterStatistics? GetStatistics() => null;
 
     protected override RateLimitLease AttemptAcquireCore(int permitCount)
     {
-        var nowTicks = _timeProvider.GetUtcNow().UtcTicks;
-        var windowTicks = _window.Ticks;
-        var bucket = nowTicks / windowTicks;
-        var retryAfter = TimeSpan.FromTicks(Math.Max(1, windowTicks - (nowTicks % windowTicks)));
-
         lock (_lock)
         {
-            if (bucket != _windowBucket)
+            var nowTicks = _timeProvider.GetUtcNow().UtcTicks;
+            _lastAcquiredTicks = nowTicks;
+
+            var windowTicks = _window.Ticks;
+            var bucket = nowTicks / windowTicks;
+            var retryAfter = TimeSpan.FromTicks(Math.Max(1, windowTicks - (nowTicks % windowTicks)));
+
+            if (_windowBucket == -1 || bucket > _windowBucket)
             {
                 _windowBucket = bucket;
                 _count = 0;
@@ -98,3 +103,4 @@ public sealed class InMemoryFixedWindowRateLimiter : RateLimiter
         }
     }
 }
+
