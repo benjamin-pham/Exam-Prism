@@ -1,7 +1,9 @@
 namespace Tests.Infrastructure;
 
+using ExamPrism.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -21,6 +23,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     public async Task InitializeAsync()
     {
         await _dbContainer.StartAsync();
+
+        using var scope = Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
     }
 
     public new async Task DisposeAsync()
