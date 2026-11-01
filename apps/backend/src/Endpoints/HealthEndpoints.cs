@@ -1,4 +1,4 @@
-namespace ExamPrism.Api.Endpoints;
+namespace Endpoints;
 
 public record HealthResponse(string Status, DateTime Timestamp);
 

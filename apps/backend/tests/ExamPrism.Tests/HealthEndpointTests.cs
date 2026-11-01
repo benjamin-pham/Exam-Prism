@@ -1,10 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
-using ExamPrism.Api.Endpoints;
+using Endpoints;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
-namespace ExamPrism.Api.Tests;
+namespace Tests;
 
 public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
 {

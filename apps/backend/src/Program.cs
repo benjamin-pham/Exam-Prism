@@ -1,4 +1,4 @@
-using ExamPrism.Api.Endpoints;
+using Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,4 +17,3 @@ app.MapHealthEndpoints();
 app.Run();
 
 public partial class Program { }
-

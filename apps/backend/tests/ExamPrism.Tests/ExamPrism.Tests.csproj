@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ExamPrism.Api.csproj" />
+    <ProjectReference Include="..\..\src\ExamPrism.csproj" />
   </ItemGroup>
 
 </Project>

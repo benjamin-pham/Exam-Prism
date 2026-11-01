@@ -1,8 +1,8 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/ExamPrism.Api.csproj" />
+    <Project Path="src/ExamPrism.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/ExamPrism.Api.Tests/ExamPrism.Api.Tests.csproj" />
+    <Project Path="tests/ExamPrism.Tests/ExamPrism.Tests.csproj" />
   </Folder>
 </Solution>
