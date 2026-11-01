@@ -21,9 +21,11 @@ public class LocalizationTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Theory]
-    [InlineData("vi-VN", "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.")]
-    [InlineData("en-US", "An unexpected error occurred. Please try again later.")]
-    public void StringLocalizer_ReturnsCorrectLocalizedMessage_ForCulture(string cultureName, string expected)
+    [InlineData("vi-VN", "InternalServerError", "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.")]
+    [InlineData("en-US", "InternalServerError", "An unexpected error occurred. Please try again later.")]
+    [InlineData("vi-VN", "ValidationErrorOccurred", "Một hoặc nhiều lỗi xác thực dữ liệu đã xảy ra.")]
+    [InlineData("en-US", "ValidationErrorOccurred", "One or more validation errors occurred.")]
+    public void StringLocalizer_ReturnsCorrectLocalizedMessage_ForCulture(string cultureName, string resourceKey, string expected)
     {
         using var scope = _factory.Services.CreateScope();
         var localizer = scope.ServiceProvider.GetRequiredService<IStringLocalizer<SharedResources>>();
@@ -32,7 +34,7 @@ public class LocalizationTests : IClassFixture<CustomWebApplicationFactory>
         CultureInfo.CurrentCulture = culture;
         CultureInfo.CurrentUICulture = culture;
 
-        var message = localizer["InternalServerError"].Value;
+        var message = localizer[resourceKey].Value;
 
         message.Should().Be(expected);
     }
@@ -46,8 +48,12 @@ public class LocalizationTests : IClassFixture<CustomWebApplicationFactory>
         options.DefaultRequestCulture.Culture.Name.Should().Be("vi-VN");
         options.DefaultRequestCulture.UICulture.Name.Should().Be("vi-VN");
         options.SupportedCultures.Should().Contain(c => c.Name == "vi-VN");
+        options.SupportedCultures.Should().Contain(c => c.Name == "vi");
         options.SupportedCultures.Should().Contain(c => c.Name == "en-US");
+        options.SupportedCultures.Should().Contain(c => c.Name == "en");
         options.SupportedUICultures.Should().Contain(c => c.Name == "vi-VN");
+        options.SupportedUICultures.Should().Contain(c => c.Name == "vi");
         options.SupportedUICultures.Should().Contain(c => c.Name == "en-US");
+        options.SupportedUICultures.Should().Contain(c => c.Name == "en");
     }
 }

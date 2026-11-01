@@ -26,7 +26,7 @@ builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddLocalization(options => options.ResourcesPath = "Common/Localization/Resources");
 
-var supportedCultures = new[] { "vi-VN", "en-US" };
+var supportedCultures = new[] { "vi-VN", "vi", "en-US", "en" };
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     options.SetDefaultCulture("vi-VN")
@@ -36,12 +36,7 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 
 var app = builder.Build();
 
-var localizationOptions = new RequestLocalizationOptions()
-    .SetDefaultCulture("vi-VN")
-    .AddSupportedCultures(supportedCultures)
-    .AddSupportedUICultures(supportedCultures);
-
-app.UseRequestLocalization(localizationOptions);
+app.UseRequestLocalization();
 
 if (app.Environment.IsDevelopment())
 {
