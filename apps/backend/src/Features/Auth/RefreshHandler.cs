@@ -10,6 +10,8 @@ using Wolverine.Http;
 public static class RefreshHandler
 {
     [WolverinePost("/api/auth/refresh")]
+    [Tags("Authentication")]
+    [EndpointSummary("Rotates refresh token and returns updated auth cookies")]
     public static async Task<IResult> Handle(
         HttpRequest request,
         HttpResponse response,

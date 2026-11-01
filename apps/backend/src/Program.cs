@@ -1,4 +1,5 @@
 using Common.Exceptions;
+using Common.Validation;
 using ExamPrism.Infrastructure;
 using FluentValidation;
 using Microsoft.OpenApi;
@@ -13,6 +14,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseWolverine(opts =>
 {
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
+    if (!builder.Environment.IsDevelopment())
+    {
+        opts.Discovery.CustomizeHandlerDiscovery(actions =>
+        {
+            actions.Excludes.InNamespace("ExamPrism.Features.Test");
+        });
+    }
     opts.UseEntityFrameworkCoreTransactions();
     opts.Policies.AutoApplyTransactions();
 });
@@ -38,6 +46,8 @@ builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddLocalization(options => options.ResourcesPath = "Common/Localization/Resources");
 builder.Services.AddProblemDetails();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient(typeof(IProblemDetailSource<>), typeof(CustomProblemDetailSource<>));
 builder.Services.AddWolverineHttp();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);

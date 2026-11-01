@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using Wolverine;
 using Xunit;
 
 public class WolverineHandlerTests
@@ -100,4 +101,43 @@ public class WolverineHandlerTests
 
         result.Should().BeOfType<UnauthorizedHttpResult>();
     }
+
+    [Fact]
+    public async Task RefreshHandler_WhenRefreshTokenCookieIsMissing_ReturnsUnauthorized()
+    {
+        var httpContext = new DefaultHttpContext();
+        var tokenService = Substitute.For<ITokenService>();
+        var jwtOptions = Options.Create(new JwtOptions());
+        var timeProvider = TimeProvider.System;
+
+        var result = await RefreshHandler.Handle(
+            httpContext.Request,
+            httpContext.Response,
+            null!,
+            tokenService,
+            jwtOptions,
+            timeProvider);
+
+        result.Should().BeOfType<UnauthorizedHttpResult>();
+    }
+
+    [Fact]
+    public async Task LogoutHandler_WhenRefreshTokenCookieIsMissing_ReturnsNoContentAndClearsCookies()
+    {
+        var httpContext = new DefaultHttpContext();
+        var tokenService = Substitute.For<ITokenService>();
+        var timeProvider = TimeProvider.System;
+
+        var result = await LogoutHandler.Handle(
+            httpContext.Request,
+            httpContext.Response,
+            null!,
+            tokenService,
+            timeProvider);
+
+        result.Should().BeOfType<NoContent>();
+        httpContext.Response.Headers.SetCookie.Should().Contain(h => h != null && h.StartsWith("access_token="));
+        httpContext.Response.Headers.SetCookie.Should().Contain(h => h != null && h.StartsWith("refresh_token="));
+    }
 }
+

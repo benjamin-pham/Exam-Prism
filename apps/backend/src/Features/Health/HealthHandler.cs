@@ -9,6 +9,8 @@ public record HealthResponse(string Status, DateTime Timestamp);
 public static class HealthHandler
 {
     [WolverineGet("/health")]
+    [Tags("Health")]
+    [EndpointSummary("Returns health status of the API")]
     public static async Task<IResult> Handle(HealthCheckService healthCheckService)
     {
         var report = await healthCheckService.CheckHealthAsync();

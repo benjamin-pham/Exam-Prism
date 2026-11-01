@@ -17,6 +17,8 @@ public record RegisterResponse(Guid Id, string Email);
 public static class RegisterHandler
 {
     [WolverinePost("/api/auth/register")]
+    [Tags("Authentication")]
+    [EndpointSummary("Registers a new user and sets auth cookies")]
     public static async Task<IResult> Handle(
         RegisterRequest request,
         UserManager<ApplicationUser> userManager,

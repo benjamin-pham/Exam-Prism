@@ -9,6 +9,8 @@ using Wolverine.Http;
 public static class LogoutHandler
 {
     [WolverinePost("/api/auth/logout")]
+    [Tags("Authentication")]
+    [EndpointSummary("Revokes refresh token and clears auth cookies")]
     public static async Task<IResult> Handle(
         HttpRequest request,
         HttpResponse response,

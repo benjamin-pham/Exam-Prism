@@ -17,6 +17,8 @@ public record LoginResponse(Guid Id, string Email);
 public static class LoginHandler
 {
     [WolverinePost("/api/auth/login")]
+    [Tags("Authentication")]
+    [EndpointSummary("Authenticates user credentials and sets auth cookies")]
     public static async Task<IResult> Handle(
         LoginRequest request,
         UserManager<ApplicationUser> userManager,

@@ -13,6 +13,8 @@ public static class GetMeHandler
 {
     [WolverineGet("/api/auth/me")]
     [Authorize]
+    [Tags("Authentication")]
+    [EndpointSummary("Gets currently authenticated user details")]
     public static async Task<IResult> Handle(
         IUserContext userContext,
         UserManager<ApplicationUser> userManager)
