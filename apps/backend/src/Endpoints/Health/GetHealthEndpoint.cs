@@ -28,6 +28,7 @@ public sealed class GetHealthEndpoint : IEndpoint
                 : Results.Json(result.Value, statusCode: StatusCodes.Status503ServiceUnavailable);
         })
         .WithTags("Health")
-        .WithSummary("Returns health status of the API");
+        .WithSummary("Returns health status of the API")
+        .DisableRateLimiting();
     }
 }

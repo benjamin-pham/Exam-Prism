@@ -1,6 +1,7 @@
 namespace ExamPrism.Endpoints.Auth;
 
 using Common.Endpoints;
+using Common.RateLimiting;
 using Common.Results;
 using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure.Identity;
@@ -38,6 +39,7 @@ public sealed class RegisterEndpoint : IEndpoint
             return Results.Created("/api/auth/me", result.Value);
         })
         .WithTags("Authentication")
-        .WithSummary("Registers a new user and sets auth cookies");
+        .WithSummary("Registers a new user and sets auth cookies")
+        .RequireRateLimiting(RateLimitPolicies.Auth);
     }
 }

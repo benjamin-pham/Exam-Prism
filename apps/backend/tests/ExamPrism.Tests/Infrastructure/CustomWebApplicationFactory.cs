@@ -18,6 +18,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:DefaultConnection", _dbContainer.GetConnectionString());
+        builder.UseSetting("RateLimiting:Global:PermitLimit", "10000");
+        builder.UseSetting("RateLimiting:Auth:PermitLimit", "10000");
     }
 
     public async Task InitializeAsync()

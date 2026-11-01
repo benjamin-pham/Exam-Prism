@@ -1,6 +1,8 @@
 namespace Tests.Infrastructure;
 
+using Common.Caching;
 using ExamPrism.Infrastructure;
+using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
@@ -8,9 +10,12 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 using Xunit;
 
 public class DependencyInjectionTests
@@ -175,5 +180,52 @@ public class DependencyInjectionTests
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Jwt:SecretKey*");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AddInfrastructure_WhenRedisConnectionStringOmittedOrWhitespace_RegistersInMemoryHybridCacheOnly_WithoutRedisOrRedisHealthCheck(string? redisConn)
+    {
+        var settings = CreateValidSettings();
+        if (redisConn is not null)
+        {
+            settings["ConnectionStrings:Redis"] = redisConn;
+        }
+
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        var services = new ServiceCollection();
+
+        services.AddInfrastructure(configuration);
+        var provider = services.BuildServiceProvider();
+
+        provider.GetService<ICacheService>().Should().BeOfType<HybridCacheService>();
+        provider.GetService<IConnectionMultiplexer>().Should().BeNull();
+        provider.GetService<IDistributedCache>().Should().BeNull();
+
+        var healthCheckOptions = provider.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
+        healthCheckOptions.Registrations.Should().Contain(r => r.Name == "database");
+        healthCheckOptions.Registrations.Should().NotContain(r => r.Name == "redis");
+    }
+
+    [Fact]
+    public void AddInfrastructure_WhenRedisConnectionStringProvided_RegistersMultiplexerResilientDistributedCacheAndRedisHealthCheck()
+    {
+        var settings = CreateValidSettings();
+        settings["ConnectionStrings:Redis"] = "localhost:6399"; // Non-running port to prove AbortOnConnectFail=false doesn't crash boot
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        var services = new ServiceCollection();
+
+        services.AddInfrastructure(configuration);
+        var provider = services.BuildServiceProvider();
+
+        provider.GetService<IConnectionMultiplexer>().Should().NotBeNull();
+        provider.GetService<IDistributedCache>().Should().BeOfType<ResilientDistributedCache>();
+        provider.GetService<ICacheService>().Should().BeOfType<HybridCacheService>();
+
+        var healthCheckOptions = provider.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
+        healthCheckOptions.Registrations.Should().Contain(r => r.Name == "database");
+        healthCheckOptions.Registrations.Should().Contain(r => r.Name == "redis");
     }
 }

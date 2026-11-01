@@ -70,4 +70,7 @@
   <data name="RequestBodyRequired" xml:space="preserve">
     <value>Request body cannot be null.</value>
   </data>
+  <data name="RateLimitExceeded" xml:space="preserve">
+    <value>Too many requests. Please try again later.</value>
+  </data>
 </root>

@@ -14,8 +14,6 @@ builder.Host.UseWolverine(opts =>
 {
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
     opts.UseFluentValidation();
-    opts.UseEntityFrameworkCoreTransactions();
-    opts.Policies.AutoApplyTransactions();
 });
 
 builder.Services.AddOpenApi(options =>
@@ -67,6 +65,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapEndpoints();

@@ -70,4 +70,7 @@
   <data name="RequestBodyRequired" xml:space="preserve">
     <value>Dữ liệu yêu cầu không được để trống.</value>
   </data>
+  <data name="RateLimitExceeded" xml:space="preserve">
+    <value>Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.</value>
+  </data>
 </root>

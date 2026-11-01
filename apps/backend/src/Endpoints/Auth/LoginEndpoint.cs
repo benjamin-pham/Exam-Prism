@@ -1,6 +1,7 @@
 namespace ExamPrism.Endpoints.Auth;
 
 using Common.Endpoints;
+using Common.RateLimiting;
 using Common.Results;
 using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure.Identity;
@@ -38,6 +39,7 @@ public sealed class LoginEndpoint : IEndpoint
             return Results.Ok(result.Value);
         })
         .WithTags("Authentication")
-        .WithSummary("Authenticates user credentials and sets auth cookies");
+        .WithSummary("Authenticates user credentials and sets auth cookies")
+        .RequireRateLimiting(RateLimitPolicies.Auth);
     }
 }

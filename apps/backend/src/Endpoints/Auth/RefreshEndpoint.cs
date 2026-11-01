@@ -1,6 +1,7 @@
 namespace ExamPrism.Endpoints.Auth;
 
 using Common.Endpoints;
+using Common.RateLimiting;
 using Common.Results;
 using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure.Identity;
@@ -46,6 +47,7 @@ public sealed class RefreshEndpoint : IEndpoint
             return Results.Ok();
         })
         .WithTags("Authentication")
-        .WithSummary("Rotates refresh token and returns updated auth cookies");
+        .WithSummary("Rotates refresh token and returns updated auth cookies")
+        .RequireRateLimiting(RateLimitPolicies.Auth);
     }
 }
