@@ -1,0 +1,15 @@
+# .NET ignore
+**/[Bb]in/
+**/[Oo]bj/
+**/TestResults/
+
+# IDE & Editor
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# OS generated
+.DS_Store
+Thumbs.db
