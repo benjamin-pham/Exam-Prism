@@ -38,4 +38,28 @@ public class DependencyInjectionTests
         Assert.NotNull(serviceDescriptor);
         Assert.Equal(ServiceLifetime.Scoped, serviceDescriptor.Lifetime);
     }
+
+    [Fact]
+    public void AddInfrastructure_RegistersTimeProvider_AsSingleton()
+    {
+        var services = new ServiceCollection();
+        var inMemorySettings = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test;Username=postgres;Password=postgres"
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings)
+            .Build();
+
+        services.AddInfrastructure(configuration);
+
+        var serviceDescriptor = services.FirstOrDefault(s => s.ServiceType == typeof(TimeProvider));
+        Assert.NotNull(serviceDescriptor);
+        Assert.Equal(ServiceLifetime.Singleton, serviceDescriptor.Lifetime);
+
+        var serviceProvider = services.BuildServiceProvider();
+        var timeProvider = serviceProvider.GetService<TimeProvider>();
+        Assert.NotNull(timeProvider);
+        Assert.Same(TimeProvider.System, timeProvider);
+    }
 }

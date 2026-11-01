@@ -18,6 +18,8 @@ public static class DependencyInjection
         services.AddHealthChecks()
             .AddDbContextCheck<AppDbContext>(name: "database");
 
+        services.AddSingleton(TimeProvider.System);
+
         return services;
     }
 }
