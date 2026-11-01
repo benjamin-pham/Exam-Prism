@@ -5,7 +5,7 @@ using Common.Endpoints;
 using Common.Handlers;
 using ExamPrism.Features.Auth.Refresh;
 using ExamPrism.Features.Auth.Register;
-using ExamPrism.Features.Health.GetHealth;
+using ExamPrism.Features.Health;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;

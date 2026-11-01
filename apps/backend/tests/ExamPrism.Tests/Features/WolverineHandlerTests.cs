@@ -8,7 +8,7 @@ using ExamPrism.Features.Auth.Login;
 using ExamPrism.Features.Auth.Logout;
 using ExamPrism.Features.Auth.Refresh;
 using ExamPrism.Features.Auth.Register;
-using ExamPrism.Features.Health.GetHealth;
+using ExamPrism.Features.Health;
 using ExamPrism.Infrastructure.Identity;
 using FluentAssertions;
 using FluentValidation;
@@ -96,12 +96,14 @@ public class WolverineHandlerTests
         healthCheckService.CheckHealthAsync(Arg.Any<Func<HealthCheckRegistration, bool>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(healthReport));
 
-        var result = await GetHealthHandler.Handle(new GetHealthQuery(), healthCheckService);
+        var handler = new GetHealthHandler(healthCheckService);
+        var result = await handler.Handle(new GetHealthQuery());
 
-        result.Status.Should().Be("Healthy");
-        result.IsHealthy.Should().BeTrue();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Status.Should().Be("Healthy");
+        result.Value.IsHealthy.Should().BeTrue();
 
-        var json = JsonSerializer.Serialize(result);
+        var json = JsonSerializer.Serialize(result.Value);
         json.Should().NotContain("IsHealthy").And.NotContain("isHealthy");
     }
 
@@ -117,10 +119,12 @@ public class WolverineHandlerTests
         healthCheckService.CheckHealthAsync(Arg.Any<Func<HealthCheckRegistration, bool>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(healthReport));
 
-        var result = await GetHealthHandler.Handle(new GetHealthQuery(), healthCheckService);
+        var handler = new GetHealthHandler(healthCheckService);
+        var result = await handler.Handle(new GetHealthQuery());
 
-        result.Status.Should().Be("Unhealthy");
-        result.IsHealthy.Should().BeFalse();
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Status.Should().Be("Unhealthy");
+        result.Value.IsHealthy.Should().BeFalse();
     }
 
     [Fact]

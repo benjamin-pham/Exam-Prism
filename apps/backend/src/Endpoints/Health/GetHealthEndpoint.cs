@@ -1,7 +1,8 @@
 namespace ExamPrism.Endpoints.Health;
 
 using Common.Endpoints;
-using ExamPrism.Features.Health.GetHealth;
+using Common.Results;
+using ExamPrism.Features.Health;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -11,19 +12,22 @@ public sealed class GetHealthEndpoint : IEndpoint
 {
     public static void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapGet("/health", Handle)
-            .WithTags("Health")
-            .WithSummary("Returns health status of the API");
-    }
+        app.MapGet("/health", async (
+            IMessageBus bus,
+            HttpContext httpContext,
+            CancellationToken ct) =>
+        {
+            var result = await bus.InvokeAsync<Result<GetHealthResult>>(new GetHealthQuery(), ct);
+            if (result.IsFailure)
+            {
+                return result.ToProblemResult(httpContext);
+            }
 
-    private static async Task<IResult> Handle(
-        IMessageBus bus,
-        CancellationToken ct)
-    {
-        var result = await bus.InvokeAsync<GetHealthResult>(new GetHealthQuery(), ct);
-        return result.IsHealthy
-            ? Results.Ok(result)
-            : Results.Json(result, statusCode: StatusCodes.Status503ServiceUnavailable);
+            return result.Value.IsHealthy
+                ? Results.Ok(result.Value)
+                : Results.Json(result.Value, statusCode: StatusCodes.Status503ServiceUnavailable);
+        })
+        .WithTags("Health")
+        .WithSummary("Returns health status of the API");
     }
 }
-
