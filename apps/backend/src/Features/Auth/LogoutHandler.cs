@@ -1,22 +1,23 @@
-namespace ExamPrism.Features.Auth.Logout;
+namespace ExamPrism.Features.Auth;
 
 using Common.Handlers;
+using Common.Results;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-public sealed class LogoutHandler : IHandler
+public record LogoutCommand(string? RefreshToken);
+
+public sealed class LogoutHandler(
+    AppDbContext db,
+    ITokenService tokenService,
+    TimeProvider timeProvider) : IHandler<LogoutCommand>
 {
-    public static async Task Handle(
-        LogoutCommand command,
-        AppDbContext? db,
-        ITokenService tokenService,
-        TimeProvider timeProvider,
-        CancellationToken ct = default)
+    public async Task<Result> Handle(LogoutCommand command, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(command.RefreshToken) || db is null)
         {
-            return;
+            return Result.Success();
         }
 
         var hash = tokenService.HashToken(command.RefreshToken);
@@ -26,6 +27,7 @@ public sealed class LogoutHandler : IHandler
             token.RevokedAt = timeProvider.GetUtcNow();
             await db.SaveChangesAsync(ct);
         }
+
+        return Result.Success();
     }
 }
-

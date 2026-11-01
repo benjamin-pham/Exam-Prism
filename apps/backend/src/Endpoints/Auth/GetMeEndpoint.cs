@@ -1,7 +1,8 @@
 namespace ExamPrism.Endpoints.Auth;
 
 using Common.Endpoints;
-using ExamPrism.Features.Auth.GetMe;
+using Common.Results;
+using ExamPrism.Features.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -11,18 +12,21 @@ public sealed class GetMeEndpoint : IEndpoint
 {
     public static void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/auth/me", Handle)
-            .RequireAuthorization()
-            .WithTags("Authentication")
-            .WithSummary("Gets currently authenticated user details");
-    }
+        app.MapGet("/api/auth/me", async (
+            IMessageBus bus,
+            HttpContext httpContext,
+            CancellationToken ct) =>
+        {
+            var result = await bus.InvokeAsync<Result<GetMeResult>>(new GetMeQuery(), ct);
+            if (result.IsFailure)
+            {
+                return result.ToProblemResult(httpContext);
+            }
 
-    private static async Task<IResult> Handle(
-        IMessageBus bus,
-        CancellationToken ct)
-    {
-        var result = await bus.InvokeAsync<GetMeResult>(new GetMeQuery(), ct);
-        return Results.Ok(result);
+            return Results.Ok(result.Value);
+        })
+        .RequireAuthorization()
+        .WithTags("Authentication")
+        .WithSummary("Gets currently authenticated user details");
     }
 }
-

@@ -1,7 +1,8 @@
 namespace ExamPrism.Endpoints.Auth;
 
 using Common.Endpoints;
-using ExamPrism.Features.Auth.Register;
+using Common.Results;
+using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -13,22 +14,30 @@ public sealed class RegisterEndpoint : IEndpoint
 {
     public static void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/auth/register", Handle)
-            .WithTags("Authentication")
-            .WithSummary("Registers a new user and sets auth cookies");
-    }
+        app.MapPost("/api/auth/register", async (
+            RegisterCommand command,
+            IMessageBus bus,
+            HttpContext httpContext,
+            IOptions<JwtOptions> jwtOptions,
+            TimeProvider timeProvider,
+            CancellationToken ct) =>
+        {
+            var result = await bus.InvokeAsync<Result<RegisterResult>>(command, ct);
+            if (result.IsFailure)
+            {
+                return result.ToProblemResult(httpContext);
+            }
 
-    private static async Task<IResult> Handle(
-        RegisterCommand command,
-        IMessageBus bus,
-        HttpResponse response,
-        IOptions<JwtOptions> jwtOptions,
-        TimeProvider timeProvider,
-        CancellationToken ct)
-    {
-        var result = await bus.InvokeAsync<RegisterResult>(command, ct);
-        AuthCookieHelper.SetAuthCookies(response, result.AccessToken, result.RefreshToken, jwtOptions.Value, timeProvider);
-        return Results.Created("/api/auth/me", result);
+            AuthCookieHelper.SetAuthCookies(
+                httpContext.Response,
+                result.Value.AccessToken,
+                result.Value.RefreshToken,
+                jwtOptions.Value,
+                timeProvider);
+
+            return Results.Created("/api/auth/me", result.Value);
+        })
+        .WithTags("Authentication")
+        .WithSummary("Registers a new user and sets auth cookies");
     }
 }
-

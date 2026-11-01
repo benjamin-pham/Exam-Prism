@@ -1,7 +1,8 @@
 namespace ExamPrism.Endpoints.Auth;
 
 using Common.Endpoints;
-using ExamPrism.Features.Auth.Login;
+using Common.Results;
+using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -13,22 +14,30 @@ public sealed class LoginEndpoint : IEndpoint
 {
     public static void MapEndpoint(IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/auth/login", Handle)
-            .WithTags("Authentication")
-            .WithSummary("Authenticates user credentials and sets auth cookies");
-    }
+        app.MapPost("/api/auth/login", async (
+            LoginCommand command,
+            IMessageBus bus,
+            HttpContext httpContext,
+            IOptions<JwtOptions> jwtOptions,
+            TimeProvider timeProvider,
+            CancellationToken ct) =>
+        {
+            var result = await bus.InvokeAsync<Result<LoginResult>>(command, ct);
+            if (result.IsFailure)
+            {
+                return result.ToProblemResult(httpContext);
+            }
 
-    private static async Task<IResult> Handle(
-        LoginCommand command,
-        IMessageBus bus,
-        HttpResponse response,
-        IOptions<JwtOptions> jwtOptions,
-        TimeProvider timeProvider,
-        CancellationToken ct)
-    {
-        var result = await bus.InvokeAsync<LoginResult>(command, ct);
-        AuthCookieHelper.SetAuthCookies(response, result.AccessToken, result.RefreshToken, jwtOptions.Value, timeProvider);
-        return Results.Ok(result);
+            AuthCookieHelper.SetAuthCookies(
+                httpContext.Response,
+                result.Value.AccessToken,
+                result.Value.RefreshToken,
+                jwtOptions.Value,
+                timeProvider);
+
+            return Results.Ok(result.Value);
+        })
+        .WithTags("Authentication")
+        .WithSummary("Authenticates user credentials and sets auth cookies");
     }
 }
-

@@ -1,17 +1,12 @@
 namespace ExamPrism.Tests.Features;
 
 using System.Text.Json;
-using Common.Exceptions;
+using Common.Results;
 using Common.Security;
-using ExamPrism.Features.Auth.GetMe;
-using ExamPrism.Features.Auth.Login;
-using ExamPrism.Features.Auth.Logout;
-using ExamPrism.Features.Auth.Refresh;
-using ExamPrism.Features.Auth.Register;
+using ExamPrism.Features.Auth;
 using ExamPrism.Features.Health;
 using ExamPrism.Infrastructure.Identity;
 using FluentAssertions;
-using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -21,7 +16,7 @@ using Xunit;
 public class WolverineHandlerTests
 {
     [Fact]
-    public async Task LoginHandler_WhenCredentialsAreEmpty_ThrowsUnauthorizedAccessException()
+    public async Task LoginHandler_WhenCredentialsAreEmpty_ReturnsUnauthorizedFailure()
     {
         var userStore = Substitute.For<IUserStore<ApplicationUser>>();
         var userManager = new UserManager<ApplicationUser>(
@@ -30,20 +25,16 @@ public class WolverineHandlerTests
         var jwtOptions = Options.Create(new JwtOptions());
         var timeProvider = TimeProvider.System;
 
-        var command = new LoginCommand("", "");
+        var handler = new LoginHandler(userManager, null!, tokenService, jwtOptions, timeProvider);
+        var result = await handler.Handle(new LoginCommand("", ""));
 
-        await FluentActions.Invoking(() => LoginHandler.Handle(
-            command,
-            userManager,
-            null!,
-            tokenService,
-            jwtOptions,
-            timeProvider))
-            .Should().ThrowAsync<UnauthorizedAccessException>();
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Unauthorized);
+        result.Error.Code.Should().Be("INVALID_CREDENTIALS");
     }
 
     [Fact]
-    public async Task RegisterHandler_WhenCredentialsAreEmpty_ThrowsValidationException()
+    public async Task RegisterHandler_WhenCredentialsAreEmpty_ReturnsValidationFailure()
     {
         var userStore = Substitute.For<IUserStore<ApplicationUser>>();
         var userManager = new UserManager<ApplicationUser>(
@@ -52,16 +43,36 @@ public class WolverineHandlerTests
         var jwtOptions = Options.Create(new JwtOptions());
         var timeProvider = TimeProvider.System;
 
-        var command = new RegisterCommand("", "");
+        var handler = new RegisterHandler(userManager, null!, tokenService, jwtOptions, timeProvider);
+        var result = await handler.Handle(new RegisterCommand("", ""));
 
-        await FluentActions.Invoking(() => RegisterHandler.Handle(
-            command,
-            userManager,
-            null!,
-            tokenService,
-            jwtOptions,
-            timeProvider))
-            .Should().ThrowAsync<ValidationException>();
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Validation);
+        result.Error.Code.Should().Be("VALIDATION_ERROR");
+        result.Error.ValidationErrors.Should().ContainSingle(e => e.Code == "REQUIRED");
+    }
+
+    [Fact]
+    public async Task RegisterHandler_WhenEmailAlreadyExists_ReturnsDuplicateEmailValidationFailure()
+    {
+        var userStore = Substitute.For<IUserStore<ApplicationUser>, IUserEmailStore<ApplicationUser>>();
+        ((IUserEmailStore<ApplicationUser>)userStore)
+            .FindByEmailAsync("existing@example.com", Arg.Any<CancellationToken>())
+            .Returns(new ApplicationUser { Email = "existing@example.com" });
+
+        var userManager = new UserManager<ApplicationUser>(
+            userStore, null!, null!, null!, null!, null!, null!, null!, null!);
+        var tokenService = Substitute.For<ITokenService>();
+        var jwtOptions = Options.Create(new JwtOptions());
+        var timeProvider = TimeProvider.System;
+
+        var handler = new RegisterHandler(userManager, null!, tokenService, jwtOptions, timeProvider);
+        var result = await handler.Handle(new RegisterCommand("existing@example.com", "Password123!"));
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Validation);
+        result.Error.ValidationErrors.Should().ContainSingle(e =>
+            e.Field == "Email" && e.Code == "DUPLICATE_EMAIL");
     }
 
     [Fact]
@@ -128,7 +139,7 @@ public class WolverineHandlerTests
     }
 
     [Fact]
-    public async Task GetMeHandler_WhenUserContextHasNoUserId_ThrowsUnauthorizedAccessException()
+    public async Task GetMeHandler_WhenUserContextHasNoUserId_ReturnsUnauthorizedFailure()
     {
         var userContext = Substitute.For<IUserContext>();
         userContext.UserId.Returns((Guid?)null);
@@ -137,12 +148,16 @@ public class WolverineHandlerTests
         var userManager = new UserManager<ApplicationUser>(
             userStore, null!, null!, null!, null!, null!, null!, null!, null!);
 
-        await FluentActions.Invoking(() => GetMeHandler.Handle(new GetMeQuery(), userContext, userManager))
-            .Should().ThrowAsync<UnauthorizedAccessException>();
+        var handler = new GetMeHandler(userContext, userManager);
+        var result = await handler.Handle(new GetMeQuery());
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Unauthorized);
+        result.Error.Code.Should().Be("UNAUTHORIZED");
     }
 
     [Fact]
-    public async Task GetMeHandler_WhenUserNotFound_ThrowsNotFoundException()
+    public async Task GetMeHandler_WhenUserNotFound_ReturnsNotFoundFailure()
     {
         var userId = Guid.NewGuid();
         var userContext = Substitute.For<IUserContext>();
@@ -152,39 +167,38 @@ public class WolverineHandlerTests
         var userManager = new UserManager<ApplicationUser>(
             userStore, null!, null!, null!, null!, null!, null!, null!, null!);
 
-        await FluentActions.Invoking(() => GetMeHandler.Handle(new GetMeQuery(), userContext, userManager))
-            .Should().ThrowAsync<NotFoundException>();
+        var handler = new GetMeHandler(userContext, userManager);
+        var result = await handler.Handle(new GetMeQuery());
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.NotFound);
+        result.Error.Code.Should().Be("USER_NOT_FOUND");
     }
 
     [Fact]
-    public async Task RefreshTokenHandler_WhenTokenIsBlank_ReturnsNullWithoutThrowing()
+    public async Task RefreshTokenHandler_WhenTokenIsBlank_ReturnsUnauthorizedFailure()
     {
         var tokenService = Substitute.For<ITokenService>();
         var jwtOptions = Options.Create(new JwtOptions());
         var timeProvider = TimeProvider.System;
 
-        var result = await RefreshTokenHandler.Handle(
-            new RefreshTokenCommand(""),
-            null!,
-            tokenService,
-            jwtOptions,
-            timeProvider);
+        var handler = new RefreshTokenHandler(null!, tokenService, jwtOptions, timeProvider);
+        var result = await handler.Handle(new RefreshTokenCommand(""));
 
-        result.Should().BeNull();
+        result.IsFailure.Should().BeTrue();
+        result.Error.Type.Should().Be(ErrorType.Unauthorized);
+        result.Error.Code.Should().Be("INVALID_REFRESH_TOKEN");
     }
 
     [Fact]
-    public async Task LogoutHandler_WhenTokenIsNullOrBlank_CompletesWithoutTouchingDb()
+    public async Task LogoutHandler_WhenTokenIsNullOrBlank_ReturnsSuccessResult()
     {
         var tokenService = Substitute.For<ITokenService>();
         var timeProvider = TimeProvider.System;
 
-        var act = () => LogoutHandler.Handle(
-            new LogoutCommand(null),
-            null!,
-            tokenService,
-            timeProvider);
+        var handler = new LogoutHandler(null!, tokenService, timeProvider);
+        var result = await handler.Handle(new LogoutCommand(null));
 
-        await act.Should().NotThrowAsync();
+        result.IsSuccess.Should().BeTrue();
     }
 }

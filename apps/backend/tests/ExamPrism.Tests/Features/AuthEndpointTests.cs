@@ -7,9 +7,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using ExamPrism.Endpoints.Auth;
-using ExamPrism.Features.Auth.GetMe;
-using ExamPrism.Features.Auth.Login;
-using ExamPrism.Features.Auth.Register;
+using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
@@ -254,10 +252,10 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     [InlineData("", "Password123!")]
     [InlineData("test@example.com", "")]
     [InlineData(null, "Password123!")]
-    public async Task Login_WithEmptyOrNullInput_Returns401(string? email, string? password)
+    public async Task Login_WithEmptyOrNullInput_Returns400(string? email, string? password)
     {
         var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginCommand(email!, password!));
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

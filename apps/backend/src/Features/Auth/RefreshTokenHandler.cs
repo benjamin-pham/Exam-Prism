@@ -1,24 +1,30 @@
-namespace ExamPrism.Features.Auth.Refresh;
+namespace ExamPrism.Features.Auth;
 
+using System.Text.Json.Serialization;
 using Common.Handlers;
+using Common.Results;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
-public sealed class RefreshTokenHandler : IHandler
+public record RefreshTokenCommand(string RefreshToken);
+
+public record RefreshTokenResult(
+    [property: JsonIgnore] string AccessToken = "",
+    [property: JsonIgnore] string RefreshToken = "");
+
+public sealed class RefreshTokenHandler(
+    AppDbContext db,
+    ITokenService tokenService,
+    IOptions<JwtOptions> jwtOptions,
+    TimeProvider timeProvider) : IHandler<RefreshTokenCommand, RefreshTokenResult>
 {
-    public static async Task<RefreshTokenResult?> Handle(
-        RefreshTokenCommand command,
-        AppDbContext? db,
-        ITokenService tokenService,
-        IOptions<JwtOptions> jwtOptions,
-        TimeProvider timeProvider,
-        CancellationToken ct = default)
+    public async Task<Result<RefreshTokenResult>> Handle(RefreshTokenCommand command, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(command.RefreshToken) || db is null)
         {
-            return null;
+            return Error.Unauthorized("INVALID_REFRESH_TOKEN", "Invalid or expired refresh token.");
         }
 
         var hash = tokenService.HashToken(command.RefreshToken);
@@ -28,7 +34,7 @@ public sealed class RefreshTokenHandler : IHandler
 
         if (token is null)
         {
-            return null;
+            return Error.Unauthorized("INVALID_REFRESH_TOKEN", "Invalid or expired refresh token.");
         }
 
         var now = timeProvider.GetUtcNow();
@@ -40,13 +46,13 @@ public sealed class RefreshTokenHandler : IHandler
                 .Where(t => t.UserId == token.UserId && t.RevokedAt == null)
                 .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
 
-            return null;
+            return Error.Unauthorized("COMPROMISED_REFRESH_TOKEN", "Refresh token has been revoked.");
         }
 
         // Expired check
         if (token.IsExpired(timeProvider))
         {
-            return null;
+            return Error.Unauthorized("INVALID_REFRESH_TOKEN", "Invalid or expired refresh token.");
         }
 
         // Rotate
@@ -71,4 +77,3 @@ public sealed class RefreshTokenHandler : IHandler
         return new RefreshTokenResult(newAccessToken, newRaw);
     }
 }
-

@@ -1,6 +1,7 @@
 namespace ExamPrism.Tests.Features;
 
 using Common.Handlers;
+using Common.Results;
 using FluentAssertions;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,10 +20,10 @@ public sealed class ProbeValidatedCommandValidator : AbstractValidator<ProbeVali
     }
 }
 
-public sealed class ProbeValidatedCommandHandler : IHandler
+public sealed class ProbeValidatedCommandHandler : IHandler<ProbeValidatedCommand, ProbeValidatedResult>
 {
-    public static Task<ProbeValidatedResult> Handle(ProbeValidatedCommand command) =>
-        Task.FromResult(new ProbeValidatedResult(command.Code));
+    public Task<Result<ProbeValidatedResult>> Handle(ProbeValidatedCommand command, CancellationToken ct = default) =>
+        Task.FromResult(Result.Success(new ProbeValidatedResult(command.Code)));
 }
 
 public record ProbeValidatedResult(string Code);
@@ -49,12 +50,13 @@ public class BusValidationTests
 
         var bus = host.Services.GetRequiredService<IMessageBus>();
 
-        var invalidAct = () => bus.InvokeAsync<ProbeValidatedResult>(new ProbeValidatedCommand(""));
+        var invalidAct = () => bus.InvokeAsync<Result<ProbeValidatedResult>>(new ProbeValidatedCommand(""));
         await invalidAct.Should().ThrowAsync<ValidationException>();
 
-        var validResult = await bus.InvokeAsync<ProbeValidatedResult>(new ProbeValidatedCommand("VALID_CODE"));
+        var validResult = await bus.InvokeAsync<Result<ProbeValidatedResult>>(new ProbeValidatedCommand("VALID_CODE"));
         validResult.Should().NotBeNull();
-        validResult.Code.Should().Be("VALID_CODE");
+        validResult.IsSuccess.Should().BeTrue();
+        validResult.Value.Code.Should().Be("VALID_CODE");
 
         await host.StopAsync();
     }
@@ -66,8 +68,7 @@ public class BusValidationTests
         services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
         var provider = services.BuildServiceProvider();
 
-        provider.GetService<IValidator<ExamPrism.Features.Auth.Register.RegisterCommand>>().Should().NotBeNull();
-        provider.GetService<IValidator<ExamPrism.Features.Auth.Login.LoginCommand>>().Should().NotBeNull();
+        provider.GetService<IValidator<ExamPrism.Features.Auth.RegisterCommand>>().Should().NotBeNull();
+        provider.GetService<IValidator<ExamPrism.Features.Auth.LoginCommand>>().Should().NotBeNull();
     }
 }
-
