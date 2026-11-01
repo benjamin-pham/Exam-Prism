@@ -9,11 +9,12 @@ public static class EndpointExtensions
         this IEndpointRouteBuilder app,
         params Assembly[] assemblies)
     {
-        var targetAssemblies = assemblies.Length > 0
+        IEnumerable<Assembly> targetAssemblies = assemblies.Length > 0
             ? assemblies.Distinct()
-            : [Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly()];
+            : [Assembly.GetCallingAssembly(), Assembly.GetExecutingAssembly()];
 
         var endpointTypes = targetAssemblies
+            .Distinct()
             .SelectMany(GetExportedTypesSafely)
             .Where(t => !t.IsAbstract && !t.IsInterface && typeof(IEndpoint).IsAssignableFrom(t))
             .Distinct();

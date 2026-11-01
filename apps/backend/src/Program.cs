@@ -1,4 +1,4 @@
-using Endpoints;
+using Common.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +12,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.MapHealthEndpoints();
+app.MapEndpoints();
 
 app.Run();
 
