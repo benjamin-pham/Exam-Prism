@@ -1,4 +1,5 @@
 using Common.Endpoints;
+using Common.Exceptions;
 using ExamPrism.Infrastructure;
 using FluentValidation;
 using Microsoft.OpenApi;
@@ -26,6 +27,8 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddLocalization(options => options.ResourcesPath = "Common/Localization/Resources");
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
 
 var supportedCultures = new[] { "vi-VN", "vi", "en-US", "en" };
@@ -39,6 +42,7 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 var app = builder.Build();
 
 app.UseRequestLocalization();
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
