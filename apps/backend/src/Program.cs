@@ -1,11 +1,21 @@
-using Common.Endpoints;
 using Common.Exceptions;
 using ExamPrism.Infrastructure;
 using FluentValidation;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using Wolverine;
+using Wolverine.EntityFrameworkCore;
+using Wolverine.Http;
+using Wolverine.Http.FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseWolverine(opts =>
+{
+    opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
+    opts.UseEntityFrameworkCoreTransactions();
+    opts.Policies.AutoApplyTransactions();
+});
 
 builder.Services.AddOpenApi(options =>
 {
@@ -57,7 +67,10 @@ if (app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapEndpoints();
+app.MapWolverineEndpoints(opts =>
+{
+    opts.UseFluentValidationProblemDetailMiddleware();
+});
 
 app.Run();
 
