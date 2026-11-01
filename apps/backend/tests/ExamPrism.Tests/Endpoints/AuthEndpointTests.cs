@@ -59,7 +59,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.PostAsJsonAsync("/api/auth/register", request);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var user = await response.Content.ReadFromJsonAsync<UserResponse>();
+        var user = await response.Content.ReadFromJsonAsync<RegisterResponse>();
         user.Should().NotBeNull();
         user!.Email.Should().Be(email);
 
@@ -98,7 +98,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password));
 
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var user = await loginResponse.Content.ReadFromJsonAsync<UserResponse>();
+        var user = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
         user.Should().NotBeNull();
         user!.Email.Should().Be(email);
 
@@ -143,7 +143,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
     {
         var email = $"reuseuser_{Guid.NewGuid()}@example.com";
         var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "Password123!"));
-        var (user, rawRefresh1) = (await regResponse.Content.ReadFromJsonAsync<UserResponse>(), ExtractCookies(regResponse).RefreshToken);
+        var (user, rawRefresh1) = (await regResponse.Content.ReadFromJsonAsync<RegisterResponse>(), ExtractCookies(regResponse).RefreshToken);
 
         // First rotation: valid
         var req1 = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
@@ -214,7 +214,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         var meResponse = await _client.SendAsync(meRequest);
 
         meResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var user = await meResponse.Content.ReadFromJsonAsync<UserResponse>();
+        var user = await meResponse.Content.ReadFromJsonAsync<GetMeResponse>();
         user.Should().NotBeNull();
         user!.Email.Should().Be(email);
     }
@@ -232,7 +232,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         var meResponse = await _client.SendAsync(meRequest);
 
         meResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var user = await meResponse.Content.ReadFromJsonAsync<UserResponse>();
+        var user = await meResponse.Content.ReadFromJsonAsync<GetMeResponse>();
         user.Should().NotBeNull();
         user!.Email.Should().Be(email);
     }
