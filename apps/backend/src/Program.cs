@@ -24,15 +24,34 @@ builder.Services.AddOpenApi(options =>
 });
 builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddLocalization(options => options.ResourcesPath = "Common/Localization/Resources");
+
+var supportedCultures = new[] { "vi-VN", "en-US" };
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.SetDefaultCulture("vi-VN")
+           .AddSupportedCultures(supportedCultures)
+           .AddSupportedUICultures(supportedCultures);
+});
 
 var app = builder.Build();
 
+var localizationOptions = new RequestLocalizationOptions()
+    .SetDefaultCulture("vi-VN")
+    .AddSupportedCultures(supportedCultures)
+    .AddSupportedUICultures(supportedCultures);
+
+app.UseRequestLocalization(localizationOptions);
+
+if (app.Environment.IsDevelopment())
+{
     app.MapOpenApi();
     app.MapScalarApiReference(options =>
     {
         options.WithTitle("ExamPrism API")
                .AddPreferredSecuritySchemes(["Bearer"]);
     });
+}
 
 app.UseAuthentication();
 app.UseAuthorization();

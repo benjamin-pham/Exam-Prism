@@ -13,4 +13,13 @@
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Update="Common/Localization/Resources/SharedResources.resx">
+      <LogicalName>ExamPrism.Common.Localization.Resources.Common.Localization.SharedResources.resources</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Common/Localization/Resources/SharedResources.vi.resx">
+      <LogicalName>ExamPrism.Common.Localization.Resources.Common.Localization.SharedResources.vi.resources</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>
