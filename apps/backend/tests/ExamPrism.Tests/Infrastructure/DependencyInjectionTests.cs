@@ -103,6 +103,26 @@ public class DependencyInjectionTests
     }
 
     [Fact]
+    public void AddInfrastructure_RegistersUserContextAndHttpContextAccessor()
+    {
+        // Arrange
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(CreateValidSettings())
+            .Build();
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddInfrastructure(configuration);
+        var provider = services.BuildServiceProvider();
+
+        // Assert
+        services.Should().ContainSingle(s => s.ServiceType == typeof(Common.Security.IUserContext))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
+        provider.GetService<IHttpContextAccessor>().Should().NotBeNull();
+        provider.GetService<Common.Security.IUserContext>().Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task AddInfrastructure_ConfiguresJwtBearer_WithCookieFallback()
     {
         // Arrange

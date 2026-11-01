@@ -25,6 +25,9 @@ public static class DependencyInjection
 
         services.AddSingleton(TimeProvider.System);
 
+        services.AddHttpContextAccessor();
+        services.AddScoped<Common.Security.IUserContext, UserContext>();
+
         // Identity setup
         services.AddIdentityCore<ApplicationUser>(options =>
         {

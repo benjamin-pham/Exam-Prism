@@ -1,7 +1,7 @@
 namespace ExamPrism.Endpoints.Auth;
 
-using System.Security.Claims;
 using Common.Endpoints;
+using Common.Security;
 using ExamPrism.Infrastructure.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -22,16 +22,15 @@ public sealed class GetMeEndpoint : IEndpoint
     }
 
     private static async Task<IResult> HandleAsync(
-        ClaimsPrincipal principal,
+        IUserContext userContext,
         UserManager<ApplicationUser> userManager)
     {
-        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var guid))
+        if (userContext.UserId is not { } userId)
         {
             return Results.Unauthorized();
         }
 
-        var user = await userManager.FindByIdAsync(guid.ToString());
+        var user = await userManager.FindByIdAsync(userId.ToString());
         if (user is null)
         {
             return Results.NotFound();
