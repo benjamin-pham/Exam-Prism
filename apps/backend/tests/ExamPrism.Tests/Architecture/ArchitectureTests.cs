@@ -153,6 +153,14 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void HasDbContextReference_DetectsDbContextInPropertiesReturnTypesAndGenerics()
+    {
+        HasDbContextReference(typeof(ProbeEndpointWithPropertyDbContext)).Should().BeTrue();
+        HasDbContextReference(typeof(ProbeEndpointWithMethodReturnTypeDbContext)).Should().BeTrue();
+        HasDbContextReference(typeof(ProbeEndpointWithGenericDbContextWrapper)).Should().BeTrue();
+    }
+
+    [Fact]
     public void TypesInFeatures_MustNotReferenceAspNetCoreHttpRoutingOrMvc()
     {
         var forbiddenPrefixes = new[]
@@ -299,19 +307,25 @@ public class ArchitectureTests
             }
 
             var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
-            if (fields.Any(f => typeof(DbContext).IsAssignableFrom(f.FieldType)))
+            if (fields.Any(f => IsDbContextOrContainsDbContext(f.FieldType)))
+            {
+                return true;
+            }
+
+            var properties = t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
+            if (properties.Any(p => IsDbContextOrContainsDbContext(p.PropertyType)))
             {
                 return true;
             }
 
             var constructors = t.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
-            if (constructors.Any(c => c.GetParameters().Any(p => typeof(DbContext).IsAssignableFrom(p.ParameterType))))
+            if (constructors.Any(c => c.GetParameters().Any(p => IsDbContextOrContainsDbContext(p.ParameterType))))
             {
                 return true;
             }
 
             var methods = t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
-            if (methods.Any(m => m.GetParameters().Any(p => typeof(DbContext).IsAssignableFrom(p.ParameterType))))
+            if (methods.Any(m => IsDbContextOrContainsDbContext(m.ReturnType) || m.GetParameters().Any(p => IsDbContextOrContainsDbContext(p.ParameterType))))
             {
                 return true;
             }
@@ -319,6 +333,9 @@ public class ArchitectureTests
 
         return false;
     }
+
+    private static bool IsDbContextOrContainsDbContext(Type type) =>
+        UnwrapTypes(type).Any(t => typeof(DbContext).IsAssignableFrom(t));
 
     private static void AssertNotForbidden(Type type, Type declaringType, string memberName, string[] forbiddenPrefixes)
     {
@@ -366,5 +383,20 @@ public class ArchitectureTests
             var action = (AppDbContext db) => db.ToString();
             _ = action;
         }
+    }
+
+    private sealed class ProbeEndpointWithPropertyDbContext
+    {
+        public AppDbContext Db => null!;
+    }
+
+    private sealed class ProbeEndpointWithMethodReturnTypeDbContext
+    {
+        public AppDbContext GetDb() => null!;
+    }
+
+    private sealed class ProbeEndpointWithGenericDbContextWrapper
+    {
+        public Func<AppDbContext> Factory => null!;
     }
 }

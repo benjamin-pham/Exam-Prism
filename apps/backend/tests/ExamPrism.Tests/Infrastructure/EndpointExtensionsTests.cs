@@ -48,6 +48,60 @@ public class EndpointExtensionsTests
         routePatterns.Should().Contain("/test-discovery/public");
         routePatterns.Should().NotContain("/test-discovery/dev-only-fixture");
     }
+
+    [Fact]
+    public void MapEndpoints_NullApp_ThrowsArgumentNullException()
+    {
+        IEndpointRouteBuilder app = null!;
+        var act = () => app.MapEndpoints();
+        act.Should().Throw<ArgumentNullException>().WithParameterName("app");
+    }
+
+    [Fact]
+    public void MapEndpoints_NullAssembliesArray_ThrowsArgumentNullException()
+    {
+        var builder = WebApplication.CreateBuilder();
+        using var app = builder.Build();
+
+        var act = () => app.MapEndpoints(assemblies: null!);
+        act.Should().Throw<ArgumentNullException>().WithParameterName("assemblies");
+    }
+
+    [Fact]
+    public void MapEndpoints_GenericMarker_DiscoversEndpoints()
+    {
+        var builder = WebApplication.CreateBuilder();
+        using var app = builder.Build();
+
+        app.MapEndpoints<EndpointExtensionsTests>();
+
+        var routePatterns = ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(ds => ds.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Select(e => e.RoutePattern.RawText)
+            .ToList();
+
+        routePatterns.Should().Contain("/test-discovery/public");
+    }
+
+    [Fact]
+    public void MapEndpoints_DuplicateAssemblies_DeduplicatesWithoutError()
+    {
+        var builder = WebApplication.CreateBuilder();
+        using var app = builder.Build();
+
+        var asm = typeof(EndpointExtensionsTests).Assembly;
+        app.MapEndpoints(asm, asm);
+
+        var routePatterns = ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(ds => ds.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Select(e => e.RoutePattern.RawText)
+            .Where(r => r == "/test-discovery/public")
+            .ToList();
+
+        routePatterns.Count.Should().Be(1);
+    }
 }
 
 public class PublicTestEndpoint : IEndpoint

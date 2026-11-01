@@ -32,7 +32,7 @@ public sealed class RefreshTokenHandler(
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
 
-        if (token is null)
+        if (token is null || token.User is null)
         {
             return Error.Unauthorized("INVALID_REFRESH_TOKEN", "Invalid or expired refresh token.");
         }
