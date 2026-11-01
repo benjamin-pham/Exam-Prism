@@ -1,6 +1,7 @@
 namespace Common.Endpoints;
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using Microsoft.AspNetCore.Routing;
 
@@ -18,6 +19,8 @@ public static class EndpointExtensions
     /// <param name="assemblies">Optional explicit assemblies to scan.</param>
     /// <returns>The endpoint route builder for chaining.</returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="app"/> or <paramref name="assemblies"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if an endpoint type does not provide an invokable MapEndpoint method.</exception>
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public static IEndpointRouteBuilder MapEndpoints(
         this IEndpointRouteBuilder app,
         params Assembly[] assemblies)
@@ -33,7 +36,7 @@ public static class EndpointExtensions
         var endpointTypes = targetAssemblies
             .Distinct()
             .SelectMany(GetTypesSafely)
-            .Where(t => !t.IsAbstract && !t.IsInterface && !t.IsGenericTypeDefinition && typeof(IEndpoint).IsAssignableFrom(t))
+            .Where(t => !t.IsAbstract && !t.IsInterface && !t.IsGenericTypeDefinition && !t.ContainsGenericParameters && typeof(IEndpoint).IsAssignableFrom(t))
             .Distinct();
 
         foreach (var type in endpointTypes)
@@ -44,9 +47,15 @@ public static class EndpointExtensions
                 [typeof(IEndpointRouteBuilder)])
                 ?? GetExplicitInterfaceMethod(type);
 
+            if (mapMethod is null)
+            {
+                throw new InvalidOperationException(
+                    $"Type '{type.FullName}' implements '{nameof(IEndpoint)}' but no static '{nameof(IEndpoint.MapEndpoint)}' method could be found.");
+            }
+
             try
             {
-                mapMethod?.Invoke(null, [app]);
+                mapMethod.Invoke(null, [app]);
             }
             catch (TargetInvocationException ex) when (ex.InnerException is not null)
             {

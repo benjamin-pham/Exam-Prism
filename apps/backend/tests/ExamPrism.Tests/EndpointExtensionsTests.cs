@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Xunit;
 
-public class EndpointExtensionsTests
+public class EndpointExtensionsTests : IDisposable
 {
     public class MockEndpointRouteBuilder : IEndpointRouteBuilder
     {
@@ -50,6 +50,14 @@ public class EndpointExtensionsTests
         public static void MapEndpoint(IEndpointRouteBuilder app) { }
     }
 
+    public class OuterGeneric<T>
+    {
+        public class NestedEndpoint : IEndpoint
+        {
+            public static void MapEndpoint(IEndpointRouteBuilder app) { }
+        }
+    }
+
     public abstract class AbstractTestEndpoint : IEndpoint
     {
         public static void MapEndpoint(IEndpointRouteBuilder app) => throw new InvalidOperationException("Should not be called");
@@ -58,6 +66,16 @@ public class EndpointExtensionsTests
     public class NonEndpoint
     {
         public static void MapEndpoint(IEndpointRouteBuilder app) => throw new InvalidOperationException("Should not be called");
+    }
+
+    public EndpointExtensionsTests()
+    {
+        ResetCounters();
+    }
+
+    public void Dispose()
+    {
+        ResetCounters();
     }
 
     private void ResetCounters()
@@ -71,7 +89,6 @@ public class EndpointExtensionsTests
     [Fact]
     public void MapEndpoints_InvokesRegisteredEndpoints()
     {
-        ResetCounters();
         var builder = new MockEndpointRouteBuilder();
 
         builder.MapEndpoints(typeof(EndpointExtensionsTests).Assembly);
@@ -82,9 +99,20 @@ public class EndpointExtensionsTests
     }
 
     [Fact]
+    public void MapEndpoints_Parameterless_DiscoversExecutingAndCallingAssemblies()
+    {
+        var builder = new MockEndpointRouteBuilder();
+
+        builder.MapEndpoints();
+
+        Assert.Equal(1, StandardTestEndpoint.InvocationCount);
+        Assert.Equal(1, ExplicitTestEndpoint.InvocationCount);
+        Assert.Equal(1, InternalTestEndpoint.InvocationCount);
+    }
+
+    [Fact]
     public void MapEndpoints_DuplicateAssemblies_InvokesEachEndpointOnlyOnce()
     {
-        ResetCounters();
         var builder = new MockEndpointRouteBuilder();
         var asm = typeof(EndpointExtensionsTests).Assembly;
 
@@ -98,7 +126,6 @@ public class EndpointExtensionsTests
     [Fact]
     public void MapEndpoints_GenericMarker_InvokesRegisteredEndpoints()
     {
-        ResetCounters();
         var builder = new MockEndpointRouteBuilder();
 
         builder.MapEndpoints<EndpointExtensionsTests>();
@@ -125,11 +152,17 @@ public class EndpointExtensionsTests
     [Fact]
     public void MapEndpoints_WhenEndpointThrows_UnwrapsTargetInvocationException()
     {
-        ResetCounters();
-        ThrowingTestEndpoint.ShouldThrow = true;
-        var builder = new MockEndpointRouteBuilder();
+        try
+        {
+            ThrowingTestEndpoint.ShouldThrow = true;
+            var builder = new MockEndpointRouteBuilder();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => builder.MapEndpoints(typeof(EndpointExtensionsTests).Assembly));
-        Assert.Equal("Endpoint registration failure", ex.Message);
+            var ex = Assert.Throws<InvalidOperationException>(() => builder.MapEndpoints(typeof(EndpointExtensionsTests).Assembly));
+            Assert.Equal("Endpoint registration failure", ex.Message);
+        }
+        finally
+        {
+            ThrowingTestEndpoint.ShouldThrow = false;
+        }
     }
 }
