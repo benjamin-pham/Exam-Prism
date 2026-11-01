@@ -1,14 +1,12 @@
 namespace ExamPrism.Features.Auth;
 
 using System.ComponentModel.DataAnnotations;
-using Common.Endpoints;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
+using Wolverine.Http;
 
 public record RegisterRequest(
     [Required, EmailAddress] string Email,
@@ -16,17 +14,10 @@ public record RegisterRequest(
 
 public record RegisterResponse(Guid Id, string Email);
 
-public sealed class RegisterEndpoint : IEndpoint
+public static class RegisterHandler
 {
-    public static void MapEndpoint(IEndpointRouteBuilder app)
-    {
-        app.MapPost("/api/auth/register", HandleAsync)
-            .WithTags("Authentication")
-            .WithName("Register")
-            .WithDescription("Registers a new user and sets auth cookies");
-    }
-
-    private static async Task<IResult> HandleAsync(
+    [WolverinePost("/api/auth/register")]
+    public static async Task<IResult> Handle(
         RegisterRequest request,
         UserManager<ApplicationUser> userManager,
         AppDbContext db,
@@ -89,4 +80,3 @@ public sealed class RegisterEndpoint : IEndpoint
         return Results.Created("/api/auth/me", new RegisterResponse(user.Id, user.Email!));
     }
 }
-

@@ -1,14 +1,12 @@
 namespace ExamPrism.Features.Auth;
 
 using System.ComponentModel.DataAnnotations;
-using Common.Endpoints;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Options;
+using Wolverine.Http;
 
 public record LoginRequest(
     [Required, EmailAddress] string Email,
@@ -16,17 +14,10 @@ public record LoginRequest(
 
 public record LoginResponse(Guid Id, string Email);
 
-public sealed class LoginEndpoint : IEndpoint
+public static class LoginHandler
 {
-    public static void MapEndpoint(IEndpointRouteBuilder app)
-    {
-        app.MapPost("/api/auth/login", HandleAsync)
-            .WithTags("Authentication")
-            .WithName("Login")
-            .WithDescription("Authenticates user credentials and sets auth cookies");
-    }
-
-    private static async Task<IResult> HandleAsync(
+    [WolverinePost("/api/auth/login")]
+    public static async Task<IResult> Handle(
         LoginRequest request,
         UserManager<ApplicationUser> userManager,
         AppDbContext db,
@@ -67,4 +58,3 @@ public sealed class LoginEndpoint : IEndpoint
         return Results.Ok(new LoginResponse(user.Id, user.Email!));
     }
 }
-

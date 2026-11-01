@@ -1,24 +1,15 @@
 namespace ExamPrism.Features.Auth;
 
-using Common.Endpoints;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Wolverine.Http;
 
-public sealed class LogoutEndpoint : IEndpoint
+public static class LogoutHandler
 {
-    public static void MapEndpoint(IEndpointRouteBuilder app)
-    {
-        app.MapPost("/api/auth/logout", HandleAsync)
-            .WithTags("Authentication")
-            .WithName("Logout")
-            .WithDescription("Revokes refresh token and clears auth cookies");
-    }
-
-    private static async Task<IResult> HandleAsync(
+    [WolverinePost("/api/auth/logout")]
+    public static async Task<IResult> Handle(
         HttpRequest request,
         HttpResponse response,
         AppDbContext db,
@@ -41,4 +32,3 @@ public sealed class LogoutEndpoint : IEndpoint
         return Results.NoContent();
     }
 }
-

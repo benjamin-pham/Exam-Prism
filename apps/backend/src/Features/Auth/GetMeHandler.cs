@@ -1,27 +1,19 @@
 namespace ExamPrism.Features.Auth;
 
-using Common.Endpoints;
 using Common.Security;
 using ExamPrism.Infrastructure.Identity;
-using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Routing;
+using Wolverine.Http;
 
 public record GetMeResponse(Guid Id, string Email);
 
-public sealed class GetMeEndpoint : IEndpoint
+public static class GetMeHandler
 {
-    public static void MapEndpoint(IEndpointRouteBuilder app)
-    {
-        app.MapGet("/api/auth/me", HandleAsync)
-            .RequireAuthorization()
-            .WithTags("Authentication")
-            .WithName("GetMe")
-            .WithDescription("Gets currently authenticated user details");
-    }
-
-    private static async Task<IResult> HandleAsync(
+    [WolverineGet("/api/auth/me")]
+    [Authorize]
+    public static async Task<IResult> Handle(
         IUserContext userContext,
         UserManager<ApplicationUser> userManager)
     {
@@ -39,4 +31,3 @@ public sealed class GetMeEndpoint : IEndpoint
         return Results.Ok(new GetMeResponse(user.Id, user.Email!));
     }
 }
-

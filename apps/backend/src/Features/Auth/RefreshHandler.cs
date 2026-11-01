@@ -1,25 +1,16 @@
 namespace ExamPrism.Features.Auth;
 
-using Common.Endpoints;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Wolverine.Http;
 
-public sealed class RefreshEndpoint : IEndpoint
+public static class RefreshHandler
 {
-    public static void MapEndpoint(IEndpointRouteBuilder app)
-    {
-        app.MapPost("/api/auth/refresh", HandleAsync)
-            .WithTags("Authentication")
-            .WithName("Refresh")
-            .WithDescription("Rotates refresh token and returns updated auth cookies");
-    }
-
-    private static async Task<IResult> HandleAsync(
+    [WolverinePost("/api/auth/refresh")]
+    public static async Task<IResult> Handle(
         HttpRequest request,
         HttpResponse response,
         AppDbContext db,
@@ -88,4 +79,3 @@ public sealed class RefreshEndpoint : IEndpoint
         return Results.Ok();
     }
 }
-
