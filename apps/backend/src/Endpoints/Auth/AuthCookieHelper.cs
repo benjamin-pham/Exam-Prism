@@ -23,6 +23,7 @@ public static class AuthCookieHelper
             Secure = true,
             SameSite = SameSiteMode.Lax,
             Path = "/",
+            Domain = null,
             Expires = now.AddMinutes(options.AccessTokenExpirationMinutes)
         });
 
@@ -32,6 +33,7 @@ public static class AuthCookieHelper
             Secure = true,
             SameSite = SameSiteMode.Lax,
             Path = "/",
+            Domain = null,
             Expires = now.AddDays(options.RefreshTokenExpirationDays)
         });
     }
@@ -43,7 +45,8 @@ public static class AuthCookieHelper
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Lax,
-            Path = "/"
+            Path = "/",
+            Domain = null
         });
 
         response.Cookies.Delete(RefreshTokenCookieName, new CookieOptions
@@ -51,7 +54,8 @@ public static class AuthCookieHelper
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Lax,
-            Path = "/"
+            Path = "/",
+            Domain = null
         });
     }
 }

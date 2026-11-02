@@ -6,8 +6,11 @@ using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using Common.Localization;
+using Common.MultiTenancy;
 using Common.RateLimiting;
 using ExamPrism.Infrastructure.Caching;
+using ExamPrism.Infrastructure.MultiTenancy;
+using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -74,8 +77,10 @@ public static class RateLimitingSetup
 
             options.AddPolicy(RateLimitPolicies.Auth, httpContext =>
             {
+                var tenantInfo = httpContext.GetMultiTenantContext<ExamPrismTenantInfo>()?.TenantInfo;
+                var scope = tenantInfo is { Status: TenantStatus.Active } ? $"t:{tenantInfo.Id}" : "platform";
                 var ip = GetClientIp(httpContext);
-                var partitionKey = $"auth:ip:{ip}";
+                var partitionKey = $"{scope}:auth:ip:{ip}";
 
                 return RateLimitPartition.Get(partitionKey, _ => useRedis && multiplexer is not null
                     ? new RedisFixedWindowRateLimiter(
@@ -118,6 +123,9 @@ public static class RateLimitingSetup
                     return RateLimitPartition.GetNoLimiter("infra");
                 }
 
+                var tenantInfo = httpContext.GetMultiTenantContext<ExamPrismTenantInfo>()?.TenantInfo;
+                var scope = tenantInfo is { Status: TenantStatus.Active } ? $"t:{tenantInfo.Id}" : "platform";
+
                 string partitionKey;
                 if (httpContext.User.Identity?.IsAuthenticated == true)
                 {
@@ -125,12 +133,12 @@ public static class RateLimitingSetup
                         ?? httpContext.User.FindFirst("sub")?.Value;
 
                     partitionKey = !string.IsNullOrWhiteSpace(userId)
-                        ? $"global:user:{userId}"
-                        : $"global:ip:{GetClientIp(httpContext)}";
+                        ? $"{scope}:global:user:{userId}"
+                        : $"{scope}:global:ip:{GetClientIp(httpContext)}";
                 }
                 else
                 {
-                    partitionKey = $"global:ip:{GetClientIp(httpContext)}";
+                    partitionKey = $"{scope}:global:ip:{GetClientIp(httpContext)}";
                 }
 
                 return RateLimitPartition.Get(partitionKey, _ => useRedis && multiplexer is not null

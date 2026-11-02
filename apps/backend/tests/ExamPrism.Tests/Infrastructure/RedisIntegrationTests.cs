@@ -82,7 +82,7 @@ public class RedisIntegrationTests : IClassFixture<RedisWebApplicationFactory>
 
         await cache.SetAsync(cacheKey, probe);
 
-        var keyExistsInRedis = await multiplexer.GetDatabase().KeyExistsAsync($"examprism:{cacheKey}");
+        var keyExistsInRedis = await multiplexer.GetDatabase().KeyExistsAsync($"examprism:platform:{cacheKey}");
         keyExistsInRedis.Should().BeTrue();
 
         var retrieved = await cache.GetOrDefaultAsync<QuizCacheProbe>(cacheKey);
@@ -116,7 +116,7 @@ public class RedisIntegrationTests : IClassFixture<RedisWebApplicationFactory>
         // Verify Redis rate limit key was created
         var endpoint = multiplexer.GetEndPoints()[0];
         var server = multiplexer.GetServer(endpoint);
-        var keys = server.Keys(pattern: "examprism:ratelimit:auth:*").ToList();
+        var keys = server.Keys(pattern: "examprism:ratelimit:*:auth:*").ToList();
         keys.Should().NotBeEmpty();
     }
 

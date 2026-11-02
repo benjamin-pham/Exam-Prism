@@ -4,8 +4,10 @@ using System.Text;
 using Common.Caching;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Identity;
+using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.RateLimiting;
+using Finbuckle.MultiTenant.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -63,6 +65,8 @@ public static class DependencyInjection
         }
 
         services.TryAddSingleton(TimeProvider.System);
+
+        services.AddMultiTenant<ExamPrismTenantInfo>();
 
         var initialCacheOpts = configuration.GetSection(CacheOptions.SectionName).Get<CacheOptions>() ?? new CacheOptions();
         services.AddHybridCache(options =>

@@ -1,6 +1,9 @@
 namespace ExamPrism.Infrastructure.Caching;
 
 using Common.Caching;
+using Common.MultiTenancy;
+using ExamPrism.Infrastructure.MultiTenancy;
+using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 
@@ -8,11 +11,16 @@ public sealed class HybridCacheService : ICacheService
 {
     private readonly HybridCache _hybridCache;
     private readonly CacheOptions _options;
+    private readonly IMultiTenantContextAccessor<ExamPrismTenantInfo>? _tenantAccessor;
 
-    public HybridCacheService(HybridCache hybridCache, IOptions<CacheOptions> options)
+    public HybridCacheService(
+        HybridCache hybridCache,
+        IOptions<CacheOptions> options,
+        IMultiTenantContextAccessor<ExamPrismTenantInfo>? tenantAccessor = null)
     {
         _hybridCache = hybridCache ?? throw new ArgumentNullException(nameof(hybridCache));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _tenantAccessor = tenantAccessor;
     }
 
     public async ValueTask<T> GetOrCreateAsync<T>(
@@ -26,14 +34,16 @@ public sealed class HybridCacheService : ICacheService
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentNullException.ThrowIfNull(factory);
 
+        var (scopePrefix, tenantInfo) = GetCurrentScope();
+        var scopedKey = scopePrefix + key;
+        var scopedTags = ResolveTags(tenantInfo, scopePrefix, tags);
         var options = CreateEntryOptions(expiration, localExpiration);
-        var tagCollection = tags as IReadOnlyCollection<string> ?? tags?.ToList();
 
         return await _hybridCache.GetOrCreateAsync(
-            key,
+            scopedKey,
             factory,
             options,
-            tagCollection,
+            scopedTags,
             cancellationToken);
     }
 
@@ -43,13 +53,16 @@ public sealed class HybridCacheService : ICacheService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
+        var (scopePrefix, _) = GetCurrentScope();
+        var scopedKey = scopePrefix + key;
+
         var options = new HybridCacheEntryOptions
         {
             Flags = HybridCacheEntryFlags.DisableUnderlyingData
         };
 
         return await _hybridCache.GetOrCreateAsync<object?, T?>(
-            key,
+            scopedKey,
             state: null,
             static (_, _) => ValueTask.FromResult<T?>(default),
             options,
@@ -67,14 +80,16 @@ public sealed class HybridCacheService : ICacheService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
+        var (scopePrefix, tenantInfo) = GetCurrentScope();
+        var scopedKey = scopePrefix + key;
+        var scopedTags = ResolveTags(tenantInfo, scopePrefix, tags);
         var options = CreateEntryOptions(expiration, localExpiration);
-        var tagCollection = tags as IReadOnlyCollection<string> ?? tags?.ToList();
 
         await _hybridCache.SetAsync(
-            key,
+            scopedKey,
             value,
             options,
-            tagCollection,
+            scopedTags,
             cancellationToken);
     }
 
@@ -83,7 +98,9 @@ public sealed class HybridCacheService : ICacheService
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        await _hybridCache.RemoveAsync(key, cancellationToken);
+
+        var (scopePrefix, _) = GetCurrentScope();
+        await _hybridCache.RemoveAsync(scopePrefix + key, cancellationToken);
     }
 
     public async ValueTask RemoveByTagAsync(
@@ -91,7 +108,40 @@ public sealed class HybridCacheService : ICacheService
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tag);
-        await _hybridCache.RemoveByTagAsync(tag, cancellationToken);
+
+        var (scopePrefix, _) = GetCurrentScope();
+        await _hybridCache.RemoveByTagAsync(scopePrefix + tag, cancellationToken);
+    }
+
+    private (string ScopePrefix, ExamPrismTenantInfo? TenantInfo) GetCurrentScope()
+    {
+        var tenantInfo = _tenantAccessor?.MultiTenantContext?.TenantInfo;
+        var scopePrefix = tenantInfo is { Status: TenantStatus.Active }
+            ? $"t:{tenantInfo.Id}:"
+            : "platform:";
+        return (scopePrefix, tenantInfo);
+    }
+
+    private static IReadOnlyCollection<string>? ResolveTags(
+        ExamPrismTenantInfo? tenantInfo,
+        string scopePrefix,
+        IEnumerable<string>? tags)
+    {
+        var hasActiveTenant = tenantInfo is { Status: TenantStatus.Active };
+        var umbrellaTag = hasActiveTenant ? $"t:{tenantInfo!.Id}" : null;
+
+        if (tags is null)
+        {
+            return umbrellaTag is not null ? [umbrellaTag] : null;
+        }
+
+        var scopedTags = tags.Select(t => scopePrefix + t).ToList();
+        if (umbrellaTag is not null && !scopedTags.Contains(umbrellaTag, StringComparer.Ordinal))
+        {
+            scopedTags.Add(umbrellaTag);
+        }
+
+        return scopedTags;
     }
 
     private HybridCacheEntryOptions? CreateEntryOptions(TimeSpan? expiration, TimeSpan? localExpiration)
@@ -112,4 +162,3 @@ public sealed class HybridCacheService : ICacheService
         };
     }
 }
-

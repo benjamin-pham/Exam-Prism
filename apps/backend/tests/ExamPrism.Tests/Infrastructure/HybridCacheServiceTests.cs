@@ -3,6 +3,8 @@ namespace Tests.Infrastructure;
 using System.Buffers;
 using Common.Caching;
 using ExamPrism.Infrastructure.Caching;
+using ExamPrism.Infrastructure.MultiTenancy;
+using Finbuckle.MultiTenant.Extensions;
 using FluentAssertions;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -28,6 +30,7 @@ public class HybridCacheServiceTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.Configure<CacheOptions>(_ => { });
+        services.AddMultiTenant<ExamPrismTenantInfo>();
         services.AddHybridCache();
         services.AddSingleton<ICacheService, HybridCacheService>();
 
@@ -56,6 +59,7 @@ public class HybridCacheServiceTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.Configure<CacheOptions>(_ => { });
+        services.AddMultiTenant<ExamPrismTenantInfo>();
         services.AddHybridCache();
         services.AddSingleton<ICacheService, HybridCacheService>();
 
@@ -80,6 +84,7 @@ public class HybridCacheServiceTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.Configure<CacheOptions>(_ => { });
+        services.AddMultiTenant<ExamPrismTenantInfo>();
         services.AddHybridCache();
         services.AddSingleton<ICacheService, HybridCacheService>();
 
@@ -117,6 +122,7 @@ public class HybridCacheServiceTests
             options.DefaultLocalExpirationMinutes = 5;
             options.DefaultExpirationMinutes = 30;
         });
+        services.AddMultiTenant<ExamPrismTenantInfo>();
         services.AddHybridCache();
         services.AddSingleton<ICacheService, HybridCacheService>();
 
@@ -179,6 +185,7 @@ public class HybridCacheServiceTests
         services.AddLogging();
         services.Configure<CacheOptions>(_ => { });
         services.AddSingleton<IDistributedCache>(resilientCache);
+        services.AddMultiTenant<ExamPrismTenantInfo>();
         services.AddHybridCache();
         services.AddSingleton<ICacheService, HybridCacheService>();
 

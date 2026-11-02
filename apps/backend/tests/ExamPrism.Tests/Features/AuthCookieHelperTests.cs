@@ -25,11 +25,13 @@ public class AuthCookieHelperTests
         accessCookie.Should().Contain("httponly");
         accessCookie.Should().Contain("path=/");
         accessCookie.Should().Contain("samesite=lax");
+        accessCookie.Should().NotContain("domain=");
 
         var refreshCookie = setCookieHeaders.First(h => h != null && h.StartsWith("refresh_token="));
         refreshCookie.Should().Contain("httponly");
         refreshCookie.Should().Contain("path=/");
         refreshCookie.Should().Contain("samesite=lax");
+        refreshCookie.Should().NotContain("domain=");
     }
 
     [Fact]
@@ -41,7 +43,7 @@ public class AuthCookieHelperTests
 
         var setCookieHeaders = context.Response.Headers.SetCookie.ToArray();
         setCookieHeaders.Should().HaveCount(2);
-        setCookieHeaders.Should().Contain(h => h.StartsWith("access_token=") && (h.Contains("expires=") || h.Contains("max-age=0")));
-        setCookieHeaders.Should().Contain(h => h.StartsWith("refresh_token=") && (h.Contains("expires=") || h.Contains("max-age=0")));
+        setCookieHeaders.Should().Contain(h => h.StartsWith("access_token=") && (h.Contains("expires=") || h.Contains("max-age=0")) && !h.Contains("domain="));
+        setCookieHeaders.Should().Contain(h => h.StartsWith("refresh_token=") && (h.Contains("expires=") || h.Contains("max-age=0")) && !h.Contains("domain="));
     }
 }
