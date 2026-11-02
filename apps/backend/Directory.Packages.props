@@ -5,6 +5,8 @@
 
   <ItemGroup>
     <!-- API Dependencies -->
+    <PackageVersion Include="Finbuckle.MultiTenant" Version="10.1.5" />
+    <PackageVersion Include="Finbuckle.MultiTenant.AspNetCore" Version="10.1.5" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.12" />
