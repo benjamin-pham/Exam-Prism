@@ -73,4 +73,25 @@
   <data name="RateLimitExceeded" xml:space="preserve">
     <value>Too many requests. Please try again later.</value>
   </data>
+  <data name="TenantNotFound" xml:space="preserve">
+    <value>The requested organization was not found.</value>
+  </data>
+  <data name="TenantProvisioning" xml:space="preserve">
+    <value>This organization workspace is currently being provisioned. Please try again shortly.</value>
+  </data>
+  <data name="TenantSuspended" xml:space="preserve">
+    <value>This organization workspace has been suspended.</value>
+  </data>
+  <data name="TenantUnavailable" xml:space="preserve">
+    <value>This organization workspace is currently unavailable.</value>
+  </data>
+  <data name="TenantRequired" xml:space="preserve">
+    <value>A valid organization subdomain is required for this endpoint.</value>
+  </data>
+  <data name="PlatformOnly" xml:space="preserve">
+    <value>This endpoint is only available on the platform domain.</value>
+  </data>
+  <data name="TenantTokenMismatch" xml:space="preserve">
+    <value>The authentication token does not belong to this organization.</value>
+  </data>
 </root>

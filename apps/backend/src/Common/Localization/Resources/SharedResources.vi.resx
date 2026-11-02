@@ -73,4 +73,25 @@
   <data name="RateLimitExceeded" xml:space="preserve">
     <value>Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau.</value>
   </data>
+  <data name="TenantNotFound" xml:space="preserve">
+    <value>Không tìm thấy tổ chức theo tên miền này.</value>
+  </data>
+  <data name="TenantProvisioning" xml:space="preserve">
+    <value>Không gian làm việc của tổ chức đang được khởi tạo. Vui lòng thử lại sau giây lát.</value>
+  </data>
+  <data name="TenantSuspended" xml:space="preserve">
+    <value>Không gian làm việc của tổ chức đã bị tạm khóa.</value>
+  </data>
+  <data name="TenantUnavailable" xml:space="preserve">
+    <value>Không gian làm việc của tổ chức hiện không khả dụng.</value>
+  </data>
+  <data name="TenantRequired" xml:space="preserve">
+    <value>Yêu cầu truy cập qua tên miền phụ (subdomain) của tổ chức.</value>
+  </data>
+  <data name="PlatformOnly" xml:space="preserve">
+    <value>Đường dẫn này chỉ khả dụng trên tên miền hệ thống.</value>
+  </data>
+  <data name="TenantTokenMismatch" xml:space="preserve">
+    <value>Mã xác thực không thuộc về tổ chức này.</value>
+  </data>
 </root>
