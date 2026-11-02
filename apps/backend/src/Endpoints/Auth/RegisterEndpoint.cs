@@ -40,6 +40,7 @@ public sealed class RegisterEndpoint : IEndpoint
         })
         .WithTags("Authentication")
         .WithSummary("Registers a new user and sets auth cookies")
+        .RequireTenant()
         .RequireRateLimiting(RateLimitPolicies.Auth);
     }
 }

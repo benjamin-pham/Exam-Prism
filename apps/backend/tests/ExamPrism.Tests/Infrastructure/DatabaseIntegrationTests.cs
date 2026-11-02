@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using ExamPrism.Features.Health;
 using ExamPrism.Infrastructure.Persistence;
+using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -22,12 +23,19 @@ public class DatabaseIntegrationTests : IClassFixture<CustomWebApplicationFactor
     [Fact]
     public async Task CanConnectToDatabase_ReturnsTrue()
     {
-        using var scope = _factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var catalogDb = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+            var canConnectCatalog = await catalogDb.Database.CanConnectAsync();
+            canConnectCatalog.Should().BeTrue();
+        }
 
-        var canConnect = await dbContext.Database.CanConnectAsync();
-
-        canConnect.Should().BeTrue();
+        using (var tenantScope = await _factory.CreateTenantScopeAsync("tenant-a"))
+        {
+            var appDb = tenantScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var canConnectTenant = await appDb.Database.CanConnectAsync();
+            canConnectTenant.Should().BeTrue();
+        }
     }
 
     [Fact]
@@ -46,8 +54,11 @@ public class DatabaseIntegrationTests : IClassFixture<CustomWebApplicationFactor
     {
         var unreachableClient = _factory.WithWebHostBuilder(builder =>
         {
-            builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=127.0.0.1;Port=5433;Database=nonexistent;Timeout=2;CommandTimeout=2;Username=postgres;Password=postgres");
-        }).CreateClient();
+            builder.UseSetting("ConnectionStrings:CatalogConnection", "Host=127.0.0.1;Port=5433;Database=nonexistent;Timeout=2;CommandTimeout=2;Username=postgres;Password=postgres");
+        }).CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("http://localhost")
+        });
 
         var response = await unreachableClient.GetAsync("/health");
 
@@ -57,4 +68,3 @@ public class DatabaseIntegrationTests : IClassFixture<CustomWebApplicationFactor
         content!.Status.Should().Be("Unhealthy");
     }
 }
-

@@ -41,6 +41,9 @@ public sealed class TestValidationEndpoints : IEndpoint
 
         group.MapPost("/multi-param", (TestValidationRequest request, [Microsoft.AspNetCore.Mvc.FromServices] Common.Security.IUserContext? userContext) =>
             Results.Ok(new { message = "MultiParam", name = request.Name }));
+
+        app.MapGet("/test/platform-only", () => Results.Ok(new { Scope = "platform" }))
+            .RequirePlatform();
     }
 }
 

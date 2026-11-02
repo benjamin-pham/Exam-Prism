@@ -48,6 +48,7 @@ public sealed class RefreshEndpoint : IEndpoint
         })
         .WithTags("Authentication")
         .WithSummary("Rotates refresh token and returns updated auth cookies")
+        .RequireTenant()
         .RequireRateLimiting(RateLimitPolicies.Auth);
     }
 }

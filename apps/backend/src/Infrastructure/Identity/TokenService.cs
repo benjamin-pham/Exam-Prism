@@ -4,22 +4,30 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Common.MultiTenancy;
+using Common.Security;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
-public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvider) : ITokenService
+public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvider, ITenantContext tenantContext) : ITokenService
 {
     private readonly JwtOptions _options = options.Value;
 
     public string GenerateAccessToken(ApplicationUser user)
     {
+        if (!tenantContext.HasTenant || !tenantContext.TenantId.HasValue)
+        {
+            throw new InvalidOperationException("Active tenant context is required to generate a tenant access token.");
+        }
+
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(CustomClaimTypes.TenantId, tenantContext.TenantId.Value.ToString("D"))
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey));

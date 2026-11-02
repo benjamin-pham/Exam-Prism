@@ -5,7 +5,10 @@ using System.Net.Http.Json;
 using Common.Caching;
 using ExamPrism.Features.Auth;
 using ExamPrism.Features.Health;
+using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence;
+using Finbuckle.MultiTenant;
+using Finbuckle.MultiTenant.Abstractions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -28,10 +31,16 @@ public class RedisWebApplicationFactory : WebApplicationFactory<Program>, IAsync
 
     public RedisContainer RedisContainer => _redisContainer;
 
+    public RedisWebApplicationFactory()
+    {
+        ClientOptions.BaseAddress = new Uri("http://tenant-a.localhost");
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseSetting("ConnectionStrings:DefaultConnection", _dbContainer.GetConnectionString());
+        builder.UseSetting("ConnectionStrings:CatalogConnection", _dbContainer.GetConnectionString());
         builder.UseSetting("ConnectionStrings:Redis", _redisContainer.GetConnectionString());
+        builder.UseSetting("MultiTenancy:BaseDomains:0", "localhost");
         builder.UseSetting("RateLimiting:Auth:PermitLimit", "2");
         builder.UseSetting("RateLimiting:Auth:WindowSeconds", "60");
         builder.UseSetting("RateLimiting:Global:PermitLimit", "3");
@@ -41,10 +50,20 @@ public class RedisWebApplicationFactory : WebApplicationFactory<Program>, IAsync
     public async Task InitializeAsync()
     {
         await Task.WhenAll(_dbContainer.StartAsync(), _redisContainer.StartAsync());
+        await MultiTenantTestDatabaseHelper.InitializeDatabasesAndSeedAsync(
+            _dbContainer,
+            Services,
+            CreateTenantScopeAsync);
+    }
 
-        using var scope = Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await dbContext.Database.EnsureCreatedAsync();
+    public async Task<IServiceScope> CreateTenantScopeAsync(string slug = "tenant-a")
+    {
+        var scope = Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IMultiTenantStore<ExamPrismTenantInfo>>();
+        var tenantInfo = await store.GetByIdentifierAsync(slug)
+            ?? throw new InvalidOperationException($"Tenant '{slug}' not found in store.");
+
+        return new TenantServiceScope(scope, tenantInfo);
     }
 
     public new async Task DisposeAsync()
@@ -141,7 +160,10 @@ public class RedisIntegrationTests : IClassFixture<RedisWebApplicationFactory>
             builder.UseSetting("ConnectionStrings:Redis", "127.0.0.1:6399,connectTimeout=200,syncTimeout=200");
         });
 
-        var brokenClient = brokenFactory.CreateClient();
+        var brokenClient = brokenFactory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("http://tenant-a.localhost")
+        });
 
         // 1. Health check returns 503 Unhealthy because Redis is down
         var healthRes = await brokenClient.GetAsync("/health");

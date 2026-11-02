@@ -1,10 +1,14 @@
 namespace Tests.Infrastructure;
 
 using Common.Caching;
+using Common.MultiTenancy;
 using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Identity;
+using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence;
+using ExamPrism.Infrastructure.Persistence.Catalog;
+using Finbuckle.MultiTenant.Abstractions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -22,14 +26,14 @@ public class DependencyInjectionTests
 {
     private static Dictionary<string, string?> CreateValidSettings() => new()
     {
-        { "ConnectionStrings:DefaultConnection", "Host=localhost;Database=test;Username=postgres;Password=postgres" },
+        { "ConnectionStrings:CatalogConnection", "Host=localhost;Database=test;Username=postgres;Password=postgres" },
         { "Jwt:Issuer", "ExamPrism" },
         { "Jwt:Audience", "ExamPrism" },
         { "Jwt:SecretKey", "SuperSecretKeyForTestingJwtTokensMin256BitsLong!" }
     };
 
     [Fact]
-    public void AddInfrastructure_ThrowsInvalidOperationException_WhenConnectionStringMissing()
+    public void AddInfrastructure_ThrowsInvalidOperationException_WhenCatalogConnectionStringMissing()
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().Build();
@@ -37,7 +41,7 @@ public class DependencyInjectionTests
         Action act = () => services.AddInfrastructure(configuration);
 
         act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*Connection string 'DefaultConnection' not found*");
+            .WithMessage("*CatalogConnection*");
     }
 
     [Fact]
@@ -46,7 +50,7 @@ public class DependencyInjectionTests
         var services = new ServiceCollection();
         var inMemorySettings = new Dictionary<string, string?>
         {
-            ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test;Username=postgres;Password=postgres"
+            ["ConnectionStrings:CatalogConnection"] = "Host=localhost;Database=test;Username=postgres;Password=postgres"
         };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(inMemorySettings).Build();
 
@@ -57,7 +61,7 @@ public class DependencyInjectionTests
     }
 
     [Fact]
-    public void AddInfrastructure_RegistersAppDbContext_WhenConnectionStringProvided()
+    public void AddInfrastructure_RegistersMultiTenantAndPersistenceServices()
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder()
@@ -66,8 +70,42 @@ public class DependencyInjectionTests
 
         services.AddInfrastructure(configuration);
 
+        services.Should().ContainSingle(s => s.ServiceType == typeof(CatalogDbContext))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
         services.Should().ContainSingle(s => s.ServiceType == typeof(AppDbContext))
             .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
+        services.Should().ContainSingle(s => s.ServiceType == typeof(ITenantContext))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
+        services.Should().ContainSingle(s => s.ServiceType == typeof(IConnectionStringProtector))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Singleton);
+        services.Should().ContainSingle(s => s.ServiceType == typeof(ITenantConnectionStringNormalizer))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Singleton);
+        services.Should().ContainSingle(s => s.ServiceType == typeof(ITenantCacheInvalidator))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
+        services.Should().Contain(s => s.ServiceType == typeof(IMultiTenantStore<ExamPrismTenantInfo>))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
+
+        var provider = services.BuildServiceProvider();
+        var healthCheckOptions = provider.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
+        healthCheckOptions.Registrations.Should().Contain(r => r.Name == "catalog_db");
+    }
+
+    [Fact]
+    public void ResolveAppDbContext_WithoutActiveTenantContext_ThrowsInvalidOperationException()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(CreateValidSettings())
+            .Build();
+
+        services.AddInfrastructure(configuration);
+        var provider = services.BuildServiceProvider();
+
+        using var scope = provider.CreateScope();
+        var act = () => scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*active tenant context*");
     }
 
     [Fact]
@@ -103,8 +141,20 @@ public class DependencyInjectionTests
         var provider = services.BuildServiceProvider();
 
         // Assert
-        provider.GetService<ITokenService>().Should().NotBeNull();
-        provider.GetService<UserManager<ApplicationUser>>().Should().NotBeNull();
+        services.Should().Contain(s => s.ServiceType == typeof(ITokenService));
+        services.Should().Contain(s => s.ServiceType == typeof(UserManager<ApplicationUser>));
+
+        using var scope = provider.CreateScope();
+        var setter = scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>();
+        setter.MultiTenantContext = new MultiTenantContext<ExamPrismTenantInfo>(
+            new ExamPrismTenantInfo("test-id", "test-slug")
+            {
+                Status = TenantStatus.Active,
+                ConnectionString = "Host=localhost;Database=test;Username=postgres;Password=postgres"
+            });
+
+        scope.ServiceProvider.GetService<ITokenService>().Should().NotBeNull();
+        scope.ServiceProvider.GetService<UserManager<ApplicationUser>>().Should().NotBeNull();
     }
 
     [Fact]
@@ -205,7 +255,7 @@ public class DependencyInjectionTests
         provider.GetService<IDistributedCache>().Should().BeNull();
 
         var healthCheckOptions = provider.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
-        healthCheckOptions.Registrations.Should().Contain(r => r.Name == "database");
+        healthCheckOptions.Registrations.Should().Contain(r => r.Name == "catalog_db");
         healthCheckOptions.Registrations.Should().NotContain(r => r.Name == "redis");
     }
 
@@ -225,7 +275,7 @@ public class DependencyInjectionTests
         provider.GetService<ICacheService>().Should().BeOfType<HybridCacheService>();
 
         var healthCheckOptions = provider.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
-        healthCheckOptions.Registrations.Should().Contain(r => r.Name == "database");
+        healthCheckOptions.Registrations.Should().Contain(r => r.Name == "catalog_db");
         healthCheckOptions.Registrations.Should().Contain(r => r.Name == "redis");
     }
 }

@@ -31,6 +31,7 @@ public sealed class LogoutEndpoint : IEndpoint
             return Results.NoContent();
         })
         .WithTags("Authentication")
-        .WithSummary("Revokes refresh token and clears auth cookies");
+        .WithSummary("Revokes refresh token and clears auth cookies")
+        .RequireTenant();
     }
 }

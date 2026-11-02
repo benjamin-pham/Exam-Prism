@@ -40,6 +40,7 @@ public sealed class LoginEndpoint : IEndpoint
         })
         .WithTags("Authentication")
         .WithSummary("Authenticates user credentials and sets auth cookies")
+        .RequireTenant()
         .RequireRateLimiting(RateLimitPolicies.Auth);
     }
 }

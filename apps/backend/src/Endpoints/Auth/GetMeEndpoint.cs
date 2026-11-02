@@ -26,6 +26,7 @@ public sealed class GetMeEndpoint : IEndpoint
             return Results.Ok(result.Value);
         })
         .RequireAuthorization()
+        .RequireTenant()
         .WithTags("Authentication")
         .WithSummary("Gets currently authenticated user details");
     }

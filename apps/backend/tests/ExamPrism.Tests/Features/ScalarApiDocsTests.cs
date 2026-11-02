@@ -15,7 +15,7 @@ public class ScalarApiDocsTests
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
-            builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=dummy;Username=dummy;Password=dummy");
+            builder.UseSetting("ConnectionStrings:CatalogConnection", "Host=localhost;Database=dummy;Username=dummy;Password=dummy");
         });
         var client = factory.CreateClient();
 
@@ -34,7 +34,7 @@ public class ScalarApiDocsTests
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
-            builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=dummy;Username=dummy;Password=dummy");
+            builder.UseSetting("ConnectionStrings:CatalogConnection", "Host=localhost;Database=dummy;Username=dummy;Password=dummy");
         });
         var client = factory.CreateClient();
 
@@ -58,7 +58,7 @@ public class ScalarApiDocsTests
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
-            builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=dummy;Username=dummy;Password=dummy");
+            builder.UseSetting("ConnectionStrings:CatalogConnection", "Host=localhost;Database=dummy;Username=dummy;Password=dummy");
         });
         var client = factory.CreateClient();
 

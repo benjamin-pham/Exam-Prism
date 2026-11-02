@@ -68,7 +68,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         access.Should().NotBeNullOrWhiteSpace();
         refresh.Should().NotBeNullOrWhiteSpace();
 
-        using var scope = _factory.Services.CreateScope();
+        using var scope = await _factory.CreateTenantScopeAsync("tenant-a");
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var dbUser = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
         dbUser.Should().NotBeNull();
@@ -161,7 +161,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         resReuse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         // Verify in DB that ALL tokens for user are now revoked
-        using var scope = _factory.Services.CreateScope();
+        using var scope = await _factory.CreateTenantScopeAsync("tenant-a");
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var userTokens = await db.RefreshTokens.Where(t => t.UserId == user!.Id).ToListAsync();
         userTokens.Should().NotBeEmpty();
@@ -265,7 +265,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
         var regResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterCommand(email, "Password123!"));
         var (_, rawRefresh) = ExtractCookies(regResponse);
 
-        using (var scope = _factory.Services.CreateScope())
+        using (var scope = await _factory.CreateTenantScopeAsync("tenant-a"))
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();

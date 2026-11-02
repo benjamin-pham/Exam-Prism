@@ -1,6 +1,8 @@
 using Common.Endpoints;
 using Common.Exceptions;
 using ExamPrism.Infrastructure;
+using ExamPrism.Infrastructure.MultiTenancy;
+using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using FluentValidation;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -14,6 +16,7 @@ builder.Host.UseWolverine(opts =>
 {
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
     opts.UseFluentValidation();
+    opts.Policies.AddMiddleware<TenantWolverineMiddleware>();
 });
 
 builder.Services.AddOpenApi(options =>
@@ -54,6 +57,18 @@ var app = builder.Build();
 app.UseRequestLocalization();
 app.UseExceptionHandler();
 
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+});
+
+app.UseMultiTenant();
+app.UseMiddleware<TenantAccessGuardMiddleware>();
+
+app.UseAuthentication();
+app.UseRateLimiter();
+app.UseAuthorization();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -63,15 +78,6 @@ if (app.Environment.IsDevelopment())
                .AddPreferredSecuritySchemes(["Bearer"]);
     });
 }
-
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-});
-
-app.UseAuthentication();
-app.UseRateLimiter();
-app.UseAuthorization();
 
 app.MapEndpoints();
 
