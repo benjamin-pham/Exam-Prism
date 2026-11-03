@@ -164,6 +164,9 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
                     b.Property<string>("EncryptedConnectionString")
                         .HasColumnType("text");
 
+                    b.Property<string>("EncryptedOwnerPassword")
+                        .HasColumnType("text");
+
                     b.Property<string>("FailureReason")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -172,6 +175,10 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("OwnerEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<DateTimeOffset?>("ProvisionedAt")
                         .HasColumnType("timestamp with time zone");

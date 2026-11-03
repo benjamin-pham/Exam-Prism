@@ -103,4 +103,10 @@
   <data name="InvalidPageSize" xml:space="preserve">
     <value>Page size must be between 1 and 100.</value>
   </data>
+  <data name="SlugAlreadyTaken" xml:space="preserve">
+    <value>This organization subdomain is already taken or reserved.</value>
+  </data>
+  <data name="InvalidSlug" xml:space="preserve">
+    <value>Subdomain slug must be 1-63 lowercase alphanumeric characters or hyphens and cannot start or end with a hyphen.</value>
+  </data>
 </root>

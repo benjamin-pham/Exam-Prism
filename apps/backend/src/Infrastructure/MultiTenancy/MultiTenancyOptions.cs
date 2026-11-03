@@ -13,6 +13,8 @@ public sealed class MultiTenancyOptions
     public int NotFoundCacheExpirationSeconds { get; set; } = 30;
     public int ProvisioningRetryAfterSeconds { get; set; } = 5;
     public TenantDatabasePoolOptions DatabasePool { get; set; } = new();
+    public TenantProvisioningOptions Provisioning { get; set; } = new();
+    public TenantFleetMigrationOptions FleetMigration { get; set; } = new();
 }
 
 public sealed class TenantDatabasePoolOptions
@@ -21,4 +23,19 @@ public sealed class TenantDatabasePoolOptions
     public int MinPoolSize { get; set; } = 0;
     public int ConnectionIdleLifetimeSeconds { get; set; } = 30;
     public int ConnectionPruningIntervalSeconds { get; set; } = 10;
+}
+
+public sealed class TenantProvisioningOptions
+{
+    public string? ServerConnectionString { get; set; }
+    public string DatabaseNamePrefix { get; set; } = "examprism_tenant_";
+    public string DedicatedUserPrefix { get; set; } = "examprism_u_";
+    public bool CreateDedicatedPostgresUser { get; set; } = false;
+    public bool RecoverStuckProvisioningOnStartup { get; set; } = true;
+}
+
+public sealed class TenantFleetMigrationOptions
+{
+    public bool MigrateOnStartup { get; set; } = false;
+    public int MaxDegreeOfParallelism { get; set; } = 10;
 }

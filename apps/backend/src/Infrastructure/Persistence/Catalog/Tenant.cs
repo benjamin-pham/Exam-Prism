@@ -16,6 +16,10 @@ public class Tenant
 
     public string? FailureReason { get; set; }
 
+    public string? OwnerEmail { get; set; }
+
+    public string? EncryptedOwnerPassword { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset? ProvisionedAt { get; set; }

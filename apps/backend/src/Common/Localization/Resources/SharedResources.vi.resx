@@ -103,4 +103,10 @@
   <data name="InvalidPageSize" xml:space="preserve">
     <value>Kích thước trang phải nằm trong khoảng từ 1 đến 100.</value>
   </data>
+  <data name="SlugAlreadyTaken" xml:space="preserve">
+    <value>Tên miền phụ của tổ chức này đã được sử dụng hoặc thuộc danh sách hệ thống.</value>
+  </data>
+  <data name="InvalidSlug" xml:space="preserve">
+    <value>Tên miền phụ chỉ được chứa chữ thường, chữ số hoặc dấu gạch ngang (1-63 ký tự) và không bắt đầu hay kết thúc bằng dấu gạch ngang.</value>
+  </data>
 </root>

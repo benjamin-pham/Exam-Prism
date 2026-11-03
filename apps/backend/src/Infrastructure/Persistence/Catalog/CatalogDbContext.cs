@@ -45,6 +45,13 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
                 .HasMaxLength(1000)
                 .IsRequired(false);
 
+            b.Property(t => t.OwnerEmail)
+                .HasMaxLength(256)
+                .IsRequired(false);
+
+            b.Property(t => t.EncryptedOwnerPassword)
+                .IsRequired(false);
+
             b.Property(t => t.CreatedAt)
                 .IsRequired();
 

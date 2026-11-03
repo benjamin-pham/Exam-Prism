@@ -98,6 +98,16 @@ public class CatalogDbContextSchemaTests
         var updatedProp = entityType.FindProperty(nameof(Tenant.UpdatedAt))!;
         updatedProp.Should().NotBeNull();
         updatedProp.IsNullable.Should().BeFalse();
+
+        // OwnerEmail & EncryptedOwnerPassword
+        var ownerEmailProp = entityType.FindProperty(nameof(Tenant.OwnerEmail))!;
+        ownerEmailProp.Should().NotBeNull();
+        ownerEmailProp.IsNullable.Should().BeTrue();
+        ownerEmailProp.GetMaxLength().Should().Be(256);
+
+        var encryptedOwnerPassProp = entityType.FindProperty(nameof(Tenant.EncryptedOwnerPassword))!;
+        encryptedOwnerPassProp.Should().NotBeNull();
+        encryptedOwnerPassProp.IsNullable.Should().BeTrue();
     }
 
     [Fact]
@@ -158,6 +168,7 @@ public class CatalogDbContextSchemaTests
         catalogMigrations.Should().NotBeEmpty();
         catalogMigrations.Should().Contain(m => m.EndsWith("_InitialCatalog"));
         catalogMigrations.Should().Contain(m => m.EndsWith("_AddPlatformIdentity"));
+        catalogMigrations.Should().Contain(m => m.EndsWith("_AddTenantProvisioningMetadata"));
 
         tenantMigrations.Should().NotBeEmpty();
         tenantMigrations.Should().ContainSingle(m => m.EndsWith("_InitialTenant"));
