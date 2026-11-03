@@ -66,8 +66,23 @@ public static class DependencyInjection
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<CatalogMultiTenantStore>();
         services.AddScoped<ITenantCacheInvalidator>(sp => sp.GetRequiredService<CatalogMultiTenantStore>());
-        services.AddScoped<ITenantProvisioner, TenantProvisioner>();
-        services.AddScoped<ITenantFleetMigrator, TenantFleetMigrator>();
+        services.AddScoped<ITenantProvisioner>(sp => new TenantProvisioner(
+            sp.GetRequiredService<CatalogDbContext>(),
+            sp.GetRequiredService<IConfiguration>(),
+            sp.GetRequiredService<IOptions<MultiTenancyOptions>>(),
+            sp.GetRequiredService<IConnectionStringProtector>(),
+            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
+            sp.GetRequiredService<ITenantCacheInvalidator>(),
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<ILogger<TenantProvisioner>>()));
+        services.AddScoped<ITenantFleetMigrator>(sp => new TenantFleetMigrator(
+            sp.GetRequiredService<CatalogDbContext>(),
+            sp.GetRequiredService<IConnectionStringProtector>(),
+            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
+            sp.GetRequiredService<IOptions<MultiTenancyOptions>>(),
+            sp.GetRequiredService<ILogger<TenantFleetMigrator>>(),
+            sp.GetRequiredService<IServiceScopeFactory>()));
 
         services.AddMultiTenant<ExamPrismTenantInfo>()
             .WithStrategy<SubdomainMultiTenantStrategy>(ServiceLifetime.Scoped)

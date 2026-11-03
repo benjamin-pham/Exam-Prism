@@ -89,6 +89,11 @@ public sealed class TenantFleetMigrator(
             .Select(t => t.Id)
             .ToListAsync(ct);
 
+        if (activeTenants.Count > 1)
+        {
+            ArgumentNullException.ThrowIfNull(serviceScopeFactory);
+        }
+
         var maxParallelism = Math.Max(1, options.Value.FleetMigration.MaxDegreeOfParallelism);
         var results = new ConcurrentBag<TenantMigrationItemResult>();
         var parallelOptions = new ParallelOptions
