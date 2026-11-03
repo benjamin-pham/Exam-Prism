@@ -3,6 +3,7 @@ namespace ExamPrism.Infrastructure;
 using System.Text;
 using Common.Caching;
 using Common.MultiTenancy;
+using Common.Security;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.MultiTenancy;
@@ -158,6 +159,10 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, TokenService>();
         services.AddSingleton<JwtTenantValidator>();
 
+        // PlatformAdmin
+        services.Configure<PlatformAdminOptions>(configuration.GetSection(PlatformAdminOptions.SectionName));
+        services.AddScoped<PlatformAdminSeeder>();
+
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? throw new InvalidOperationException("Jwt configuration section is missing.");
 
@@ -211,7 +216,11 @@ public static class DependencyInjection
             };
         });
 
-        services.AddAuthorization();
+        services.AddAuthorizationBuilder()
+            .AddPolicy(PlatformRoles.PolicyName, policy =>
+                policy.RequireAuthenticatedUser()
+                      .RequireClaim(CustomClaimTypes.TokenScope, CustomClaimTypes.PlatformScopeValue)
+                      .RequireRole(PlatformRoles.SuperAdmin));
 
         return services;
     }

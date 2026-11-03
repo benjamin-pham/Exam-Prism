@@ -30,6 +30,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         builder.UseSetting("MultiTenancy:BaseDomains:0", "localhost");
         builder.UseSetting("RateLimiting:Global:PermitLimit", "10000");
         builder.UseSetting("RateLimiting:Auth:PermitLimit", "10000");
+        builder.UseSetting("PlatformAdmin:SeedOnStartup", "false");
+        builder.UseSetting("PlatformAdmin:Email", "admin@examprism.com");
+        builder.UseSetting("PlatformAdmin:Password", "AdminPassword123!");
     }
 
     public async Task InitializeAsync()

@@ -121,7 +121,7 @@ public class CrossCuttingTenantIsolationUnitTests
             httpContext.Items[JwtTenantValidator.AuthFailureItemKey].Should().Be(JwtTenantValidator.TenantTokenMismatchErrorCode);
         }
 
-        // 5. Platform host (TenantInfo == null) + token has NO tenant_id claim -> Success
+        // 5. Platform host (TenantInfo == null) + token has token_scope == "platform" (no tenant_id) -> Success
         {
             var platformAccessor = Substitute.For<IMultiTenantContextAccessor<ExamPrismTenantInfo>>();
             platformAccessor.MultiTenantContext.Returns(new MultiTenantContext<ExamPrismTenantInfo>((ExamPrismTenantInfo?)null));
@@ -132,7 +132,8 @@ public class CrossCuttingTenantIsolationUnitTests
             {
                 Principal = new ClaimsPrincipal(new ClaimsIdentity(
                 [
-                    new Claim(ClaimTypes.NameIdentifier, "platform-admin")
+                    new Claim(ClaimTypes.NameIdentifier, "platform-admin"),
+                    new Claim(CustomClaimTypes.TokenScope, CustomClaimTypes.PlatformScopeValue)
                 ], "Bearer"))
             };
 
@@ -140,6 +141,45 @@ public class CrossCuttingTenantIsolationUnitTests
 
             context.Result?.Failure.Should().BeNull();
             httpContext.Items.ContainsKey(JwtTenantValidator.AuthFailureItemKey).Should().BeFalse();
+        }
+
+        // 6. Platform host + token with neither tenant_id nor token_scope == "platform" -> Fails with TENANT_TOKEN_MISMATCH
+        {
+            var platformAccessor = Substitute.For<IMultiTenantContextAccessor<ExamPrismTenantInfo>>();
+            platformAccessor.MultiTenantContext.Returns(new MultiTenantContext<ExamPrismTenantInfo>((ExamPrismTenantInfo?)null));
+            var platformValidator = new JwtTenantValidator(platformAccessor);
+
+            var httpContext = new DefaultHttpContext();
+            var context = new TokenValidatedContext(httpContext, scheme, options)
+            {
+                Principal = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier, "unscoped-user")
+                ], "Bearer"))
+            };
+
+            await platformValidator.ValidateAsync(context);
+
+            context.Result?.Failure.Should().NotBeNull();
+            httpContext.Items[JwtTenantValidator.AuthFailureItemKey].Should().Be(JwtTenantValidator.TenantTokenMismatchErrorCode);
+        }
+
+        // 7. Tenant host + token carrying token_scope == "platform" (even if tenant_id is forged) -> Fails with TENANT_TOKEN_MISMATCH
+        {
+            var httpContext = new DefaultHttpContext();
+            var context = new TokenValidatedContext(httpContext, scheme, options)
+            {
+                Principal = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(CustomClaimTypes.TenantId, tenantA.Id),
+                    new Claim(CustomClaimTypes.TokenScope, CustomClaimTypes.PlatformScopeValue)
+                ], "Bearer"))
+            };
+
+            await validator.ValidateAsync(context);
+
+            context.Result?.Failure.Should().NotBeNull();
+            httpContext.Items[JwtTenantValidator.AuthFailureItemKey].Should().Be(JwtTenantValidator.TenantTokenMismatchErrorCode);
         }
     }
 

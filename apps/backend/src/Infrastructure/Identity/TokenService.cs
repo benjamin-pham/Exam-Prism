@@ -45,6 +45,46 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    public string GeneratePlatformAccessToken(PlatformUser user, IEnumerable<string> roles)
+    {
+        if (tenantContext.HasTenant)
+        {
+            throw new InvalidOperationException("Platform access tokens cannot be generated inside an active tenant context.");
+        }
+
+        var claimsList = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            new(ClaimTypes.Email, user.Email ?? string.Empty),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(CustomClaimTypes.TokenScope, CustomClaimTypes.PlatformScopeValue)
+        };
+
+        if (roles != null)
+        {
+            foreach (var role in roles.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                claimsList.Add(new Claim(ClaimTypes.Role, role));
+            }
+        }
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SecretKey));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+
+        var token = new JwtSecurityToken(
+            issuer: _options.Issuer,
+            audience: _options.Audience,
+            claims: claimsList,
+            notBefore: now,
+            expires: now.AddMinutes(_options.AccessTokenExpirationMinutes),
+            signingCredentials: creds);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
     public (string RawToken, string TokenHash) GenerateRefreshToken()
     {
         var randomBytes = new byte[64];

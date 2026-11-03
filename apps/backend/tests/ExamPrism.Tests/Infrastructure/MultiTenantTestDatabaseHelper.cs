@@ -1,6 +1,7 @@
 namespace Tests.Infrastructure;
 
 using Common.MultiTenancy;
+using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
@@ -99,6 +100,9 @@ public static class MultiTenantTestDatabaseHelper
         {
             var catalogDb = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
             await catalogDb.Database.MigrateAsync();
+
+            var seeder = scope.ServiceProvider.GetRequiredService<PlatformAdminSeeder>();
+            await seeder.SeedAsync();
 
             var protector = scope.ServiceProvider.GetRequiredService<IConnectionStringProtector>();
             var now = DateTimeOffset.UtcNow;

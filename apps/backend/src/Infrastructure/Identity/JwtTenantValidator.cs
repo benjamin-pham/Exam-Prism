@@ -27,11 +27,14 @@ public sealed class JwtTenantValidator
         var tenantInfo = _tenantAccessor?.MultiTenantContext?.TenantInfo
             ?? context.HttpContext.GetMultiTenantContext<ExamPrismTenantInfo>()?.TenantInfo;
 
+        var claimTenantId = context.Principal?.FindFirst(CustomClaimTypes.TenantId)?.Value;
+        var tokenScope = context.Principal?.FindFirst(CustomClaimTypes.TokenScope)?.Value;
+
         if (tenantInfo is { Status: TenantStatus.Active })
         {
-            var claimTenantId = context.Principal?.FindFirst(CustomClaimTypes.TenantId)?.Value;
             if (string.IsNullOrWhiteSpace(claimTenantId) ||
-                !string.Equals(claimTenantId, tenantInfo.Id, StringComparison.OrdinalIgnoreCase))
+                !string.Equals(claimTenantId, tenantInfo.Id, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(tokenScope, CustomClaimTypes.PlatformScopeValue, StringComparison.OrdinalIgnoreCase))
             {
                 context.HttpContext.Items[AuthFailureItemKey] = TenantTokenMismatchErrorCode;
                 context.Fail("Token tenant mismatch.");
@@ -40,11 +43,11 @@ public sealed class JwtTenantValidator
         }
         else if (tenantInfo is null)
         {
-            var claimTenantId = context.Principal?.FindFirst(CustomClaimTypes.TenantId)?.Value;
-            if (!string.IsNullOrWhiteSpace(claimTenantId))
+            if (!string.IsNullOrWhiteSpace(claimTenantId) ||
+                !string.Equals(tokenScope, CustomClaimTypes.PlatformScopeValue, StringComparison.OrdinalIgnoreCase))
             {
                 context.HttpContext.Items[AuthFailureItemKey] = TenantTokenMismatchErrorCode;
-                context.Fail("Tenant token cannot be used in platform context.");
+                context.Fail("Platform context requires a valid platform token.");
                 return Task.CompletedTask;
             }
         }

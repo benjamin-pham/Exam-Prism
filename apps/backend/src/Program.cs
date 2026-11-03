@@ -1,9 +1,11 @@
 using Common.Endpoints;
 using Common.Exceptions;
 using ExamPrism.Infrastructure;
+using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.MultiTenancy;
 using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using FluentValidation;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Wolverine;
@@ -80,6 +82,21 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapEndpoints();
+
+var platformAdminOptions = app.Services.GetRequiredService<IOptions<PlatformAdminOptions>>().Value;
+if (platformAdminOptions.SeedOnStartup)
+{
+    try
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var seeder = scope.ServiceProvider.GetRequiredService<PlatformAdminSeeder>();
+        await seeder.SeedAsync();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "PlatformAdminSeeder skipped on startup because database is not available or not yet migrated.");
+    }
+}
 
 app.Run();
 

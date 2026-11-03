@@ -75,6 +75,58 @@ public class TokenServiceTests
     }
 
     [Fact]
+    public void GeneratePlatformAccessToken_WhenInPlatformContext_EmitsTokenScopeAndRoleClaims_WithoutTenantId()
+    {
+        var tenantContext = Substitute.For<ITenantContext>();
+        tenantContext.HasTenant.Returns(false);
+        tenantContext.TenantId.Returns((Guid?)null);
+
+        var service = new TokenService(_options, _timeProvider, tenantContext);
+        var user = new PlatformUser
+        {
+            Id = Guid.NewGuid(),
+            Email = "admin@examprism.com",
+            UserName = "admin@examprism.com"
+        };
+
+        var tokenString = service.GeneratePlatformAccessToken(user, ["SuperAdmin"]);
+        tokenString.Should().NotBeNullOrWhiteSpace();
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(tokenString);
+
+        jwt.Issuer.Should().Be("ExamPrismTest");
+        jwt.Audiences.Should().Contain("ExamPrismTestAudience");
+        jwt.Claims.First(c => c.Type == JwtRegisteredClaimNames.Sub).Value.Should().Be(user.Id.ToString());
+        jwt.Claims.First(c => c.Type == JwtRegisteredClaimNames.Email).Value.Should().Be(user.Email);
+        jwt.Claims.First(c => c.Type == CustomClaimTypes.TokenScope).Value.Should().Be(CustomClaimTypes.PlatformScopeValue);
+        jwt.Claims.First(c => c.Type == ClaimTypes.Role).Value.Should().Be("SuperAdmin");
+        jwt.Claims.Any(c => c.Type == CustomClaimTypes.TenantId).Should().BeFalse();
+        jwt.ValidTo.Should().BeCloseTo(_timeProvider.GetUtcNow().UtcDateTime.AddMinutes(15), TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public void GeneratePlatformAccessToken_WhenActiveTenantPresent_ThrowsInvalidOperationException()
+    {
+        var tenantContext = Substitute.For<ITenantContext>();
+        tenantContext.HasTenant.Returns(true);
+        tenantContext.TenantId.Returns(Guid.NewGuid());
+
+        var service = new TokenService(_options, _timeProvider, tenantContext);
+        var user = new PlatformUser
+        {
+            Id = Guid.NewGuid(),
+            Email = "admin@examprism.com",
+            UserName = "admin@examprism.com"
+        };
+
+        var act = () => service.GeneratePlatformAccessToken(user, ["SuperAdmin"]);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*tenant*");
+    }
+
+    [Fact]
     public void GenerateRefreshToken_ReturnsRawTokenAndMatchingDeterministicSha256Hash()
     {
         var tenantContext = Substitute.For<ITenantContext>();
