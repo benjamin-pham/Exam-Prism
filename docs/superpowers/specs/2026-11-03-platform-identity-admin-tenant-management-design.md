@@ -240,21 +240,21 @@ All Platform Auth handlers live in `namespace ExamPrism.Features.Platform.Auth` 
 
 ### 5.2. `POST /api/platform/auth/refresh`
 * **Endpoint**: `PlatformRefreshEndpoint` (`.WithTags("Platform Authentication")`, `.RequirePlatform()`, `.RequireRateLimiting(RateLimitPolicies.Auth)`).
-  * Reads `refresh_token` cookie from `httpContext.Request.Cookies`, invokes `PlatformRefreshTokenCommand(rawRefreshToken)`.
+  * Reads `refresh_token` cookie from `httpContext.Request.Cookies` (returning `Results.Unauthorized()` if missing/whitespace), invokes `PlatformRefreshTokenCommand(rawRefreshToken)`.
   * On failure, clears cookies (`AuthCookieHelper.ClearAuthCookies`) and returns `result.ToProblemResult(httpContext)`.
-  * On success, sets rotated cookies (`AuthCookieHelper.SetAuthCookies`) and returns `200 OK`.
-* **Handler (`PlatformRefreshTokenHandler`)**:
+  * On success, sets rotated cookies (`AuthCookieHelper.SetAuthCookies`) and returns `Results.Ok()`.
+* **Handler (`PlatformRefreshTokenHandler : IHandler<PlatformRefreshTokenCommand, PlatformRefreshTokenResult>`)**:
   * Mirrors tenant `RefreshTokenHandler` against `CatalogDbContext.PlatformRefreshTokens` + `UserManager<PlatformUser>`:
-    * Missing/unknown hash -> `Error.Unauthorized("INVALID_REFRESH_TOKEN", "Invalid refresh token.")`.
-    * Reuse detection (`existingToken.IsRevoked`) -> revokes all active `PlatformRefreshTokens` for `existingToken.UserId`, saves changes, returns `Error.Unauthorized("INVALID_REFRESH_TOKEN", "Refresh token has been revoked.")`.
-    * Expired (`existingToken.IsExpired(timeProvider)`) -> returns `Error.Unauthorized("REFRESH_TOKEN_EXPIRED", "Refresh token has expired.")`.
-    * Rotates token (`RevokedAt = now`, `ReplacedByTokenHash = newHash`), adds new `PlatformRefreshToken`, fetches current `userManager.GetRolesAsync(user)`, generates new platform access token, saves changes, returns `PlatformLoginResult`.
+    * Missing/unknown hash -> `Error.Unauthorized("INVALID_REFRESH_TOKEN", "Invalid or expired refresh token.")`.
+    * Reuse detection (`existingToken.IsRevoked || existingToken.ReplacedByTokenHash != null`) -> revokes all active `PlatformRefreshTokens` for `existingToken.UserId`, returns `Error.Unauthorized("COMPROMISED_REFRESH_TOKEN", "Refresh token has been revoked.")`.
+    * Expired (`existingToken.IsExpired(timeProvider)`) -> returns `Error.Unauthorized("INVALID_REFRESH_TOKEN", "Invalid or expired refresh token.")`.
+    * Rotates token (`RevokedAt = now`, `ReplacedByTokenHash = newHash`), adds new `PlatformRefreshToken`, fetches current `userManager.GetRolesAsync(user)`, generates new platform access token, saves changes, returns `PlatformRefreshTokenResult(newAccessToken, newRaw)`.
 
 ### 5.3. `POST /api/platform/auth/logout`
-* **Endpoint**: `PlatformLogoutEndpoint` (`.WithTags("Platform Authentication")`, `.RequirePlatform()`, `.RequireRateLimiting(RateLimitPolicies.Auth)`).
-  * Reads `refresh_token` cookie, invokes `PlatformLogoutCommand(rawRefreshToken)`, calls `AuthCookieHelper.ClearAuthCookies`, returns `200 OK` (`PlatformLogoutResult(true)`).
-* **Handler (`PlatformLogoutHandler`)**:
-  * Looks up active `PlatformRefreshToken` by hash in `CatalogDbContext` and sets `RevokedAt = timeProvider.GetUtcNow()` if found and active.
+* **Endpoint**: `PlatformLogoutEndpoint` (`.WithTags("Platform Authentication")`, `.RequirePlatform()`).
+  * Reads `refresh_token` cookie, invokes `PlatformLogoutCommand(rawRefreshToken)`, calls `AuthCookieHelper.ClearAuthCookies`, returns `Results.NoContent()` (`204 No Content`).
+* **Handler (`PlatformLogoutHandler : IHandler<PlatformLogoutCommand>`)**:
+  * Looks up `PlatformRefreshToken` by hash in `CatalogDbContext`, sets `RevokedAt = timeProvider.GetUtcNow()` if found and not already revoked, saves changes, and returns `Result.Success()`.
 
 ### 5.4. `GET /api/platform/auth/me`
 * **Endpoint**: `GetPlatformMeEndpoint` (`.WithTags("Platform Authentication")`, `.RequirePlatform()`, `.RequireAuthorization(PlatformRoles.PolicyName)`).
