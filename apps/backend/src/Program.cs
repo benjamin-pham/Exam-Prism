@@ -27,7 +27,8 @@ if (builder.Environment.IsDevelopment())
         {
             policy.SetIsOriginAllowed(origin =>
             {
-                if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                if (Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
+                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
                 {
                     var host = uri.Host;
                     return host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
@@ -130,12 +131,13 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
 });
 
+app.UseRouting();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseCors(DevCorsPolicyName);
 }
 
-app.UseRouting();
 app.UseMultiTenant();
 app.UseMiddleware<TenantAccessGuardMiddleware>();
 

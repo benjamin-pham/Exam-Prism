@@ -195,5 +195,20 @@ public class ScalarApiDocsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task GetOpenApiDocument_InProduction_ReturnsNotFound()
+    {
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            builder.UseSetting("ConnectionStrings:CatalogConnection", "Host=localhost;Database=dummy;Username=dummy;Password=dummy");
+        });
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/openapi/v1.json");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
 
