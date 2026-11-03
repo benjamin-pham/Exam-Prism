@@ -18,6 +18,30 @@ using Wolverine.FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
 
+const string DevCorsPolicyName = "DevSubdomainCors";
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy(DevCorsPolicyName, policy =>
+        {
+            policy.SetIsOriginAllowed(origin =>
+            {
+                if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                {
+                    var host = uri.Host;
+                    return host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                           host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
+                }
+                return false;
+            })
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+        });
+    });
+}
+
 builder.Host.UseWolverine(opts =>
 {
     opts.Discovery.IncludeAssembly(typeof(Program).Assembly);
@@ -38,6 +62,44 @@ builder.Services.AddOpenApi(options =>
             BearerFormat = "JWT",
             Description = "Enter your JWT access token"
         };
+        document.Components.SecuritySchemes["X-Tenant"] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header,
+            Name = "X-Tenant",
+            Description = "Tenant slug for multi-tenant requests in development (e.g. school-a)"
+        };
+
+        document.Servers ??= new List<OpenApiServer>();
+        document.Servers.Add(new OpenApiServer
+        {
+            Url = "/",
+            Description = "Current Origin"
+        });
+        document.Servers.Add(new OpenApiServer
+        {
+            Url = "{scheme}://{tenant}.localhost:{port}",
+            Description = "Subdomain Tenant (Development)",
+            Variables = new Dictionary<string, OpenApiServerVariable>
+            {
+                ["scheme"] = new OpenApiServerVariable
+                {
+                    Default = "http",
+                    Description = "HTTP scheme",
+                    Enum = ["http", "https"]
+                },
+                ["tenant"] = new OpenApiServerVariable
+                {
+                    Default = "school-a",
+                    Description = "Tenant subdomain slug"
+                },
+                ["port"] = new OpenApiServerVariable
+                {
+                    Default = "5000",
+                    Description = "Server port"
+                }
+            }
+        });
 
         return Task.CompletedTask;
     });
@@ -68,6 +130,11 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
 });
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseCors(DevCorsPolicyName);
+}
+
 app.UseRouting();
 app.UseMultiTenant();
 app.UseMiddleware<TenantAccessGuardMiddleware>();
@@ -82,7 +149,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(options =>
     {
         options.WithTitle("ExamPrism API")
-               .AddPreferredSecuritySchemes(["Bearer"]);
+               .AddPreferredSecuritySchemes(["Bearer", "X-Tenant"]);
     });
 }
 
