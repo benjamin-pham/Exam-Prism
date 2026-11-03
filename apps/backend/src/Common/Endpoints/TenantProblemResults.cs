@@ -150,6 +150,30 @@ public static class TenantProblemResults
             null,
             cancellationToken);
 
+    public static Task WritePlatformOnlyAsync(
+        HttpContext httpContext,
+        CancellationToken cancellationToken = default) =>
+        WriteProblemAsync(
+            httpContext,
+            StatusCodes.Status404NotFound,
+            PlatformOnly,
+            "PlatformOnly",
+            "This endpoint is only available on the platform domain.",
+            null,
+            cancellationToken);
+
+    public static Task WriteTenantRequiredAsync(
+        HttpContext httpContext,
+        CancellationToken cancellationToken = default) =>
+        WriteProblemAsync(
+            httpContext,
+            StatusCodes.Status400BadRequest,
+            TenantRequired,
+            "TenantRequired",
+            "A valid organization subdomain is required for this endpoint.",
+            null,
+            cancellationToken);
+
     public static IResult TenantRequiredResult(HttpContext httpContext) =>
         CreateProblemResult(
             httpContext,

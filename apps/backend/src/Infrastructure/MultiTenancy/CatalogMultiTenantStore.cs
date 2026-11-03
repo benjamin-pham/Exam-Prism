@@ -279,7 +279,7 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
     public async ValueTask InvalidateTenantAsync(Guid tenantId, string slug, CancellationToken ct = default)
     {
         var keys = new List<string>(2);
-        var tags = new List<string>(2);
+        var tags = new List<string>(3);
 
         if (!string.IsNullOrWhiteSpace(slug))
         {
@@ -292,6 +292,7 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         {
             keys.Add($"catalog:tenant:id:{tenantId:D}");
             tags.Add($"catalog:tenant:{tenantId:D}");
+            tags.Add($"t:{tenantId:D}");
         }
 
         foreach (var key in keys)

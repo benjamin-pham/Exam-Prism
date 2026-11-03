@@ -54,6 +54,12 @@ public sealed class TenantAccessGuardMiddleware
                 switch (tenantInfo.Status)
                 {
                     case TenantStatus.Active:
+                        var tenantEndpoint = context.GetEndpoint();
+                        if (tenantEndpoint?.Metadata.GetMetadata<TenantBoundaryMetadata>()?.Mode == TenantBoundaryMode.PlatformOnly)
+                        {
+                            await TenantProblemResults.WritePlatformOnlyAsync(context);
+                            return;
+                        }
                         await _next(context);
                         return;
 

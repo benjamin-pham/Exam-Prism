@@ -94,4 +94,13 @@
   <data name="TenantTokenMismatch" xml:space="preserve">
     <value>Mã xác thực không thuộc về tổ chức này.</value>
   </data>
+  <data name="InvalidTenantStatusTransition" xml:space="preserve">
+    <value>Không thể chuyển đổi trạng thái của tổ chức từ trạng thái hiện tại.</value>
+  </data>
+  <data name="InvalidPage" xml:space="preserve">
+    <value>Số trang phải lớn hơn hoặc bằng 1.</value>
+  </data>
+  <data name="InvalidPageSize" xml:space="preserve">
+    <value>Kích thước trang phải nằm trong khoảng từ 1 đến 100.</value>
+  </data>
 </root>
