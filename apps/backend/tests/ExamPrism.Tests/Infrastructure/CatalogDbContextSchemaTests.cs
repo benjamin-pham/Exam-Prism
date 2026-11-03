@@ -1,6 +1,7 @@
 namespace Tests.Infrastructure;
 
 using Common.MultiTenancy;
+using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentAssertions;
@@ -100,6 +101,42 @@ public class CatalogDbContextSchemaTests
     }
 
     [Fact]
+    public void CatalogDbContext_ModelMetadata_ConfiguresPlatformIdentityAndPlatformRefreshTokens()
+    {
+        var options = new DbContextOptionsBuilder<CatalogDbContext>()
+            .UseNpgsql("Host=localhost;Database=dummy_catalog")
+            .Options;
+
+        using var context = new CatalogDbContext(options);
+
+        var userEntity = context.Model.FindEntityType(typeof(PlatformUser));
+        userEntity.Should().NotBeNull();
+
+        var roleEntity = context.Model.FindEntityType(typeof(PlatformRole));
+        roleEntity.Should().NotBeNull();
+
+        var rtEntity = context.Model.FindEntityType(typeof(PlatformRefreshToken));
+        rtEntity.Should().NotBeNull();
+        rtEntity!.GetTableName().Should().Be("PlatformRefreshTokens");
+
+        var tokenHashProp = rtEntity.FindProperty(nameof(PlatformRefreshToken.TokenHash));
+        tokenHashProp.Should().NotBeNull();
+        tokenHashProp!.IsNullable.Should().BeFalse();
+        tokenHashProp.GetMaxLength().Should().Be(128);
+
+        var tokenHashIndex = rtEntity.GetIndexes().FirstOrDefault(i =>
+            i.Properties.Count == 1 && i.Properties[0].Name == nameof(PlatformRefreshToken.TokenHash));
+        tokenHashIndex.Should().NotBeNull();
+        tokenHashIndex!.IsUnique.Should().BeTrue();
+        tokenHashIndex.GetDatabaseName().Should().Be("IX_PlatformRefreshTokens_TokenHash");
+
+        var userIdIndex = rtEntity.GetIndexes().FirstOrDefault(i =>
+            i.Properties.Count == 1 && i.Properties[0].Name == nameof(PlatformRefreshToken.UserId));
+        userIdIndex.Should().NotBeNull();
+        userIdIndex!.GetDatabaseName().Should().Be("IX_PlatformRefreshTokens_UserId");
+    }
+
+    [Fact]
     public void CatalogAndTenantMigrations_ExistSeparately_AndDoNotCrossContaminate()
     {
         var catalogOptions = new DbContextOptionsBuilder<CatalogDbContext>()
@@ -120,9 +157,10 @@ public class CatalogDbContextSchemaTests
 
         catalogMigrations.Should().NotBeEmpty();
         catalogMigrations.Should().Contain(m => m.EndsWith("_InitialCatalog"));
+        catalogMigrations.Should().Contain(m => m.EndsWith("_AddPlatformIdentity"));
 
         tenantMigrations.Should().NotBeEmpty();
-        tenantMigrations.Should().Contain(m => m.EndsWith("_InitialTenant"));
+        tenantMigrations.Should().ContainSingle(m => m.EndsWith("_InitialTenant"));
 
         catalogMigrations.Intersect(tenantMigrations).Should().BeEmpty();
     }

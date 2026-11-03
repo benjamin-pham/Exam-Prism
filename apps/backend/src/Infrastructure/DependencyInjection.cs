@@ -133,7 +133,7 @@ public static class DependencyInjection
         services.AddScoped<Common.Security.IUserContext, UserContext>();
 
         // Identity setup
-        services.AddIdentityCore<ApplicationUser>(options =>
+        Action<IdentityOptions> configureIdentity = options =>
         {
             options.Password.RequireDigit = true;
             options.Password.RequireLowercase = true;
@@ -141,10 +141,17 @@ public static class DependencyInjection
             options.Password.RequireNonAlphanumeric = false;
             options.Password.RequiredLength = 6;
             options.User.RequireUniqueEmail = true;
-        })
-        .AddRoles<IdentityRole<Guid>>()
-        .AddEntityFrameworkStores<AppDbContext>()
-        .AddDefaultTokenProviders();
+        };
+
+        services.AddIdentityCore<ApplicationUser>(configureIdentity)
+            .AddRoles<IdentityRole<Guid>>()
+            .AddEntityFrameworkStores<AppDbContext>()
+            .AddDefaultTokenProviders();
+
+        services.AddIdentityCore<PlatformUser>(configureIdentity)
+            .AddRoles<PlatformRole>()
+            .AddEntityFrameworkStores<CatalogDbContext>()
+            .AddDefaultTokenProviders();
 
         // JwtOptions & TokenService
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));

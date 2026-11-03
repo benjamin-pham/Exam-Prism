@@ -278,4 +278,43 @@ public class DependencyInjectionTests
         healthCheckOptions.Registrations.Should().Contain(r => r.Name == "catalog_db");
         healthCheckOptions.Registrations.Should().Contain(r => r.Name == "redis");
     }
+
+    [Fact]
+    public void AddInfrastructure_RegistersDualIdentity_ResolvingPlatformManagersWithoutActiveTenantContext()
+    {
+        // Arrange
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(CreateValidSettings())
+            .Build();
+        var services = new ServiceCollection();
+
+        // Act
+        services.AddInfrastructure(configuration);
+        var provider = services.BuildServiceProvider();
+
+        // Assert - in scope without active tenant
+        using var scopeWithoutTenant = provider.CreateScope();
+        var platformUserManager = scopeWithoutTenant.ServiceProvider.GetService<UserManager<PlatformUser>>();
+        platformUserManager.Should().NotBeNull();
+
+        var platformRoleManager = scopeWithoutTenant.ServiceProvider.GetService<RoleManager<PlatformRole>>();
+        platformRoleManager.Should().NotBeNull();
+
+        var resolveAppUserAct = () => scopeWithoutTenant.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        resolveAppUserAct.Should().Throw<InvalidOperationException>()
+            .WithMessage("*active tenant context*");
+
+        // Assert - in scope with active tenant
+        using var scopeWithTenant = provider.CreateScope();
+        var setter = scopeWithTenant.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>();
+        setter.MultiTenantContext = new MultiTenantContext<ExamPrismTenantInfo>(
+            new ExamPrismTenantInfo("test-id", "test-slug")
+            {
+                Status = TenantStatus.Active,
+                ConnectionString = "Host=localhost;Database=test;Username=postgres;Password=postgres"
+            });
+
+        var appUserManager = scopeWithTenant.ServiceProvider.GetService<UserManager<ApplicationUser>>();
+        appUserManager.Should().NotBeNull();
+    }
 }
