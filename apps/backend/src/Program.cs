@@ -1,10 +1,14 @@
 using Common.Endpoints;
 using Common.Exceptions;
+using Common.MultiTenancy;
+using ExamPrism.Features.Tenants;
 using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.MultiTenancy;
+using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -96,6 +100,44 @@ if (platformAdminOptions.SeedOnStartup)
     catch (Exception ex)
     {
         app.Logger.LogWarning(ex, "PlatformAdminSeeder skipped on startup because database is not available or not yet migrated.");
+    }
+}
+
+var multiTenancyOptions = app.Services.GetRequiredService<IOptions<MultiTenancyOptions>>().Value;
+if (multiTenancyOptions.Provisioning.RecoverStuckProvisioningOnStartup)
+{
+    try
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var catalogDb = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
+        var stuckTenants = await catalogDb.Tenants
+            .Where(t => t.Status == TenantStatus.Provisioning)
+            .Select(t => t.Id)
+            .ToListAsync();
+
+        foreach (var tenantId in stuckTenants)
+        {
+            await bus.SendAsync(new StartTenantProvisioningCommand(tenantId));
+        }
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Stuck provisioning recovery skipped on startup because database or bus is not available.");
+    }
+}
+
+if (multiTenancyOptions.FleetMigration.MigrateOnStartup)
+{
+    try
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var fleetMigrator = scope.ServiceProvider.GetRequiredService<ITenantFleetMigrator>();
+        await fleetMigrator.MigrateAllActiveTenantsAsync();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Fleet migration skipped on startup because database is not available.");
     }
 }
 

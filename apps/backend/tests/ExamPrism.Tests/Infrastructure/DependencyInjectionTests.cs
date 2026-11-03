@@ -82,10 +82,19 @@ public class DependencyInjectionTests
             .Which.Lifetime.Should().Be(ServiceLifetime.Singleton);
         services.Should().ContainSingle(s => s.ServiceType == typeof(ITenantCacheInvalidator))
             .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
+        services.Should().ContainSingle(s => s.ServiceType == typeof(ITenantProvisioner))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
+        services.Should().ContainSingle(s => s.ServiceType == typeof(ITenantFleetMigrator))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
         services.Should().Contain(s => s.ServiceType == typeof(IMultiTenantStore<ExamPrismTenantInfo>))
             .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
 
         var provider = services.BuildServiceProvider();
+        using (var scope = provider.CreateScope())
+        {
+            scope.ServiceProvider.GetService<ITenantProvisioner>().Should().NotBeNull();
+            scope.ServiceProvider.GetService<ITenantFleetMigrator>().Should().NotBeNull();
+        }
         var healthCheckOptions = provider.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
         healthCheckOptions.Registrations.Should().Contain(r => r.Name == "catalog_db");
     }

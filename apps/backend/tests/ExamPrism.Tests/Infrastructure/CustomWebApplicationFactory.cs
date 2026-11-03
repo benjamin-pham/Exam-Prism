@@ -33,6 +33,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         builder.UseSetting("PlatformAdmin:SeedOnStartup", "false");
         builder.UseSetting("PlatformAdmin:Email", "admin@examprism.com");
         builder.UseSetting("PlatformAdmin:Password", "AdminPassword123!");
+        builder.UseSetting("MultiTenancy:Provisioning:RecoverStuckProvisioningOnStartup", "false");
+        builder.UseSetting("MultiTenancy:FleetMigration:MigrateOnStartup", "false");
     }
 
     public async Task InitializeAsync()

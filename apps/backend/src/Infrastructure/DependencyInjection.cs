@@ -33,6 +33,7 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddLogging();
+        services.TryAddSingleton(configuration);
 
         var catalogConnection = configuration.GetConnectionString("CatalogConnection")
             ?? throw new InvalidOperationException("Connection string 'CatalogConnection' not found.");
@@ -65,6 +66,8 @@ public static class DependencyInjection
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<CatalogMultiTenantStore>();
         services.AddScoped<ITenantCacheInvalidator>(sp => sp.GetRequiredService<CatalogMultiTenantStore>());
+        services.AddScoped<ITenantProvisioner, TenantProvisioner>();
+        services.AddScoped<ITenantFleetMigrator, TenantFleetMigrator>();
 
         services.AddMultiTenant<ExamPrismTenantInfo>()
             .WithStrategy<SubdomainMultiTenantStrategy>(ServiceLifetime.Scoped)
