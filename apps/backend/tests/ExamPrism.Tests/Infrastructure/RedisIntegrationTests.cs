@@ -45,6 +45,8 @@ public class RedisWebApplicationFactory : WebApplicationFactory<Program>, IAsync
         builder.UseSetting("RateLimiting:Auth:WindowSeconds", "60");
         builder.UseSetting("RateLimiting:Global:PermitLimit", "3");
         builder.UseSetting("RateLimiting:Global:WindowSeconds", "60");
+        builder.UseSetting("Orleans:SiloPort", "0");
+        builder.UseSetting("Orleans:GatewayPort", "0");
     }
 
     public async Task InitializeAsync()

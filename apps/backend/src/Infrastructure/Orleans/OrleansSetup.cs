@@ -111,11 +111,23 @@ public static class OrleansSetup
                     isRedisReachable = testMux.IsConnected;
                     if (!isRedisReachable)
                     {
+                        if (!context.HostingEnvironment.IsDevelopment())
+                        {
+                            throw new InvalidOperationException(
+                                "ConnectionStrings:Redis was configured but the Redis endpoint is unreachable at Orleans silo startup.");
+                        }
+
                         Console.WriteLine("[OrleansSetup] WARNING: ConnectionStrings:Redis was provided but unreachable at boot time. Falling back to localhost in-memory clustering/storage/reminders.");
                     }
                 }
                 catch (Exception ex)
                 {
+                    if (!context.HostingEnvironment.IsDevelopment())
+                    {
+                        throw new InvalidOperationException(
+                            "ConnectionStrings:Redis was configured but the Redis endpoint is unreachable at Orleans silo startup.", ex);
+                    }
+
                     Console.WriteLine($"[OrleansSetup] WARNING: Redis connectivity probe failed ({ex.Message}). Falling back to localhost in-memory clustering/storage/reminders.");
                     isRedisReachable = false;
                 }

@@ -83,6 +83,7 @@ public abstract class TenantScopedGrain : Grain, ITenantScopedGrain
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return await action(sp);
         }
         finally
