@@ -64,6 +64,10 @@ public static class HttpPerformanceSetup
             });
         });
 
+        services.Configure<LoadSheddingOptions>(configuration.GetSection(LoadSheddingOptions.SectionName));
+        services.AddSingleton(sp => new AdaptiveConcurrencyLimiter(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<LoadSheddingOptions>>()));
+        services.AddAppRuntimeTuning(configuration);
+
         return services;
     }
 
@@ -71,6 +75,7 @@ public static class HttpPerformanceSetup
     {
         app.UseRequestDecompression();
         app.UseResponseCompression();
+        app.UseAdaptiveLoadShedding();
         app.UseRequestTimeouts();
         app.UseOutputCache();
         return app;
