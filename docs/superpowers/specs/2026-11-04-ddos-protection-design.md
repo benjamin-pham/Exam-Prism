@@ -310,3 +310,4 @@ app.MapEndpoints();
    * `IpPenaltyBoxAndNatSafetyTests`: Verify strike accumulation (`UnknownTenantProbe`, `RateLimitExceeded`, `UnauthorizedAuthAttempt`) triggers an IP ban (`429 Too Many Requests` with `X-Penalty-Box: true` and `Retry-After`), and verify **NAT-Safe Valid-JWT Bypass** (a request with a valid signed JWT from the same banned IP succeeds without being blocked).
    * `TenantCatalogPenetrationShieldTests`: Verify invalid slug formats skip `HybridCache` and `CatalogDbContext`, verify unknown tenant misses do not write to `IDistributedCache` (L2 Redis), and verify `MaxCatalogDbMissesPerSecond` protects `CatalogDbContext` during a 200-random-slug flood.
    * `KestrelAndTenantOnboardingDdosTests`: Verify Kestrel `MinRequestBodyDataRate`, `MinResponseDataRate`, header limits, `RateLimitPolicies.TenantOnboarding` on `POST /api/tenants`, and Prometheus `/metrics` exposure of all 6 new DDoS counters.
+
