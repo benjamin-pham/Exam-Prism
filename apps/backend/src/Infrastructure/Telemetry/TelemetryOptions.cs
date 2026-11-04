@@ -6,4 +6,6 @@ public sealed class TelemetryOptions
 
     public string? OtlpEndpoint { get; set; }
     public bool EnablePrometheusEndpoint { get; set; } = true;
+    public double TraceSamplingRatio { get; set; } = 1.0;
+    public int AlwaysSampleSlowRequestsMs { get; set; } = 500;
 }

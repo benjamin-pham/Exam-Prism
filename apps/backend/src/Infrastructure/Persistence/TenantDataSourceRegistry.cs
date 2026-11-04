@@ -49,6 +49,7 @@ public sealed class TenantDataSourceRegistry : IHostedService, IAsyncDisposable,
         }
 
         NpgsqlDataSource? toDispose = null;
+        NpgsqlDataSource dataSource;
 
         lock (_syncRoot)
         {
@@ -80,7 +81,7 @@ public sealed class TenantDataSourceRegistry : IHostedService, IAsyncDisposable,
                 }
             }
 
-            var dataSource = NpgsqlDataSource.Create(normalizedConnectionString);
+            dataSource = NpgsqlDataSource.Create(normalizedConnectionString);
             var entry = new DataSourceEntry(dataSource, nowMs);
             _cache[normalizedConnectionString] = entry;
 
@@ -102,7 +103,7 @@ public sealed class TenantDataSourceRegistry : IHostedService, IAsyncDisposable,
             });
         }
 
-        return _cache[normalizedConnectionString].DataSource;
+        return dataSource;
     }
 
     public async ValueTask EvictIdleAsync(TimeSpan maxIdle, CancellationToken ct = default)
@@ -208,6 +209,23 @@ public sealed class TenantDataSourceRegistry : IHostedService, IAsyncDisposable,
             await _cts.CancelAsync().ConfigureAwait(false);
             _cts.Dispose();
             _cts = null;
+        }
+
+        if (_backgroundTask != null)
+        {
+            try
+            {
+                await _backgroundTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on cancellation
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Exception awaiting background eviction task on registry disposal.");
+            }
+            _backgroundTask = null;
         }
 
         List<NpgsqlDataSource> toDispose;

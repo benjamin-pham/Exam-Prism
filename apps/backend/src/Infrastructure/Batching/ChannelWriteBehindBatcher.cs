@@ -107,8 +107,22 @@ public class ChannelWriteBehindBatcher<TItem> : BackgroundService, IWriteBehindB
 
                 if (batch.Count > 0)
                 {
-                    await FlushBatchInternalAsync(batch, stoppingToken);
-                    batch.Clear();
+                    try
+                    {
+                        await FlushBatchInternalAsync(batch, stoppingToken);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Transient error flushing batch in ChannelWriteBehindBatcher<{ItemType}>", typeof(TItem).Name);
+                    }
+                    finally
+                    {
+                        batch.Clear();
+                    }
                 }
             }
         }
@@ -127,11 +141,14 @@ public class ChannelWriteBehindBatcher<TItem> : BackgroundService, IWriteBehindB
                 try
                 {
                     await FlushBatchInternalAsync(batch, CancellationToken.None);
-                    batch.Clear();
                 }
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "Failed to flush partial batch on ChannelWriteBehindBatcher<{ItemType}> stop", typeof(TItem).Name);
+                }
+                finally
+                {
+                    batch.Clear();
                 }
             }
         }
@@ -151,15 +168,35 @@ public class ChannelWriteBehindBatcher<TItem> : BackgroundService, IWriteBehindB
             residualBatch.Add(item);
             if (residualBatch.Count >= maxBatchSize)
             {
-                await FlushBatchInternalAsync(residualBatch, cancellationToken);
-                residualBatch.Clear();
+                try
+                {
+                    await FlushBatchInternalAsync(residualBatch, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Failed to flush residual batch on StopAsync in ChannelWriteBehindBatcher<{ItemType}>", typeof(TItem).Name);
+                }
+                finally
+                {
+                    residualBatch.Clear();
+                }
             }
         }
 
         if (residualBatch.Count > 0)
         {
-            await FlushBatchInternalAsync(residualBatch, cancellationToken);
-            residualBatch.Clear();
+            try
+            {
+                await FlushBatchInternalAsync(residualBatch, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to flush remaining residual batch on StopAsync in ChannelWriteBehindBatcher<{ItemType}>", typeof(TItem).Name);
+            }
+            finally
+            {
+                residualBatch.Clear();
+            }
         }
     }
 

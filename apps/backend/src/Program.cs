@@ -22,6 +22,7 @@ app.UseExceptionHandler();
 app.UseRequestDecompression();
 app.UseResponseCompression();
 app.UseRouting();
+app.UseAdaptiveLoadShedding();
 app.UseRequestTimeouts();
 app.UseSerilogRequestLogging(options =>
 {

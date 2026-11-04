@@ -42,47 +42,62 @@ public class AdaptiveLoadSheddingMiddleware
         {
             ExamPrismDiagnostics.RecordLoadSheddingRejection(priority.ToString());
 
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            context.Response.Headers.RetryAfter = _options.RetryAfterSeconds.ToString(CultureInfo.InvariantCulture);
-            context.Response.Headers["X-Load-Shed"] = "true";
-            context.Response.ContentType = "application/problem+json";
-
-            var problem = new ProblemDetails
+            if (!context.Response.HasStarted)
             {
-                Type = "https://tools.ietf.org/html/rfc7231#section-6.6.4",
-                Title = "Service Unavailable",
-                Status = StatusCodes.Status503ServiceUnavailable,
-                Detail = "The server is currently experiencing high load and cannot process your request. Please try again shortly.",
-                Instance = context.Request.Path.Value ?? string.Empty
-            };
+                context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                context.Response.Headers.RetryAfter = _options.RetryAfterSeconds.ToString(CultureInfo.InvariantCulture);
+                context.Response.Headers["X-Load-Shed"] = "true";
+                context.Response.ContentType = "application/problem+json";
 
-            var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
-            problem.Extensions["traceId"] = traceId;
+                var problem = new ProblemDetails
+                {
+                    Type = "https://tools.ietf.org/html/rfc7231#section-6.6.4",
+                    Title = "Service Unavailable",
+                    Status = StatusCodes.Status503ServiceUnavailable,
+                    Detail = "The server is currently experiencing high load and cannot process your request. Please try again shortly.",
+                    Instance = context.Request.Path.Value ?? string.Empty
+                };
 
-            await context.Response.WriteAsJsonAsync(
-                problem,
-                options: (JsonSerializerOptions?)null,
-                contentType: "application/problem+json",
-                cancellationToken: context.RequestAborted);
+                var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
+                problem.Extensions["traceId"] = traceId;
+
+                await context.Response.WriteAsJsonAsync(
+                    problem,
+                    options: (JsonSerializerOptions?)null,
+                    contentType: "application/problem+json",
+                    cancellationToken: context.RequestAborted);
+            }
 
             return;
         }
 
         ExamPrismDiagnostics.IncrementInFlightRequests();
         var startTimestamp = Stopwatch.GetTimestamp();
+        var isServerError = false;
 
         try
         {
             using (lease)
             {
-                await _next(context);
+                try
+                {
+                    await _next(context);
+                }
+                catch
+                {
+                    isServerError = true;
+                    throw;
+                }
             }
         }
         finally
         {
             ExamPrismDiagnostics.DecrementInFlightRequests();
             var elapsedMs = Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
-            bool isServerError = context.Response.StatusCode >= StatusCodes.Status500InternalServerError;
+            if (!isServerError)
+            {
+                isServerError = context.Response.StatusCode >= StatusCodes.Status500InternalServerError;
+            }
             _limiter.RecordSample(elapsedMs, isServerError);
         }
     }

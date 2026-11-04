@@ -81,13 +81,19 @@ return #members";
 
             if (tags is { Length: > 0 })
             {
+                var tagTasks = new List<Task>();
                 foreach (var tag in tags)
                 {
                     if (!string.IsNullOrWhiteSpace(tag))
                     {
                         var tagKey = $"outputcache:tag:{tag}";
-                        await db.SetAddAsync(tagKey, key);
+                        tagTasks.Add(AddTagKeyAsync(db, tagKey, key, validFor));
                     }
+                }
+
+                if (tagTasks.Count > 0)
+                {
+                    await Task.WhenAll(tagTasks);
                 }
             }
         }
@@ -96,6 +102,12 @@ return #members";
             _logger?.LogWarning(ex, "Redis error during SetAsync for key {Key}. Failing open to fallback store.", key);
             await _fallbackStore.SetAsync(key, value, tags, validFor, cancellationToken);
         }
+    }
+
+    private static async Task AddTagKeyAsync(IDatabase db, string tagKey, string key, TimeSpan validFor)
+    {
+        await db.SetAddAsync(tagKey, key);
+        await db.KeyExpireAsync(tagKey, validFor);
     }
 
     public async ValueTask EvictByTagAsync(string tag, CancellationToken cancellationToken)

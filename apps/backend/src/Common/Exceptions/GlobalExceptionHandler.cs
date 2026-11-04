@@ -151,6 +151,22 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 _logger.LogWarning(unauthorizedAccessException, "Unauthorized access at {Path} (TraceId: {TraceId})", path, traceId);
                 break;
 
+            case PasswordHashBulkheadRejectedException bulkheadEx:
+                statusCode = StatusCodes.Status503ServiceUnavailable;
+                httpContext.Response.Headers.RetryAfter = "2";
+                problemDetails = new ProblemDetails
+                {
+                    Status = statusCode,
+                    Title = "Service Unavailable",
+                    Detail = bulkheadEx.Message,
+                    Instance = path,
+                    Type = "https://tools.ietf.org/html/rfc7231#section-6.6.4"
+                };
+                problemDetails.Extensions["traceId"] = traceId;
+                problemDetails.Extensions["errorCode"] = "CPU_BULKHEAD_EXHAUSTED";
+                _logger.LogWarning(bulkheadEx, "Password hash bulkhead rejected at {Path} (TraceId: {TraceId})", path, traceId);
+                break;
+
             default:
                 statusCode = StatusCodes.Status500InternalServerError;
                 var internalServerErrorMessage = _localizer["InternalServerError"].Value ?? "An unexpected error occurred. Please try again later.";

@@ -25,6 +25,7 @@ public static class TelemetrySetup
         otelBuilder.WithTracing(tracing =>
         {
             tracing
+                .SetSampler(new AdaptiveTraceSampler(telemetryOptions.TraceSamplingRatio))
                 .AddSource(
                     ExamPrismDiagnostics.ActivitySourceName,
                     "Microsoft.Orleans.Runtime",
@@ -109,6 +110,30 @@ public static class TelemetrySetup
                     builder.AppendLine("# HELP examprism_idempotency_conflicts_total Number of concurrent idempotent requests rejected due to in-flight locks");
                     builder.AppendLine("# TYPE examprism_idempotency_conflicts_total counter");
                     builder.AppendLine($"examprism_idempotency_conflicts_total {ExamPrismDiagnostics.IdempotencyConflictsCount}");
+                    builder.AppendLine();
+                    builder.AppendLine("# HELP examprism_load_shedding_rejected_total Number of requests rejected by adaptive load shedding");
+                    builder.AppendLine("# TYPE examprism_load_shedding_rejected_total counter");
+                    builder.AppendLine($"examprism_load_shedding_rejected_total {ExamPrismDiagnostics.LoadSheddingRejectedCount}");
+                    builder.AppendLine();
+                    builder.AppendLine("# HELP examprism_auth_jwt_revoked_rejected_total Number of authentication rejections due to revoked JWT");
+                    builder.AppendLine("# TYPE examprism_auth_jwt_revoked_rejected_total counter");
+                    builder.AppendLine($"examprism_auth_jwt_revoked_rejected_total {ExamPrismDiagnostics.JwtRevokedRejectedCount}");
+                    builder.AppendLine();
+                    builder.AppendLine("# HELP examprism_auth_password_hash_bulkhead_rejected_total Number of password hashing requests rejected by CPU bulkhead");
+                    builder.AppendLine("# TYPE examprism_auth_password_hash_bulkhead_rejected_total counter");
+                    builder.AppendLine($"examprism_auth_password_hash_bulkhead_rejected_total {ExamPrismDiagnostics.PasswordHashBulkheadRejectedCount}");
+                    builder.AppendLine();
+                    builder.AppendLine("# HELP examprism_batcher_flushed_items_total Number of items flushed by write-behind batchers");
+                    builder.AppendLine("# TYPE examprism_batcher_flushed_items_total counter");
+                    builder.AppendLine($"examprism_batcher_flushed_items_total {ExamPrismDiagnostics.BatcherFlushedItemsCount}");
+                    builder.AppendLine();
+                    builder.AppendLine("# HELP examprism_db_tenant_datasources_active Number of active cached tenant NpgsqlDataSources");
+                    builder.AppendLine("# TYPE examprism_db_tenant_datasources_active gauge");
+                    builder.AppendLine($"examprism_db_tenant_datasources_active {ExamPrismDiagnostics.ActiveTenantDataSourcesCount}");
+                    builder.AppendLine();
+                    builder.AppendLine("# HELP examprism_http_in_flight_requests Current number of in-flight HTTP requests");
+                    builder.AppendLine("# TYPE examprism_http_in_flight_requests gauge");
+                    builder.AppendLine($"examprism_http_in_flight_requests {ExamPrismDiagnostics.InFlightRequestsCount}");
                     builder.AppendLine();
 
                     await context.Response.WriteAsync(builder.ToString(), Encoding.UTF8);

@@ -17,6 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
 
+[Collection("DiagnosticsSerial")]
 public class AdaptiveLoadSheddingAndRuntimeTests
 {
     [Fact]
@@ -122,7 +123,7 @@ public class AdaptiveLoadSheddingAndRuntimeTests
     [Fact]
     public async Task AdaptiveLoadSheddingMiddleware_Returns503WithRetryAfterAndHeaderWhenShed_AndExemptsHealthAndMetrics()
     {
-        ExamPrismDiagnostics.ResetForTesting();
+        var initialRejected = ExamPrismDiagnostics.LoadSheddingRejectedCount;
 
         var options = new LoadSheddingOptions
         {
@@ -159,7 +160,7 @@ public class AdaptiveLoadSheddingAndRuntimeTests
         shedContext.Response.Headers["Retry-After"].ToString().Should().Be("2");
         shedContext.Response.Headers["X-Load-Shed"].ToString().Should().Be("true");
         shedContext.Response.ContentType.Should().Contain("application/problem+json");
-        ExamPrismDiagnostics.LoadSheddingRejectedCount.Should().Be(1);
+        ExamPrismDiagnostics.LoadSheddingRejectedCount.Should().Be(initialRejected + 1);
 
         shedContext.Response.Body.Seek(0, SeekOrigin.Begin);
         var problem = await JsonSerializer.DeserializeAsync<ProblemDetails>(shedContext.Response.Body);
@@ -181,8 +182,8 @@ public class AdaptiveLoadSheddingAndRuntimeTests
         await middleware.InvokeAsync(metricsContext);
         metricsContext.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
 
-        // Verify rejected count remained 1 (health and metrics bypassed)
-        ExamPrismDiagnostics.LoadSheddingRejectedCount.Should().Be(1);
+        // Verify rejected count remained initial + 1 (health and metrics bypassed)
+        ExamPrismDiagnostics.LoadSheddingRejectedCount.Should().Be(initialRejected + 1);
 
         heldLease!.Dispose();
     }

@@ -18,6 +18,7 @@ public static class TenantProblemResults
     public const string TenantRequired = "TENANT_REQUIRED";
     public const string PlatformOnly = "PLATFORM_ONLY";
     public const string TenantTokenMismatch = "TENANT_TOKEN_MISMATCH";
+    public const string TokenRevoked = "TOKEN_REVOKED";
 
     public static ProblemDetails CreateProblemDetails(
         HttpContext httpContext,
@@ -150,6 +151,18 @@ public static class TenantProblemResults
             null,
             cancellationToken);
 
+    public static Task WriteTokenRevokedAsync(
+        HttpContext httpContext,
+        CancellationToken cancellationToken = default) =>
+        WriteProblemAsync(
+            httpContext,
+            StatusCodes.Status401Unauthorized,
+            TokenRevoked,
+            "TokenRevoked",
+            "The authentication token has been revoked.",
+            null,
+            cancellationToken);
+
     public static Task WritePlatformOnlyAsync(
         HttpContext httpContext,
         CancellationToken cancellationToken = default) =>
@@ -197,6 +210,14 @@ public static class TenantProblemResults
             TenantTokenMismatch,
             "TenantTokenMismatch",
             "The authentication token does not belong to this organization.");
+
+    public static IResult TokenRevokedResult(HttpContext httpContext) =>
+        CreateProblemResult(
+            httpContext,
+            StatusCodes.Status401Unauthorized,
+            TokenRevoked,
+            "TokenRevoked",
+            "The authentication token has been revoked.");
 
     private static string GetTitleForStatusCode(int statusCode) => statusCode switch
     {

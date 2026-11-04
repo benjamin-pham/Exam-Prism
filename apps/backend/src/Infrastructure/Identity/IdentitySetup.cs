@@ -43,6 +43,16 @@ public static class IdentitySetup
             .AddEntityFrameworkStores<CatalogDbContext>()
             .AddDefaultTokenProviders();
 
+        // High-load identity: CPU password hash bulkhead & hybrid cache token revocation
+        services.Configure<IdentityHighLoadOptions>(configuration.GetSection(IdentityHighLoadOptions.SectionName));
+        services.AddSingleton<IPasswordHasher<ApplicationUser>>(sp =>
+            new BulkheadPasswordHasher<ApplicationUser>(
+                sp.GetRequiredService<IOptions<IdentityHighLoadOptions>>()));
+        services.AddSingleton<IPasswordHasher<PlatformUser>>(sp =>
+            new BulkheadPasswordHasher<PlatformUser>(
+                sp.GetRequiredService<IOptions<IdentityHighLoadOptions>>()));
+        services.AddSingleton<ITokenRevocationService, HybridCacheTokenRevocationService>();
+
         // JwtOptions & TokenService
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddScoped<ITokenService, TokenService>();

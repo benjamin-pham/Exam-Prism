@@ -14,6 +14,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Xunit;
 
+[Collection("DiagnosticsSerial")]
 public class WriteBehindBatcherTests : IDisposable
 {
     public WriteBehindBatcherTests()

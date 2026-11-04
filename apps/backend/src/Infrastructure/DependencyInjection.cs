@@ -1,6 +1,7 @@
 namespace ExamPrism.Infrastructure;
 
 using Common.Exceptions;
+using ExamPrism.Infrastructure.Batching;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Cors;
 using ExamPrism.Infrastructure.Health;
@@ -30,6 +31,7 @@ public static class DependencyInjection
 
     public static WebApplicationBuilder AddInfrastructure(this WebApplicationBuilder builder)
     {
+        builder.ConfigureAppKestrel();
         builder.Services.AddAppCors(builder.Environment);
 
         builder.Host.UseLogging();
@@ -56,6 +58,7 @@ public static class DependencyInjection
 
         services.AddAppReverseProxy(configuration);
         services.AddAppHttpPerformance(configuration);
+        services.AddAppBatching(configuration);
         services.AddAppIdempotency(configuration);
         services.AddAppHealthDrain(configuration);
         services.AddPersistence(configuration, healthChecksBuilder);
