@@ -115,7 +115,7 @@ git commit -m "feat(orleans): add Common.Orleans contracts, TenantGrainKey, and 
   - `ExamPrism.Infrastructure.Orleans.TenantScopedGrain : Grain, ITenantScopedGrain`
   - `ExamPrism.Infrastructure.Orleans.OrleansHealthCheck(ISiloStatusOracle? siloStatusOracle = null) : IHealthCheck`
 
-- [ ] **Step 1: Add failing unit tests for filters and `OrleansHealthCheck` in `apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansFoundationUnitTests.cs`**
+- [x] **Step 1: Add failing unit tests for filters and `OrleansHealthCheck` in `apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansFoundationUnitTests.cs`**
 
 Add unit tests to `OrleansFoundationUnitTests`:
 - `OutgoingFilter_WhenRequestContextEmptyAndTenantActive_PopulatesTenantIdInRequestContext`: sets active `ExamPrismTenantInfo` on `IMultiTenantContextAccessor<ExamPrismTenantInfo>`, clears `RequestContext`, invokes `TenantOutgoingGrainCallFilter.Invoke(context)`, asserts `RequestContext.Get(OrleansTenantConstants.TenantIdRequestContextKey)` equals `tenantId.ToString("D")` and `context.Invoke()` was awaited.
@@ -124,12 +124,12 @@ Add unit tests to `OrleansFoundationUnitTests`:
 - `IncomingFilter_RejectsMalformedKey_CrossTenantRequestContext_AndInactiveOrUnknownTenant`: asserts `Invoke` throws `InvalidOperationException` when (a) key is `"bad-key"`, (b) `RequestContext` has `tenantB` while grain key has `tenantA`, (c) store returns `null`, or (d) store returns tenant with `Status = TenantStatus.Suspended`.
 - `OrleansHealthCheck_ReturnsHealthyWhenSiloActive_AndUnhealthyWhenNotActiveOrNull`: mocks `ISiloStatusOracle` returning `SiloStatus.Active` -> `HealthStatus.Healthy`; returning `SiloStatus.Dead` -> `HealthStatus.Unhealthy`; passing `null` oracle -> `HealthStatus.Unhealthy`.
 
-- [ ] **Step 2: Run `OrleansFoundationUnitTests` to verify compilation failure**
+- [x] **Step 2: Run `OrleansFoundationUnitTests` to verify compilation failure**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~OrleansFoundationUnitTests"`
 Expected: FAIL (`TenantOutgoingGrainCallFilter`, `TenantIncomingGrainCallFilter`, `TenantScopedGrain`, and `OrleansHealthCheck` do not exist yet).
 
-- [ ] **Step 3: Implement `TenantOutgoingGrainCallFilter`, `TenantIncomingGrainCallFilter`, `TenantScopedGrain`, and `OrleansHealthCheck`**
+- [x] **Step 3: Implement `TenantOutgoingGrainCallFilter`, `TenantIncomingGrainCallFilter`, `TenantScopedGrain`, and `OrleansHealthCheck`**
 
 - Create `apps/backend/src/Infrastructure/Orleans/TenantOutgoingGrainCallFilter.cs` per Spec §4.2.
 - Create `apps/backend/src/Infrastructure/Orleans/TenantIncomingGrainCallFilter.cs` per Spec §4.3:
@@ -138,12 +138,12 @@ Expected: FAIL (`TenantOutgoingGrainCallFilter`, `TenantIncomingGrainCallFilter`
 - Create `apps/backend/src/Infrastructure/Orleans/TenantScopedGrain.cs` per Spec §4.4.
 - Create `apps/backend/src/Infrastructure/Orleans/OrleansHealthCheck.cs` per Spec §4.6 with constructor `public OrleansHealthCheck(ISiloStatusOracle? siloStatusOracle = null)`.
 
-- [ ] **Step 4: Run `OrleansFoundationUnitTests` to verify all tests pass**
+- [x] **Step 4: Run `OrleansFoundationUnitTests` to verify all tests pass**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~OrleansFoundationUnitTests"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/backend/src/Infrastructure/Orleans/TenantOutgoingGrainCallFilter.cs apps/backend/src/Infrastructure/Orleans/TenantIncomingGrainCallFilter.cs apps/backend/src/Infrastructure/Orleans/TenantScopedGrain.cs apps/backend/src/Infrastructure/Orleans/OrleansHealthCheck.cs apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansFoundationUnitTests.cs
@@ -172,7 +172,7 @@ git commit -m "feat(orleans): add multi-tenant grain call filters, TenantScopedG
   - `ExamPrism.Infrastructure.Orleans.Diagnostics.ITenantProbeGrain : ITenantScopedGrain`
   - `ExamPrism.Infrastructure.Orleans.Diagnostics.TenantProbeGrain : TenantScopedGrain, ITenantProbeGrain, IRemindable`
 
-- [ ] **Step 1: Add failing tests in `ArchitectureTests.cs` and `DependencyInjectionTests.cs`**
+- [x] **Step 1: Add failing tests in `ArchitectureTests.cs` and `DependencyInjectionTests.cs`**
 
 - In `apps/backend/tests/ExamPrism.Tests/Architecture/ArchitectureTests.cs`, add:
   - `TypesInFeatures_MustNotReferenceRawOrleansGrainFactoryOrClusterClient`: scans all types in `ExamPrism.Features.*` and asserts no base type, interface, field, property, constructor parameter, or method signature references `Orleans.IGrainFactory` or `Orleans.IClusterClient`.
@@ -180,12 +180,12 @@ git commit -m "feat(orleans): add multi-tenant grain call filters, TenantScopedG
 - In `apps/backend/tests/ExamPrism.Tests/Infrastructure/DependencyInjectionTests.cs`:
   - Assert `services.Should().ContainSingle(s => s.ServiceType == typeof(ITenantGrainFactory)).Which.Lifetime.Should().Be(ServiceLifetime.Scoped);` and `healthCheckOptions.Registrations.Should().Contain(r => r.Name == "orleans");`.
 
-- [ ] **Step 2: Run `ArchitectureTests` and `DependencyInjectionTests` to verify failure**
+- [x] **Step 2: Run `ArchitectureTests` and `DependencyInjectionTests` to verify failure**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~ArchitectureTests|FullyQualifiedName~DependencyInjectionTests"`
 Expected: FAIL (`OrleansSetup` and `TenantProbeGrain` are not wired yet).
 
-- [ ] **Step 3: Implement `TenantProbeGrain`, `OrleansSetup`, and wire `Program.cs`, `DependencyInjection.cs`, `appsettings.json`, and `CustomWebApplicationFactory.cs`**
+- [x] **Step 3: Implement `TenantProbeGrain`, `OrleansSetup`, and wire `Program.cs`, `DependencyInjection.cs`, `appsettings.json`, and `CustomWebApplicationFactory.cs`**
 
 - Create `apps/backend/src/Infrastructure/Orleans/Diagnostics/TenantProbeGrain.cs`:
   - Define `[GenerateSerializer] public sealed record TenantProbeState(string? Value, int Counter, string? LastReminderName);` and `[GenerateSerializer] public sealed record TenantProbeSnapshot(Guid TenantId, string EntityKey, string? StateValue, int Counter, string? CachedValue, int TenantUserCount, string? LastReminderName);`.
@@ -209,12 +209,12 @@ Expected: FAIL (`OrleansSetup` and `TenantProbeGrain` are not wired yet).
 - Update `apps/backend/src/Infrastructure/DependencyInjection.cs` to call `services.AddExamPrismOrleans(configuration, healthChecksBuilder);`.
 - Update `apps/backend/tests/ExamPrism.Tests/Infrastructure/CustomWebApplicationFactory.cs` to add `builder.UseSetting("Orleans:SiloPort", "0");` and `builder.UseSetting("Orleans:GatewayPort", "0");`.
 
-- [ ] **Step 4: Run `ArchitectureTests`, `DependencyInjectionTests`, and `HealthEndpointTests` to verify they pass**
+- [x] **Step 4: Run `ArchitectureTests`, `DependencyInjectionTests`, and `HealthEndpointTests` to verify they pass**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~ArchitectureTests|FullyQualifiedName~DependencyInjectionTests|FullyQualifiedName~HealthEndpointTests"`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/backend/src/appsettings.json apps/backend/src/Program.cs apps/backend/src/Infrastructure/DependencyInjection.cs apps/backend/src/Infrastructure/Orleans/OrleansSetup.cs apps/backend/src/Infrastructure/Orleans/Diagnostics/TenantProbeGrain.cs apps/backend/tests/ExamPrism.Tests/Architecture/ArchitectureTests.cs apps/backend/tests/ExamPrism.Tests/Infrastructure/CustomWebApplicationFactory.cs apps/backend/tests/ExamPrism.Tests/Infrastructure/DependencyInjectionTests.cs
@@ -233,7 +233,7 @@ git commit -m "feat(orleans): wire co-hosted dual-mode Orleans silo, TenantProbe
 - Consumes: `Common.Orleans.ITenantGrainFactory`, `ExamPrism.Infrastructure.Orleans.Diagnostics.ITenantProbeGrain`, `Common.Caching.ICacheService`, `Tests.Infrastructure.CustomWebApplicationFactory`, `Tests.Infrastructure.RedisWebApplicationFactory`
 - Produces: End-to-end verification of multi-tenant grain isolation, `HybridCacheService` + `AppDbContext` integration inside grains and timer callbacks, and Redis-backed grain storage, clustering, and reminders.
 
-- [ ] **Step 1: Write `OrleansMultiTenantIntegrationTests` and `OrleansRedisIntegrationTests`**
+- [x] **Step 1: Write `OrleansMultiTenantIntegrationTests` and `OrleansRedisIntegrationTests`**
 
 - Create `apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansMultiTenantIntegrationTests.cs` (`IClassFixture<CustomWebApplicationFactory>`) with tests:
   - `GrainState_And_HybridCache_AreStrictlyIsolatedAcrossTenantsForIdenticalEntityKey`: creates tenant scopes for `"tenant-a"` and `"tenant-b"`, resolves `ITenantGrainFactory` in each scope, calls `GetGrain<ITenantProbeGrain>("attempt-shared")`, invokes `SetAndInspectAsync("ans-A", "exam:1:rubric", "rubric-A")` on tenant A and `SetAndInspectAsync("ans-B", "exam:1:rubric", "rubric-B")` on tenant B; asserts `TenantId`, `StateValue`, and `CachedValue` are completely isolated between tenant A and tenant B, and verifying via `ICacheService.GetOrDefaultAsync<string>("exam:1:rubric")` in each tenant scope returns `"rubric-A"` and `"rubric-B"` respectively.
@@ -242,17 +242,17 @@ git commit -m "feat(orleans): wire co-hosted dual-mode Orleans silo, TenantProbe
 - Create `apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansRedisIntegrationTests.cs` (`IClassFixture<RedisWebApplicationFactory>`) with tests:
   - `RedisMode_PersistsGrainStateAcrossDeactivation_RegistersReminder_AndReportsHealthyOnHealthEndpoint`: using `RedisWebApplicationFactory`, creates a `"tenant-a"` scope, resolves `ITenantProbeGrain` for `"redis-attempt-1"`, calls `SetAndInspectAsync("persisted-in-redis", "exam:redis", "cached")`, calls `RegisterProbeReminderAsync("auto-submit-reminder")`, forces grain deactivation via `DeactivateImmediatelyAsync()`, calls `GetSnapshotAsync("exam:redis")` on a new grain reference to reactivate from Redis storage, and asserts `StateValue == "persisted-in-redis"` and `LastReminderName == "auto-submit-reminder"`. Also asserts `IConnectionMultiplexer` contains Redis keys created by Orleans and `GET /health` returns `200 OK` (`Status == "Healthy"`).
 
-- [ ] **Step 2: Run the new Orleans integration test suites**
+- [x] **Step 2: Run the new Orleans integration test suites**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~OrleansMultiTenantIntegrationTests|FullyQualifiedName~OrleansRedisIntegrationTests"`
 Expected: PASS.
 
-- [ ] **Step 3: Run the entire backend test suite to verify zero regressions**
+- [x] **Step 3: Run the entire backend test suite to verify zero regressions**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx`
 Expected: PASS (all existing unit, architecture, multi-tenancy, and Redis integration tests pass alongside the new Orleans suites).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansMultiTenantIntegrationTests.cs apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansRedisIntegrationTests.cs
