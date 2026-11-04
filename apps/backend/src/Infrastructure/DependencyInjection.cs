@@ -7,6 +7,7 @@ using Common.Security;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.MultiTenancy;
+using ExamPrism.Infrastructure.Orleans;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using ExamPrism.Infrastructure.RateLimiting;
@@ -147,6 +148,7 @@ public static class DependencyInjection
         services.AddSingleton<ICacheService, HybridCacheService>();
 
         services.AddExamPrismRateLimiting(configuration, useRedis);
+        services.AddExamPrismOrleans(configuration, healthChecksBuilder);
 
         services.AddHttpContextAccessor();
         services.AddScoped<Common.Security.IUserContext, UserContext>();

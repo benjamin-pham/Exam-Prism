@@ -2,6 +2,7 @@ namespace Tests.Infrastructure;
 
 using Common.Caching;
 using Common.MultiTenancy;
+using Common.Orleans;
 using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Identity;
@@ -88,6 +89,8 @@ public class DependencyInjectionTests
             .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
         services.Should().Contain(s => s.ServiceType == typeof(IMultiTenantStore<ExamPrismTenantInfo>))
             .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
+        services.Should().ContainSingle(s => s.ServiceType == typeof(ITenantGrainFactory))
+            .Which.Lifetime.Should().Be(ServiceLifetime.Scoped);
 
         var provider = services.BuildServiceProvider();
         using (var scope = provider.CreateScope())
@@ -97,6 +100,7 @@ public class DependencyInjectionTests
         }
         var healthCheckOptions = provider.GetRequiredService<IOptions<HealthCheckServiceOptions>>().Value;
         healthCheckOptions.Registrations.Should().Contain(r => r.Name == "catalog_db");
+        healthCheckOptions.Registrations.Should().Contain(r => r.Name == "orleans");
     }
 
     [Fact]

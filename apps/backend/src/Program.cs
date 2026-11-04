@@ -5,6 +5,7 @@ using ExamPrism.Features.Tenants;
 using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.MultiTenancy;
+using ExamPrism.Infrastructure.Orleans;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using FluentValidation;
@@ -49,6 +50,8 @@ builder.Host.UseWolverine(opts =>
     opts.UseFluentValidation();
     opts.Policies.AddMiddleware<TenantWolverineMiddleware>();
 });
+
+builder.Host.UseExamPrismOrleans();
 
 builder.Services.AddOpenApi(options =>
 {

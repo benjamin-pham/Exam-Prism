@@ -35,6 +35,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         builder.UseSetting("PlatformAdmin:Password", "AdminPassword123!");
         builder.UseSetting("MultiTenancy:Provisioning:RecoverStuckProvisioningOnStartup", "false");
         builder.UseSetting("MultiTenancy:FleetMigration:MigrateOnStartup", "false");
+        builder.UseSetting("Orleans:SiloPort", "0");
+        builder.UseSetting("Orleans:GatewayPort", "0");
     }
 
     public async Task InitializeAsync()

@@ -3,9 +3,11 @@ namespace ExamPrism.Tests.Architecture;
 using System.Reflection;
 using Common.Endpoints;
 using Common.Handlers;
+using Common.Orleans;
 using Common.Results;
 using ExamPrism.Features.Auth;
 using ExamPrism.Features.Health;
+using ExamPrism.Infrastructure.Orleans;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
@@ -372,6 +374,94 @@ public class ArchitectureTests
             foreach (var inner in UnwrapTypes(underlying))
             {
                 yield return inner;
+            }
+        }
+    }
+
+    [Fact]
+    public void TypesInFeatures_MustNotReferenceRawOrleansGrainFactoryOrClusterClient()
+    {
+        var featureTypes = AppTypes
+            .Where(t => t.Namespace != null && t.Namespace.StartsWith("ExamPrism.Features", StringComparison.Ordinal))
+            .ToList();
+
+        featureTypes.Should().NotBeEmpty();
+
+        var forbiddenTypes = new[] { typeof(global::Orleans.IGrainFactory), typeof(global::Orleans.IClusterClient) };
+
+        foreach (var type in featureTypes)
+        {
+            if (type.BaseType != null)
+            {
+                AssertNotReferencingForbiddenOrleansTypes(type.BaseType, type, "BaseType", forbiddenTypes);
+            }
+
+            foreach (var iface in type.GetInterfaces())
+            {
+                AssertNotReferencingForbiddenOrleansTypes(iface, type, $"Interface:{iface.Name}", forbiddenTypes);
+            }
+
+            foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            {
+                AssertNotReferencingForbiddenOrleansTypes(field.FieldType, type, $"Field:{field.Name}", forbiddenTypes);
+            }
+
+            foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            {
+                AssertNotReferencingForbiddenOrleansTypes(prop.PropertyType, type, $"Property:{prop.Name}", forbiddenTypes);
+            }
+
+            foreach (var ctor in type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            {
+                foreach (var p in ctor.GetParameters())
+                {
+                    AssertNotReferencingForbiddenOrleansTypes(p.ParameterType, type, $"ConstructorParam:{p.Name}", forbiddenTypes);
+                }
+            }
+
+            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            {
+                AssertNotReferencingForbiddenOrleansTypes(method.ReturnType, type, $"MethodReturn:{method.Name}", forbiddenTypes);
+                foreach (var p in method.GetParameters())
+                {
+                    AssertNotReferencingForbiddenOrleansTypes(p.ParameterType, type, $"MethodParam:{method.Name}:{p.Name}", forbiddenTypes);
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void TenantScopedGrains_MustBePublicSealedEndWithGrainAndImplementITenantScopedGrain()
+    {
+        var grainTypes = AppTypes
+            .Where(t => typeof(TenantScopedGrain).IsAssignableFrom(t) && !t.IsAbstract)
+            .ToList();
+
+        grainTypes.Should().NotBeEmpty("at least one concrete TenantScopedGrain must be registered in the application");
+
+        foreach (var grain in grainTypes)
+        {
+            grain.IsPublic.Should().BeTrue($"{grain.FullName} must be public");
+            grain.IsSealed.Should().BeTrue($"{grain.FullName} must be sealed");
+            grain.Name.Should().EndWith("Grain", $"{grain.FullName} name must end with 'Grain'");
+
+            var implementsCustomTenantScopedGrainInterface = grain.GetInterfaces().Any(i =>
+                i != typeof(ITenantScopedGrain) && typeof(ITenantScopedGrain).IsAssignableFrom(i));
+
+            implementsCustomTenantScopedGrainInterface.Should().BeTrue(
+                $"{grain.FullName} must implement at least one interface inheriting from ITenantScopedGrain other than ITenantScopedGrain itself");
+        }
+    }
+
+    private static void AssertNotReferencingForbiddenOrleansTypes(Type typeToCheck, Type declaringType, string memberName, Type[] forbiddenTypes)
+    {
+        var unwrapped = UnwrapTypes(typeToCheck);
+        foreach (var t in unwrapped)
+        {
+            foreach (var forbidden in forbiddenTypes)
+            {
+                forbidden.IsAssignableFrom(t).Should().BeFalse(
+                    $"{declaringType.FullName}.{memberName} must not reference raw Orleans type '{t.FullName}'. Use ITenantGrainFactory instead.");
             }
         }
     }
