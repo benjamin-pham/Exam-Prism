@@ -77,6 +77,18 @@ public sealed class HybridCacheTokenRevocationService : ITokenRevocationService
             {
                 return true;
             }
+
+            // Cross-tenant check: if tenantId is non-empty and not "platform", also check global platform key
+            if (!string.IsNullOrWhiteSpace(tenantId) &&
+                !string.Equals(tenantId, "platform", StringComparison.OrdinalIgnoreCase))
+            {
+                var platformKey = GetUserRevocationKey(userId, "platform");
+                var platformRevokedAt = await _cacheService.GetOrDefaultAsync<DateTimeOffset?>(platformKey, cancellationToken);
+                if (platformRevokedAt.HasValue && issuedAt.Value <= platformRevokedAt.Value)
+                {
+                    return true;
+                }
+            }
         }
 
         return false;

@@ -216,6 +216,120 @@ public class AdaptiveLoadSheddingAndRuntimeTests
         metadata!.Priority.Should().Be(RequestPriority.Critical);
     }
 
+    [Fact]
+    public void AdaptiveConcurrencyLimiter_MonotonicFloorDrift_ResetsMinLatencyTowardEwmaAfterSampleWindow()
+    {
+        var options = new LoadSheddingOptions
+        {
+            InitialConcurrencyLimit = 50,
+            MinConcurrencyLimit = 5,
+            MaxConcurrencyLimit = 100,
+            BaselineLatencyFloorMs = 2.0,
+            MinLatencyResetIntervalSamples = 100,
+            LatencyGradientThreshold = 0.8,
+            SmoothingFactor = 0.2
+        };
+
+        var limiter = new AdaptiveConcurrencyLimiter(options);
+
+        // 1. Cold start sample with very low latency (e.g. 1.0ms)
+        limiter.RecordSample(1.0);
+        limiter.MinLatencyMs.Should().Be(1.0);
+
+        // 2. Traffic transitions to healthy DB traffic at 20.0ms
+        // Record 98 samples of 20ms (total samples = 99, right before reset interval 100)
+        for (int i = 0; i < 98; i++)
+        {
+            limiter.RecordSample(20.0);
+        }
+
+        // Before reset, min latency is still locked at cold start measurement
+        limiter.MinLatencyMs.Should().Be(1.0);
+        limiter.EwmaLatencyMs.Should().BeApproximately(20.0, 0.5);
+
+        // 3. 100th sample triggers periodic reset
+        limiter.RecordSample(20.0);
+
+        // MinLatencyMs must drift upward toward the current EWMA latency rather than remaining locked at 1.0ms
+        limiter.MinLatencyMs.Should().BeGreaterThanOrEqualTo(19.0);
+        limiter.MinLatencyMs.Should().BeLessThanOrEqualTo(20.5);
+    }
+
+    [Fact]
+    public async Task AdaptiveLoadSheddingMiddleware_ClampsUntrustedClientPriorityHeaders_AndRespectsEndpointMetadata()
+    {
+        var options = new LoadSheddingOptions
+        {
+            InitialConcurrencyLimit = 10,
+            MinConcurrencyLimit = 2,
+            MaxConcurrencyLimit = 20,
+            LowPriorityShedFraction = 0.5,    // Limit * 0.5 = 5
+            NormalPriorityShedFraction = 1.0, // Limit * 1.0 = 10
+            CriticalReserveMultiplier = 1.2   // Limit * 1.2 = 12
+        };
+
+        var limiter = new AdaptiveConcurrencyLimiter(options);
+
+        // Hold 10 leases so normal priority is saturated (InFlight == 10)
+        var leases = new List<IDisposable>();
+        for (int i = 0; i < 10; i++)
+        {
+            limiter.TryAcquire(RequestPriority.Normal, out var lease).Should().BeTrue();
+            leases.Add(lease!);
+        }
+
+        var middleware = new AdaptiveLoadSheddingMiddleware(
+            next: ctx =>
+            {
+                ctx.Response.StatusCode = StatusCodes.Status200OK;
+                return Task.CompletedTask;
+            },
+            limiter: limiter,
+            options: Options.Create(options));
+
+        try
+        {
+            // Case 1: Untrusted client sends X-Request-Priority: Critical without endpoint metadata
+            // Header is clamped to Normal. InFlight is 10 >= Normal threshold 10 -> shed with 503!
+            var untrustedCritContext = new DefaultHttpContext();
+            untrustedCritContext.Request.Path = "/api/v1/orders";
+            untrustedCritContext.Request.Headers["X-Request-Priority"] = "Critical";
+            untrustedCritContext.Response.Body = new MemoryStream();
+
+            await middleware.InvokeAsync(untrustedCritContext);
+            untrustedCritContext.Response.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+
+            // Case 2: Untrusted client sends X-Request-Priority: High without endpoint metadata -> shed with 503
+            var untrustedHighContext = new DefaultHttpContext();
+            untrustedHighContext.Request.Path = "/api/v1/orders";
+            untrustedHighContext.Request.Headers["X-Request-Priority"] = "High";
+            untrustedHighContext.Response.Body = new MemoryStream();
+
+            await middleware.InvokeAsync(untrustedHighContext);
+            untrustedHighContext.Response.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+
+            // Case 3: Endpoint with explicit RequestPriorityMetadata(RequestPriority.Critical)
+            // Even though InFlight is 10, Critical allows up to 12 -> admitted with 200 OK!
+            var criticalEndpointContext = new DefaultHttpContext();
+            criticalEndpointContext.Request.Path = "/api/v1/exams/submit";
+            var endpoint = new Endpoint(
+                _ => Task.CompletedTask,
+                new EndpointMetadataCollection(new RequestPriorityMetadata(RequestPriority.Critical)),
+                "CriticalEndpoint");
+            criticalEndpointContext.SetEndpoint(endpoint);
+
+            await middleware.InvokeAsync(criticalEndpointContext);
+            criticalEndpointContext.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+        }
+        finally
+        {
+            foreach (var lease in leases)
+            {
+                lease.Dispose();
+            }
+        }
+    }
+
     private sealed class TestEndpointConventionBuilder : IEndpointConventionBuilder
     {
         public List<object> Metadata { get; } = new();

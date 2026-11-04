@@ -12,6 +12,7 @@ public class AdaptiveConcurrencyLimiter
     private readonly object _syncLock = new();
 
     private int _inFlight;
+    private int _sampleCount;
     private double _currentLimit;
     private double _minLatencyMs;
     private double _ewmaLatencyMs;
@@ -41,6 +42,28 @@ public class AdaptiveConcurrencyLimiter
             lock (_syncLock)
             {
                 return _currentLimit;
+            }
+        }
+    }
+
+    public double MinLatencyMs
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _minLatencyMs;
+            }
+        }
+    }
+
+    public double EwmaLatencyMs
+    {
+        get
+        {
+            lock (_syncLock)
+            {
+                return _ewmaLatencyMs;
             }
         }
     }
@@ -87,6 +110,13 @@ public class AdaptiveConcurrencyLimiter
     {
         lock (_syncLock)
         {
+            _sampleCount++;
+            if (_options.MinLatencyResetIntervalSamples > 0 && _sampleCount >= _options.MinLatencyResetIntervalSamples)
+            {
+                _sampleCount = 0;
+                _minLatencyMs = Math.Max(_options.BaselineLatencyFloorMs, _ewmaLatencyMs);
+            }
+
             _minLatencyMs = Math.Min(_minLatencyMs, durationMs);
 
             double alpha = _options.SmoothingFactor > 0 && _options.SmoothingFactor < 1

@@ -15,6 +15,7 @@ public sealed class LoadSheddingOptions
     public double BaselineLatencyFloorMs { get; set; } = 5.0;
     public double LatencyGradientThreshold { get; set; } = 0.8;
     public double SmoothingFactor { get; set; } = 0.2;
+    public int MinLatencyResetIntervalSamples { get; set; } = 1000;
     public int MaxPendingThreadPoolWorkItems { get; set; } = 500;
     public int RetryAfterSeconds { get; set; } = 2;
 }

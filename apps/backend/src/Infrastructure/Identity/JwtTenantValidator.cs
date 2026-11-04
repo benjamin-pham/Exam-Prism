@@ -93,6 +93,16 @@ public sealed class JwtTenantValidator
             {
                 issuedAt = DateTimeOffset.FromUnixTimeSeconds(iatSeconds);
             }
+            else if (context.SecurityToken is not null && context.SecurityToken.ValidFrom != DateTime.MinValue)
+            {
+                var validFrom = context.SecurityToken.ValidFrom;
+                issuedAt = validFrom.Kind switch
+                {
+                    DateTimeKind.Utc => new DateTimeOffset(validFrom),
+                    DateTimeKind.Local => new DateTimeOffset(validFrom).ToUniversalTime(),
+                    _ => new DateTimeOffset(DateTime.SpecifyKind(validFrom, DateTimeKind.Utc))
+                };
+            }
 
             if (!string.IsNullOrWhiteSpace(jti) || !string.IsNullOrWhiteSpace(userId))
             {

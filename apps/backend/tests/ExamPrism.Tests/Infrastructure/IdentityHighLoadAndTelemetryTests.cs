@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Security.Claims;
 using System.Threading;
@@ -22,24 +23,19 @@ using Finbuckle.MultiTenant.Abstractions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using OpenTelemetry.Trace;
-using global::Tests.Infrastructure;
 using Xunit;
 
-public class IdentityHighLoadAndTelemetryTests : IClassFixture<CustomWebApplicationFactory>
+public class IdentityHighLoadAndTelemetryTests
 {
-    private readonly CustomWebApplicationFactory _factory;
-
-    public IdentityHighLoadAndTelemetryTests(CustomWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
-
     [Fact]
     public async Task BulkheadPasswordHasher_HashesAndVerifiesNormally_AndThrowsBulkheadRejectedWhenConcurrencyExhausted()
     {
@@ -203,6 +199,115 @@ public class IdentityHighLoadAndTelemetryTests : IClassFixture<CustomWebApplicat
     }
 
     [Fact]
+    public async Task CrossTenantTokenRevocation_And_JwtSecurityTokenValidFromFallback_WorkAsExpected()
+    {
+        var cacheDict = new Dictionary<string, object>();
+        var cacheService = Substitute.For<ICacheService>();
+
+        cacheService.SetAsync(
+            Arg.Any<string>(),
+            Arg.Any<object>(),
+            Arg.Any<TimeSpan?>(),
+            Arg.Any<TimeSpan?>(),
+            Arg.Any<IEnumerable<string>?>(),
+            Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var key = callInfo.Arg<string>();
+                var val = callInfo[1];
+                cacheDict[key] = val;
+                return ValueTask.CompletedTask;
+            });
+
+        cacheService.GetOrDefaultAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var key = callInfo.Arg<string>();
+                return ValueTask.FromResult(cacheDict.TryGetValue(key, out var val) && val is bool b && b);
+            });
+
+        cacheService.GetOrDefaultAsync<DateTimeOffset?>(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var key = callInfo.Arg<string>();
+                if (cacheDict.TryGetValue(key, out var val) && val is DateTimeOffset dto)
+                {
+                    return ValueTask.FromResult<DateTimeOffset?>(dto);
+                }
+                return ValueTask.FromResult<DateTimeOffset?>(null);
+            });
+
+        var highLoadOptions = Options.Create(new IdentityHighLoadOptions
+        {
+            EnableTokenRevocationCheck = true
+        });
+
+        var revocationService = new HybridCacheTokenRevocationService(cacheService, highLoadOptions);
+
+        var platformUserId = "user-global-admin";
+        var tRevoke = DateTimeOffset.UtcNow;
+        var tOld = tRevoke.AddMinutes(-5);
+        var tNew = tRevoke.AddMinutes(5);
+
+        // Revoke platform user globally (tenantId = null or "platform")
+        await revocationService.RevokeUserTokensAsync(platformUserId, tenantId: null);
+
+        // Cross-tenant check: token for tenant-123 issued before revocation must be revoked
+        (await revocationService.IsTokenRevokedAsync("jti-tenant-123", platformUserId, "tenant-123", tOld)).Should().BeTrue();
+        // Token issued after revocation is not revoked
+        (await revocationService.IsTokenRevokedAsync("jti-tenant-123-new", platformUserId, "tenant-123", tNew)).Should().BeFalse();
+
+        // Tenant-scoped revocation: revoking in tenant-a does NOT revoke access in tenant-b
+        var tenantUserId = "user-tenant-scoped";
+        await revocationService.RevokeUserTokensAsync(tenantUserId, tenantId: "tenant-a");
+        (await revocationService.IsTokenRevokedAsync("jti-a", tenantUserId, "tenant-a", tOld)).Should().BeTrue();
+        (await revocationService.IsTokenRevokedAsync("jti-b", tenantUserId, "tenant-b", tOld)).Should().BeFalse();
+
+        // JwtTenantValidator fallback: missing iat claim falls back to SecurityToken.ValidFrom
+        var tenantGuid = Guid.NewGuid();
+        var tenantInfo = new ExamPrismTenantInfo(tenantGuid.ToString("D"), "tenant-fallback")
+        {
+            TenantGuid = tenantGuid,
+            Status = TenantStatus.Active
+        };
+
+        var accessor = Substitute.For<IMultiTenantContextAccessor<ExamPrismTenantInfo>>();
+        accessor.MultiTenantContext.Returns(new MultiTenantContext<ExamPrismTenantInfo>(tenantInfo));
+
+        var validator = new JwtTenantValidator(accessor, revocationService, highLoadOptions);
+        var scheme = new AuthenticationScheme(JwtBearerDefaults.AuthenticationScheme, null, typeof(JwtBearerHandler));
+        var jwtBearerOptions = new JwtBearerOptions();
+
+        var httpContext = new DefaultHttpContext();
+        var jwtSecurityToken = new JwtSecurityToken(
+            issuer: "https://auth.examprism.com",
+            audience: "examprism-api",
+            claims:
+            [
+                new Claim(CustomClaimTypes.TenantId, tenantInfo.Id),
+                new Claim(ClaimTypes.NameIdentifier, platformUserId)
+            ],
+            notBefore: tOld.UtcDateTime,
+            expires: tRevoke.AddHours(1).UtcDateTime);
+
+        var tokenContext = new TokenValidatedContext(httpContext, scheme, jwtBearerOptions)
+        {
+            Principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim(CustomClaimTypes.TenantId, tenantInfo.Id),
+                new Claim(ClaimTypes.NameIdentifier, platformUserId)
+                // Note: no "iat" claim here to force fallback to SecurityToken.ValidFrom
+            ], "Bearer")),
+            SecurityToken = jwtSecurityToken
+        };
+
+        await validator.ValidateAsync(tokenContext);
+
+        tokenContext.Result?.Failure.Should().NotBeNull();
+        httpContext.Items[JwtTenantValidator.AuthFailureItemKey].Should().Be(JwtTenantValidator.TokenRevokedErrorCode);
+    }
+
+    [Fact]
     public async Task AdaptiveTraceSampler_And_PrometheusMetricsEndpoint_SampleCorrectlyAndExposeAllV2Metrics()
     {
         // 1. Verifies AdaptiveTraceSampler with ratio 0.0 drops normal activities but samples recorded parent or critical/error
@@ -270,17 +375,34 @@ public class IdentityHighLoadAndTelemetryTests : IClassFixture<CustomWebApplicat
             null);
         sampler.ShouldSample(errorTagParams).Decision.Should().Be(SamplingDecision.RecordAndSample);
 
-        // 2. Calls GET /metrics via CustomWebApplicationFactory and asserts output contains all 6 v2 metrics
-        var client = _factory.CreateClient();
-        var response = await client.GetAsync("/metrics");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        // 2. Calls GET /metrics via in-memory TestServer with UseAppTelemetry and asserts output contains all 6 v2 metrics
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddRouting();
+        builder.Services.AddSingleton(Options.Create(new TelemetryOptions { EnablePrometheusEndpoint = true }));
+        builder.WebHost.UseTestServer();
 
-        var metricsContent = await response.Content.ReadAsStringAsync();
-        metricsContent.Should().Contain("examprism_load_shedding_rejected_total");
-        metricsContent.Should().Contain("examprism_auth_jwt_revoked_rejected_total");
-        metricsContent.Should().Contain("examprism_auth_password_hash_bulkhead_rejected_total");
-        metricsContent.Should().Contain("examprism_batcher_flushed_items_total");
-        metricsContent.Should().Contain("examprism_db_tenant_datasources_active");
-        metricsContent.Should().Contain("examprism_http_in_flight_requests");
+        var app = builder.Build();
+        app.UseRouting();
+        app.UseAppTelemetry();
+        await app.StartAsync();
+
+        try
+        {
+            var client = app.GetTestClient();
+            var response = await client.GetAsync("/metrics");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var metricsContent = await response.Content.ReadAsStringAsync();
+            metricsContent.Should().Contain("examprism_load_shedding_rejected_total");
+            metricsContent.Should().Contain("examprism_auth_jwt_revoked_rejected_total");
+            metricsContent.Should().Contain("examprism_auth_password_hash_bulkhead_rejected_total");
+            metricsContent.Should().Contain("examprism_batcher_flushed_items_total");
+            metricsContent.Should().Contain("examprism_db_tenant_datasources_active");
+            metricsContent.Should().Contain("examprism_http_in_flight_requests");
+        }
+        finally
+        {
+            await app.StopAsync();
+        }
     }
 }

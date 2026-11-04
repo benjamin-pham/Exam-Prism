@@ -114,7 +114,12 @@ public class AdaptiveLoadSheddingMiddleware
         if (context.Request.Headers.TryGetValue("X-Request-Priority", out var headerValue) &&
             Enum.TryParse<RequestPriority>(headerValue, ignoreCase: true, out var parsedPriority))
         {
-            return parsedPriority;
+            // Untrusted client-supplied header can only downgrade to Low; clamp High/Critical to Normal
+            return parsedPriority switch
+            {
+                RequestPriority.Low => RequestPriority.Low,
+                _ => RequestPriority.Normal
+            };
         }
 
         return RequestPriority.Normal;
