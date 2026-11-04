@@ -1,22 +1,41 @@
 namespace ExamPrism.Infrastructure.Persistence;
 
 using System.Data.Common;
+using Common.MultiTenancy;
 using Common.Telemetry;
+using ExamPrism.Infrastructure.MultiTenancy;
+using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 public sealed class SlowQueryTelemetryInterceptor(
     IOptions<PersistenceOptions> options,
-    ILogger<SlowQueryTelemetryInterceptor> logger) : DbCommandInterceptor
+    ILogger<SlowQueryTelemetryInterceptor> logger,
+    IMultiTenantContextAccessor<ExamPrismTenantInfo>? tenantAccessor = null) : DbCommandInterceptor
 {
     private readonly PersistenceOptions _options = options?.Value ?? new PersistenceOptions();
     private readonly ILogger<SlowQueryTelemetryInterceptor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+    private string? ResolveTenantId()
+    {
+        var tenantInfo = tenantAccessor?.MultiTenantContext?.TenantInfo;
+        if (tenantInfo is null)
+        {
+            return null;
+        }
+
+        return tenantInfo.TenantGuid != Guid.Empty
+            ? tenantInfo.TenantGuid.ToString("D")
+            : (string.IsNullOrWhiteSpace(tenantInfo.Id) ? null : tenantInfo.Id);
+    }
 
     public void RecordIfSlow(string? commandText, TimeSpan duration, string? tenantId = null)
     {
         if (duration.TotalMilliseconds >= _options.SlowQueryThresholdMs)
         {
+            tenantId ??= ResolveTenantId();
+
             _logger.LogWarning(
                 "Slow query detected ({ElapsedMs:F2}ms exceeding threshold {ThresholdMs}ms): {CommandText}",
                 duration.TotalMilliseconds,
@@ -82,5 +101,22 @@ public sealed class SlowQueryTelemetryInterceptor(
     {
         RecordIfSlow(command?.CommandText, eventData.Duration);
         return base.ScalarExecuted(command!, eventData, result);
+    }
+
+    public override void CommandFailed(
+        DbCommand command,
+        CommandErrorEventData eventData)
+    {
+        RecordIfSlow(command?.CommandText, eventData.Duration);
+        base.CommandFailed(command!, eventData);
+    }
+
+    public override Task CommandFailedAsync(
+        DbCommand command,
+        CommandErrorEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        RecordIfSlow(command?.CommandText, eventData.Duration);
+        return base.CommandFailedAsync(command!, eventData, cancellationToken);
     }
 }

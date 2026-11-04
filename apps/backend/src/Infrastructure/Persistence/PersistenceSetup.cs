@@ -5,6 +5,7 @@ using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -29,17 +30,7 @@ public static class PersistenceSetup
 
             options.AddInterceptors(interceptor);
             options.UseNpgsql(catalogConnection, npgsqlOptions =>
-            {
-                npgsqlOptions.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
-                npgsqlOptions.MaxBatchSize(persistenceOptions.MaxBatchSize);
-                if (persistenceOptions.MaxRetryCount > 0)
-                {
-                    npgsqlOptions.EnableRetryOnFailure(
-                        maxRetryCount: persistenceOptions.MaxRetryCount,
-                        maxRetryDelay: TimeSpan.FromSeconds(persistenceOptions.MaxRetryDelaySeconds),
-                        errorCodesToAdd: null);
-                }
-            });
+                ConfigureNpgsql(npgsqlOptions, persistenceOptions));
         });
 
         services.AddDbContext<AppDbContext>((sp, options) =>
@@ -59,21 +50,26 @@ public static class PersistenceSetup
 
             options.AddInterceptors(interceptor);
             options.UseNpgsql(normalizer.Normalize(tenantInfo.ConnectionString), npgsqlOptions =>
-            {
-                npgsqlOptions.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
-                npgsqlOptions.MaxBatchSize(persistenceOptions.MaxBatchSize);
-                if (persistenceOptions.MaxRetryCount > 0)
-                {
-                    npgsqlOptions.EnableRetryOnFailure(
-                        maxRetryCount: persistenceOptions.MaxRetryCount,
-                        maxRetryDelay: TimeSpan.FromSeconds(persistenceOptions.MaxRetryDelaySeconds),
-                        errorCodesToAdd: null);
-                }
-            });
+                ConfigureNpgsql(npgsqlOptions, persistenceOptions));
         });
 
         healthChecksBuilder.AddDbContextCheck<CatalogDbContext>(name: "catalog_db");
 
         return services;
+    }
+
+    internal static void ConfigureNpgsql(
+        NpgsqlDbContextOptionsBuilder npgsqlOptions,
+        PersistenceOptions persistenceOptions)
+    {
+        npgsqlOptions.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
+        npgsqlOptions.MaxBatchSize(persistenceOptions.MaxBatchSize);
+        if (persistenceOptions.MaxRetryCount > 0)
+        {
+            npgsqlOptions.EnableRetryOnFailure(
+                maxRetryCount: persistenceOptions.MaxRetryCount,
+                maxRetryDelay: TimeSpan.FromSeconds(persistenceOptions.MaxRetryDelaySeconds),
+                errorCodesToAdd: null);
+        }
     }
 }

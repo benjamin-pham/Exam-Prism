@@ -43,7 +43,8 @@ public static class ResilienceSetup
                 });
         });
 
-        services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler());
+        services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler(options =>
+            options.Retry.DisableForUnsafeHttpMethods()));
 
         return services;
     }

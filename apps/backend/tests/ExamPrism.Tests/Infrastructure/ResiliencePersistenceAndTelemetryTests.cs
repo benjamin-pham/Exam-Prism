@@ -3,6 +3,8 @@ namespace ExamPrism.Tests.Infrastructure;
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Common.MultiTenancy;
 using Common.Resilience;
@@ -14,6 +16,7 @@ using ExamPrism.Infrastructure.Telemetry;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -105,6 +108,103 @@ public class ResiliencePersistenceAndTelemetryTests : IClassFixture<CustomWebApp
     }
 
     [Fact]
+    public async Task SlowQueryTelemetryInterceptor_FailedCommandOverThreshold_IncrementsMetricAndLogsWarning()
+    {
+        ExamPrismDiagnostics.ResetForTesting();
+        var testLogger = new TestInterceptorLogger();
+        var interceptor = new SlowQueryTelemetryInterceptor(
+            Options.Create(new PersistenceOptions { SlowQueryThresholdMs = 500 }),
+            testLogger);
+
+        using var command = new NpgsqlCommand("SELECT pg_sleep(60)");
+
+        // Sync failure hook (e.g. command timeout)
+        interceptor.CommandFailed(command, CreateErrorEventData(command, TimeSpan.FromSeconds(30)));
+        ExamPrismDiagnostics.SlowQueriesCount.Should().Be(1);
+
+        // Async failure hook
+        await interceptor.CommandFailedAsync(command, CreateErrorEventData(command, TimeSpan.FromSeconds(30)));
+        ExamPrismDiagnostics.SlowQueriesCount.Should().Be(2);
+
+        testLogger.Logs.Should().HaveCount(2).And.OnlyContain(l =>
+            l.Level == LogLevel.Warning && l.Message.Contains("SELECT pg_sleep(60)"));
+
+        // Fast failure stays unrecorded
+        interceptor.CommandFailed(command, CreateErrorEventData(command, TimeSpan.FromMilliseconds(5)));
+        ExamPrismDiagnostics.SlowQueriesCount.Should().Be(2);
+    }
+
+    [Fact]
+    public void SlowQueryTelemetryInterceptor_PopulatesTenantIdFromMultiTenantContext_WhenAvailable()
+    {
+        ExamPrismDiagnostics.ResetForTesting();
+        var tenantGuid = Guid.NewGuid();
+        var accessor = Substitute.For<IMultiTenantContextAccessor<ExamPrismTenantInfo>>();
+        accessor.MultiTenantContext.Returns(new MultiTenantContext<ExamPrismTenantInfo>(
+            new ExamPrismTenantInfo(tenantGuid.ToString("D"), "acme") { TenantGuid = tenantGuid, Status = TenantStatus.Active }));
+
+        string? observedTenant = null;
+        using var listener = new System.Diagnostics.Metrics.MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Meter.Name == ExamPrismDiagnostics.MeterName && instrument.Name.Contains("slow"))
+            {
+                l.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            foreach (var tag in tags)
+            {
+                if (tag.Key == "tenant.id")
+                {
+                    observedTenant = tag.Value as string;
+                }
+            }
+        });
+        listener.Start();
+
+        var interceptor = new SlowQueryTelemetryInterceptor(
+            Options.Create(new PersistenceOptions { SlowQueryThresholdMs = 100 }),
+            new TestInterceptorLogger(),
+            accessor);
+
+        interceptor.RecordIfSlow("SELECT 1", TimeSpan.FromMilliseconds(250));
+
+        observedTenant.Should().Be(tenantGuid.ToString("D"));
+    }
+
+    [Fact]
+    public async Task StandardResilienceHandler_DoesNotRetryUnsafeMethods_ButRetriesGet()
+    {
+        var handler = new CountingFailingHandler();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddAppResilience(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        services.AddHttpClient("unsafe-test").ConfigurePrimaryHttpMessageHandler(() => handler);
+        services.Configure<Microsoft.Extensions.Http.Resilience.HttpStandardResilienceOptions>("unsafe-test-standard", o =>
+        {
+            o.Retry.Delay = TimeSpan.FromMilliseconds(1);
+            o.Retry.UseJitter = false;
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("unsafe-test");
+
+        var get = await client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://example.test/x"));
+        get.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        handler.GetCalls.Should().BeGreaterThan(1, "GET is idempotent and must be retried");
+
+        foreach (var method in new[] { HttpMethod.Post, HttpMethod.Patch })
+        {
+            handler.Reset();
+            var response = await client.SendAsync(new HttpRequestMessage(method, "http://example.test/x"));
+            response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+            handler.TotalCalls.Should().Be(1, $"{method} is not idempotent and must not be retried");
+        }
+    }
+
+    [Fact]
     public async Task TenantWolverineMiddleware_BeforeAsync_AwaitsStoreAsynchronously()
     {
         var middleware = new TenantWolverineMiddleware();
@@ -120,9 +220,30 @@ public class ResiliencePersistenceAndTelemetryTests : IClassFixture<CustomWebApp
             Status = TenantStatus.Active
         };
 
-        store.GetByIdentifierAsync("tenant-async-test").Returns(Task.FromResult<ExamPrismTenantInfo?>(expectedTenant));
+        var storeGate = new TaskCompletionSource<ExamPrismTenantInfo?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        store.GetByIdentifierAsync("tenant-async-test").Returns(storeGate.Task);
 
-        await middleware.BeforeAsync(envelope, accessor, setter, store);
+        Task? beforeTask = null;
+        try
+        {
+            // Invoke on a worker thread so a sync-over-async implementation shows up as a blocked caller
+            // (the gate is not released while the call runs) instead of hanging the test thread.
+            var returned = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _ = Task.Run(() => returned.TrySetResult(middleware.BeforeAsync(envelope, accessor, setter, store)));
+
+            var returnedPromptly = await Task.WhenAny(returned.Task, Task.Delay(TimeSpan.FromSeconds(2))) == returned.Task;
+            returnedPromptly.Should().BeTrue("BeforeAsync must yield instead of blocking the calling thread on the store");
+
+            beforeTask = await returned.Task;
+            beforeTask.IsCompleted.Should().BeFalse("the store lookup has not completed yet");
+            setter.MultiTenantContext.Should().BeNull();
+        }
+        finally
+        {
+            storeGate.TrySetResult(expectedTenant);
+        }
+
+        await beforeTask!.WaitAsync(TimeSpan.FromSeconds(5));
 
         setter.MultiTenantContext.Should().NotBeNull();
         setter.MultiTenantContext!.TenantInfo.Should().Be(expectedTenant);
@@ -158,6 +279,50 @@ public class ResiliencePersistenceAndTelemetryTests : IClassFixture<CustomWebApp
         var content = await response.Content.ReadAsStringAsync();
         content.Should().Contain("examprism_db_slow_queries_total");
         content.Should().Contain("examprism_idempotency_replays_total");
+    }
+
+    private static CommandErrorEventData CreateErrorEventData(NpgsqlCommand command, TimeSpan duration) =>
+        new(
+            eventDefinition: null!,
+            messageGenerator: static (_, _) => string.Empty,
+            connection: null!,
+            command: command,
+            logCommandText: command.CommandText,
+            context: null,
+            executeMethod: DbCommandMethod.ExecuteReader,
+            commandId: Guid.NewGuid(),
+            connectionId: Guid.NewGuid(),
+            exception: new TimeoutException("command timeout"),
+            async: false,
+            logParameterValues: false,
+            startTime: DateTimeOffset.UtcNow - duration,
+            duration: duration,
+            commandSource: CommandSource.LinqQuery);
+
+    private sealed class CountingFailingHandler : HttpMessageHandler
+    {
+        private int _getCalls;
+        private int _totalCalls;
+
+        public int GetCalls => Volatile.Read(ref _getCalls);
+        public int TotalCalls => Volatile.Read(ref _totalCalls);
+
+        public void Reset()
+        {
+            Interlocked.Exchange(ref _getCalls, 0);
+            Interlocked.Exchange(ref _totalCalls, 0);
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _totalCalls);
+            if (request.Method == HttpMethod.Get)
+            {
+                Interlocked.Increment(ref _getCalls);
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        }
     }
 
     private sealed class TestInterceptorLogger : ILogger<SlowQueryTelemetryInterceptor>
