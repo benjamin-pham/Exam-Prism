@@ -38,6 +38,24 @@ public static class ExamPrismDiagnostics
     private static readonly Counter<long> BatcherFlushedItemsCounter =
         Meter.CreateCounter<long>("examprism.batcher.flushed_items", "{items}", "Number of items flushed by write-behind batchers");
 
+    private static readonly Counter<long> IpPenaltyBoxRejectedCounter =
+        Meter.CreateCounter<long>("examprism.security.ip_penalty_box_rejected", "{rejections}", "Number of requests rejected by IP penalty box");
+
+    private static readonly Counter<long> IpBansIssuedCounter =
+        Meter.CreateCounter<long>("examprism.security.ip_bans_issued", "{bans}", "Number of IP bans issued by reputation service");
+
+    private static readonly Counter<long> DecompressionBombRejectedCounter =
+        Meter.CreateCounter<long>("examprism.security.decompression_bomb_rejected", "{rejections}", "Number of requests rejected due to decompression bomb detection");
+
+    private static readonly Counter<long> TenantCatalogShieldRejectedCounter =
+        Meter.CreateCounter<long>("examprism.security.tenant_catalog_shield_rejected", "{rejections}", "Number of requests rejected by tenant catalog cold-miss shield");
+
+    private static readonly Counter<long> SpoofedIpIgnoredCounter =
+        Meter.CreateCounter<long>("examprism.security.spoofed_ip_ignored", "{ignored}", "Number of spoofed forwarded IP headers ignored from untrusted peers");
+
+    private static readonly Counter<long> RateLimitRejectedCounter =
+        Meter.CreateCounter<long>("examprism.http.rate_limit_rejected", "{rejections}", "Number of requests rejected by rate limiting");
+
     private static readonly ObservableGauge<long> ActiveTenantDataSourcesGauge =
         Meter.CreateObservableGauge<long>("examprism.db.tenant_datasources.active", () => ActiveTenantDataSourcesCount, "{sources}", "Number of active cached tenant NpgsqlDataSources");
 
@@ -54,6 +72,12 @@ public static class ExamPrismDiagnostics
     private static long _passwordHashBulkheadRejectedCount;
     private static long _batcherFlushedItemsCount;
     private static long _inFlightRequestsCount;
+    private static long _ipPenaltyBoxRejectedCount;
+    private static long _ipBansIssuedCount;
+    private static long _decompressionBombRejectedCount;
+    private static long _tenantCatalogShieldRejectedCount;
+    private static long _spoofedIpIgnoredCount;
+    private static long _rateLimitRejectedCount;
 
     public static long SlowQueriesCount => Interlocked.Read(ref _slowQueriesCount);
     public static long CacheBackplaneEvictionsCount => Interlocked.Read(ref _cacheBackplaneEvictionsCount);
@@ -65,6 +89,12 @@ public static class ExamPrismDiagnostics
     public static long PasswordHashBulkheadRejectedCount => Interlocked.Read(ref _passwordHashBulkheadRejectedCount);
     public static long BatcherFlushedItemsCount => Interlocked.Read(ref _batcherFlushedItemsCount);
     public static long InFlightRequestsCount => Interlocked.Read(ref _inFlightRequestsCount);
+    public static long IpPenaltyBoxRejectedCount => Interlocked.Read(ref _ipPenaltyBoxRejectedCount);
+    public static long IpBansIssuedCount => Interlocked.Read(ref _ipBansIssuedCount);
+    public static long DecompressionBombRejectedCount => Interlocked.Read(ref _decompressionBombRejectedCount);
+    public static long TenantCatalogShieldRejectedCount => Interlocked.Read(ref _tenantCatalogShieldRejectedCount);
+    public static long SpoofedIpIgnoredCount => Interlocked.Read(ref _spoofedIpIgnoredCount);
+    public static long RateLimitRejectedCount => Interlocked.Read(ref _rateLimitRejectedCount);
 
     public static void RecordSlowQuery(string? commandText = null, double durationMs = 0, string? tenantId = null)
     {
@@ -122,6 +152,42 @@ public static class ExamPrismDiagnostics
         BatcherFlushedItemsCounter.Add(itemCount);
     }
 
+    public static void RecordIpPenaltyBoxRejection()
+    {
+        Interlocked.Increment(ref _ipPenaltyBoxRejectedCount);
+        IpPenaltyBoxRejectedCounter.Add(1);
+    }
+
+    public static void RecordIpBanIssued()
+    {
+        Interlocked.Increment(ref _ipBansIssuedCount);
+        IpBansIssuedCounter.Add(1);
+    }
+
+    public static void RecordDecompressionBombRejection()
+    {
+        Interlocked.Increment(ref _decompressionBombRejectedCount);
+        DecompressionBombRejectedCounter.Add(1);
+    }
+
+    public static void RecordTenantCatalogShieldRejection()
+    {
+        Interlocked.Increment(ref _tenantCatalogShieldRejectedCount);
+        TenantCatalogShieldRejectedCounter.Add(1);
+    }
+
+    public static void RecordSpoofedIpIgnored()
+    {
+        Interlocked.Increment(ref _spoofedIpIgnoredCount);
+        SpoofedIpIgnoredCounter.Add(1);
+    }
+
+    public static void RecordRateLimitRejection()
+    {
+        Interlocked.Increment(ref _rateLimitRejectedCount);
+        RateLimitRejectedCounter.Add(1);
+    }
+
     public static void IncrementInFlightRequests()
     {
         Interlocked.Increment(ref _inFlightRequestsCount);
@@ -144,5 +210,11 @@ public static class ExamPrismDiagnostics
         Interlocked.Exchange(ref _passwordHashBulkheadRejectedCount, 0);
         Interlocked.Exchange(ref _batcherFlushedItemsCount, 0);
         Interlocked.Exchange(ref _inFlightRequestsCount, 0);
+        Interlocked.Exchange(ref _ipPenaltyBoxRejectedCount, 0);
+        Interlocked.Exchange(ref _ipBansIssuedCount, 0);
+        Interlocked.Exchange(ref _decompressionBombRejectedCount, 0);
+        Interlocked.Exchange(ref _tenantCatalogShieldRejectedCount, 0);
+        Interlocked.Exchange(ref _spoofedIpIgnoredCount, 0);
+        Interlocked.Exchange(ref _rateLimitRejectedCount, 0);
     }
 }

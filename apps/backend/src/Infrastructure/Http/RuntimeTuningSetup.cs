@@ -60,6 +60,24 @@ public static class RuntimeTuningSetup
             kestrel.Limits.Http2.MaxStreamsPerConnection = options.MaxHttp2StreamsPerConnection;
             kestrel.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(options.KeepAliveTimeoutSeconds);
             kestrel.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(options.RequestHeadersTimeoutSeconds);
+
+            if (options.MinRequestBodyDataRateBytesPerSecond > 0)
+            {
+                kestrel.Limits.MinRequestBodyDataRate = new MinDataRate(
+                    options.MinRequestBodyDataRateBytesPerSecond,
+                    TimeSpan.FromSeconds(options.DataRateGracePeriodSeconds));
+            }
+
+            if (options.MinResponseDataRateBytesPerSecond > 0)
+            {
+                kestrel.Limits.MinResponseDataRate = new MinDataRate(
+                    options.MinResponseDataRateBytesPerSecond,
+                    TimeSpan.FromSeconds(options.DataRateGracePeriodSeconds));
+            }
+
+            kestrel.Limits.MaxRequestHeaderCount = options.MaxRequestHeaderCount;
+            kestrel.Limits.MaxRequestHeadersTotalSize = options.MaxRequestHeadersTotalSizeBytes;
+            kestrel.Limits.MaxRequestLineSize = options.MaxRequestLineSizeBytes;
         });
 
         return builder;
