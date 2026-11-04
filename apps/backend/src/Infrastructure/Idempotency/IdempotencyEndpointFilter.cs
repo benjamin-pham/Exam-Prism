@@ -33,6 +33,7 @@ public sealed class IdempotencyEndpointFilter : IIdempotencyFilter
     private readonly IdempotencyOptions _options;
     private readonly ILogger<IdempotencyEndpointFilter> _logger;
 
+    [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
     public IdempotencyEndpointFilter(
         ICacheService cache,
         IDistributedLock @lock,

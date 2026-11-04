@@ -11,7 +11,7 @@ public static class IdempotencySetup
         IConfiguration configuration)
     {
         services.Configure<IdempotencyOptions>(configuration.GetSection(IdempotencyOptions.SectionName));
-        services.AddSingleton<IdempotencyEndpointFilter>();
+        services.AddSingleton(sp => ActivatorUtilities.CreateInstance<IdempotencyEndpointFilter>(sp));
         services.AddSingleton<IIdempotencyFilter>(sp => sp.GetRequiredService<IdempotencyEndpointFilter>());
         return services;
     }

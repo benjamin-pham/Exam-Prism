@@ -20,8 +20,27 @@ public sealed class TenantConnectionStringNormalizer(IOptions<MultiTenancyOption
             MinPoolSize = pool.MinPoolSize,
             MaxPoolSize = pool.MaxPoolSize,
             ConnectionIdleLifetime = pool.ConnectionIdleLifetimeSeconds,
-            ConnectionPruningInterval = pool.ConnectionPruningIntervalSeconds
+            ConnectionPruningInterval = pool.ConnectionPruningIntervalSeconds,
+            NoResetOnClose = pool.NoResetOnClose,
+            KeepAlive = pool.KeepAliveSeconds
         };
+
+        return builder.ConnectionString;
+    }
+
+    public string NormalizeForReadReplica(string connectionString, string? replicaHostOverride = null)
+    {
+        var normalized = Normalize(connectionString);
+        if (string.IsNullOrWhiteSpace(replicaHostOverride))
+        {
+            return normalized;
+        }
+
+        var builder = new NpgsqlConnectionStringBuilder(normalized)
+        {
+            Host = replicaHostOverride.Trim()
+        };
+        builder["Target Session Attributes"] = "prefer-standby";
 
         return builder.ConnectionString;
     }

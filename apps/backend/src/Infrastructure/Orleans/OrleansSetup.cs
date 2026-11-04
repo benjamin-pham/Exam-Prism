@@ -89,6 +89,36 @@ public static class OrleansSetup
                 clusterOpts.ServiceId = options.ServiceId;
             });
 
+            siloBuilder.AddActivityPropagation();
+
+            siloBuilder.Configure<LoadSheddingOptions>(loadOpts =>
+            {
+                loadOpts.LoadSheddingEnabled = options.LoadSheddingEnabled;
+                loadOpts.CpuThreshold = options.LoadSheddingLimitPercent;
+            });
+
+            siloBuilder.Configure<GrainCollectionOptions>(grainOpts =>
+            {
+                grainOpts.CollectionAge = TimeSpan.FromMinutes(options.CollectionAgeMinutes);
+                grainOpts.CollectionQuantum = TimeSpan.FromMinutes(options.CollectionQuantumMinutes);
+            });
+
+            siloBuilder.Configure<SiloMessagingOptions>(msgOpts =>
+            {
+                msgOpts.ResponseTimeout = TimeSpan.FromSeconds(options.ResponseTimeoutSeconds);
+            });
+
+            var advertisedIp = options.AdvertisedIpAddress;
+            if (string.IsNullOrWhiteSpace(advertisedIp))
+            {
+                advertisedIp = Environment.GetEnvironmentVariable("POD_IP");
+            }
+
+            if (!string.IsNullOrWhiteSpace(advertisedIp) && IPAddress.TryParse(advertisedIp, out var ip))
+            {
+                siloBuilder.Configure<EndpointOptions>(endpointOpts => endpointOpts.AdvertisedIPAddress = ip);
+            }
+
             siloBuilder.AddIncomingGrainCallFilter<TenantIncomingGrainCallFilter>();
             siloBuilder.AddOutgoingGrainCallFilter<TenantOutgoingGrainCallFilter>();
 

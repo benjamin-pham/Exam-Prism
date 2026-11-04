@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using Wolverine;
+using Wolverine.ErrorHandling;
 using Wolverine.FluentValidation;
 
 public static class MultiTenancySetup
@@ -28,6 +29,10 @@ public static class MultiTenancySetup
             opts.Discovery.IncludeAssembly(typeof(MultiTenancySetup).Assembly);
             opts.UseFluentValidation();
             opts.Policies.AddMiddleware<TenantWolverineMiddleware>();
+            opts.Policies.OnException<Npgsql.NpgsqlException>(ex => ex.IsTransient)
+                .RetryWithCooldown(TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(250));
+            opts.Policies.OnException<TimeoutException>()
+                .RetryWithCooldown(TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(150));
         });
     }
 

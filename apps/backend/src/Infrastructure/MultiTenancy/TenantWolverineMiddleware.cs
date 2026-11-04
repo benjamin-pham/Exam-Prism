@@ -13,7 +13,7 @@ public sealed class TenantWolverineMiddleware
     private IMultiTenantContextSetter? _setter;
     private IDisposable? _logContextToken;
 
-    public Task BeforeAsync(
+    public async Task BeforeAsync(
         Envelope envelope,
         IMultiTenantContextAccessor<ExamPrismTenantInfo> accessor,
         IMultiTenantContextSetter setter,
@@ -27,7 +27,7 @@ public sealed class TenantWolverineMiddleware
         if (string.IsNullOrWhiteSpace(envelope.TenantId) ||
             string.Equals(envelope.TenantId, "*DEFAULT*", StringComparison.OrdinalIgnoreCase))
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var currentTenant = accessor.MultiTenantContext?.TenantInfo;
@@ -42,18 +42,18 @@ public sealed class TenantWolverineMiddleware
 
             _logContextToken?.Dispose();
             _logContextToken = LogContext.PushProperty("TenantId", ResolveTenantLogProperty(currentTenant, envelope.TenantId));
-            return Task.CompletedTask;
+            return;
         }
 
         ExamPrismTenantInfo? tenantInfo = null;
         if (Guid.TryParse(envelope.TenantId, out var tenantGuid))
         {
-            tenantInfo = store.GetAsync(tenantGuid.ToString("D")).GetAwaiter().GetResult();
+            tenantInfo = await store.GetAsync(tenantGuid.ToString("D"));
         }
 
         if (tenantInfo is null)
         {
-            tenantInfo = store.GetByIdentifierAsync(envelope.TenantId.ToLowerInvariant()).GetAwaiter().GetResult();
+            tenantInfo = await store.GetByIdentifierAsync(envelope.TenantId.ToLowerInvariant());
         }
 
         if (tenantInfo is null || tenantInfo.Status != TenantStatus.Active)
@@ -68,8 +68,6 @@ public sealed class TenantWolverineMiddleware
 
         _logContextToken?.Dispose();
         _logContextToken = LogContext.PushProperty("TenantId", ResolveTenantLogProperty(tenantInfo, envelope.TenantId));
-
-        return Task.CompletedTask;
     }
 
     public void Finally(IMultiTenantContextSetter? setter = null)

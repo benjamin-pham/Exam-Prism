@@ -37,6 +37,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         builder.UseSetting("MultiTenancy:FleetMigration:MigrateOnStartup", "false");
         builder.UseSetting("Orleans:SiloPort", "0");
         builder.UseSetting("Orleans:GatewayPort", "0");
+        builder.UseSetting("Persistence:MaxRetryCount", "0");
     }
 
     public async Task InitializeAsync()

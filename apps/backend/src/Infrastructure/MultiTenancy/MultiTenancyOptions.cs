@@ -23,6 +23,8 @@ public sealed class TenantDatabasePoolOptions
     public int MinPoolSize { get; set; } = 0;
     public int ConnectionIdleLifetimeSeconds { get; set; } = 30;
     public int ConnectionPruningIntervalSeconds { get; set; } = 10;
+    public bool NoResetOnClose { get; set; } = true;
+    public int KeepAliveSeconds { get; set; } = 30;
 }
 
 public sealed class TenantProvisioningOptions

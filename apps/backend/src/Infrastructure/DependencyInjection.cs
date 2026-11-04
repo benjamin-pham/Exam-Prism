@@ -6,6 +6,7 @@ using ExamPrism.Infrastructure.Cors;
 using ExamPrism.Infrastructure.Health;
 using ExamPrism.Infrastructure.Http;
 using ExamPrism.Infrastructure.Identity;
+using ExamPrism.Infrastructure.Idempotency;
 using ExamPrism.Infrastructure.Localization;
 using ExamPrism.Infrastructure.Locking;
 using ExamPrism.Infrastructure.Logging;
@@ -14,6 +15,8 @@ using ExamPrism.Infrastructure.OpenApi;
 using ExamPrism.Infrastructure.Orleans;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.RateLimiting;
+using ExamPrism.Infrastructure.Resilience;
+using ExamPrism.Infrastructure.Telemetry;
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -52,6 +55,8 @@ public static class DependencyInjection
         var healthChecksBuilder = services.AddHealthChecks();
 
         services.AddAppReverseProxy(configuration);
+        services.AddAppHttpPerformance(configuration);
+        services.AddAppIdempotency(configuration);
         services.AddAppHealthDrain(configuration);
         services.AddPersistence(configuration, healthChecksBuilder);
         services.AddMultiTenancy(configuration);
@@ -60,6 +65,8 @@ public static class DependencyInjection
         services.AddRateLimiting(configuration, useRedis);
         services.AddOrleans(configuration, healthChecksBuilder);
         services.AddIdentity(configuration);
+        services.AddAppResilience(configuration);
+        services.AddAppTelemetry(configuration);
 
         return services;
     }

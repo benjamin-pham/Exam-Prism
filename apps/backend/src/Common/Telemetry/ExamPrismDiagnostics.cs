@@ -8,6 +8,8 @@ using System.Threading;
 public static class ExamPrismDiagnostics
 {
     public const string ServiceName = "ExamPrism";
+    public const string ActivitySourceName = ServiceName;
+    public const string MeterName = ServiceName;
     public static readonly ActivitySource ActivitySource = new(ServiceName);
     public static readonly Meter Meter = new(ServiceName);
 

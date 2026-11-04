@@ -6,8 +6,8 @@ using ExamPrism.Infrastructure.Localization;
 using ExamPrism.Infrastructure.Logging;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.OpenApi;
+using ExamPrism.Infrastructure.Telemetry;
 using Finbuckle.MultiTenant.AspNetCore.Extensions;
-using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,27 +16,26 @@ builder.AddInfrastructure();
 
 var app = builder.Build();
 
+app.UseAppReverseProxy();
 app.UseAppLocalization();
 app.UseExceptionHandler();
-
-app.UseAppReverseProxy();
-
+app.UseRequestDecompression();
+app.UseResponseCompression();
 app.UseRouting();
-
+app.UseRequestTimeouts();
 app.UseSerilogRequestLogging(options =>
 {
     options.EnrichDiagnosticContext = LogEnrichmentMiddlewareExtensions.EnrichDiagnosticContext;
 });
-
 app.UseAppCors();
-
 app.UseMultiTenant();
 app.UseMiddleware<TenantAccessGuardMiddleware>();
-
 app.UseAuthentication();
 app.UseLogEnrichment();
 app.UseRateLimiter();
+app.UseOutputCache();
 app.UseAuthorization();
+app.UseAppTelemetry();
 
 if (app.Environment.IsDevelopment())
 {
