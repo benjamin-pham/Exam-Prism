@@ -19,7 +19,11 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="5.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.12" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.18.0" />
-    <PackageVersion Include="StackExchange.Redis" Version="2.8.0" />
+    <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.4.2" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.Redis" Version="10.4.2" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders.Redis" Version="10.4.2" />
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.4.2" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.11.0" />
     <PackageVersion Include="WolverineFx" Version="4.8.0" />
     <PackageVersion Include="WolverineFx.FluentValidation" Version="4.8.0" />
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="4.8.0" />

@@ -18,6 +18,10 @@
     </PackageReference>
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Redis" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Redis" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.Redis" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="WolverineFx" />
     <PackageReference Include="WolverineFx.FluentValidation" />
     <PackageReference Include="WolverineFx.EntityFrameworkCore" />
