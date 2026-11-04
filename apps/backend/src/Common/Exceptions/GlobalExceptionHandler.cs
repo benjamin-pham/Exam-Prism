@@ -167,6 +167,21 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 _logger.LogWarning(bulkheadEx, "Password hash bulkhead rejected at {Path} (TraceId: {TraceId})", path, traceId);
                 break;
 
+            case PayloadTooLargeDecompressionException decompressionEx:
+                statusCode = StatusCodes.Status413PayloadTooLarge;
+                problemDetails = new ProblemDetails
+                {
+                    Status = statusCode,
+                    Title = "Payload Too Large",
+                    Detail = decompressionEx.Message,
+                    Instance = path,
+                    Type = "https://tools.ietf.org/html/rfc7231#section-6.5.11"
+                };
+                problemDetails.Extensions["traceId"] = traceId;
+                problemDetails.Extensions["errorCode"] = "DECOMPRESSION_BOMB_DETECTED";
+                _logger.LogWarning(decompressionEx, "Decompression bomb rejected at {Path} (TraceId: {TraceId})", path, traceId);
+                break;
+
             default:
                 statusCode = StatusCodes.Status500InternalServerError;
                 var internalServerErrorMessage = _localizer["InternalServerError"].Value ?? "An unexpected error occurred. Please try again later.";
