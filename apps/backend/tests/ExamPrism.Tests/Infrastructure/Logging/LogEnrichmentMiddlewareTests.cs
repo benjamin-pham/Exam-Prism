@@ -367,4 +367,22 @@ public class LogEnrichmentMiddlewareTests
 
         diagnosticContext.DidNotReceiveWithAnyArgs().Set(default!, default!, default);
     }
+
+    [Fact]
+    public void UseLogEnrichment_WhenAppIsNull_ThrowsArgumentNullException()
+    {
+        var act = () => LogEnrichmentMiddlewareExtensions.UseLogEnrichment(null!);
+        act.Should().Throw<ArgumentNullException>().WithParameterName("app");
+    }
+
+    [Fact]
+    public void UseLogEnrichment_WhenAppIsNotNull_CallsUseMiddleware()
+    {
+        var app = Substitute.For<Microsoft.AspNetCore.Builder.IApplicationBuilder>();
+        app.Use(Arg.Any<Func<RequestDelegate, RequestDelegate>>()).Returns(app);
+
+        var result = LogEnrichmentMiddlewareExtensions.UseLogEnrichment(app);
+
+        result.Should().BeSameAs(app);
+    }
 }

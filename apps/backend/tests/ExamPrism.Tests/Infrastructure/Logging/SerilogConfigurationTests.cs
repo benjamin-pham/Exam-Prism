@@ -121,6 +121,11 @@ public class SerilogConfigurationTests
         serilogSection.Exists().Should().BeTrue("appsettings.Development.json must configure the Serilog section");
 
         configuration.GetSection("Logging").Exists().Should().BeFalse("Standard Logging section should be replaced by Serilog in Development");
+
+        var writeTo = serilogSection.GetSection("WriteTo").GetChildren().ToList();
+        writeTo.Should().Contain(s => s["Name"] == "Console");
+        var consoleSink = writeTo.First(s => s["Name"] == "Console");
+        consoleSink["Args:outputTemplate"].Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]

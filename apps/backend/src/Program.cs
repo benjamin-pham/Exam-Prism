@@ -23,6 +23,11 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 
 app.UseRouting();
 
+app.UseSerilogRequestLogging(options =>
+{
+    options.EnrichDiagnosticContext = LogEnrichmentMiddlewareExtensions.EnrichDiagnosticContext;
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseCors(DependencyInjection.DevCorsPolicyName);
@@ -32,11 +37,7 @@ app.UseMultiTenant();
 app.UseMiddleware<TenantAccessGuardMiddleware>();
 
 app.UseAuthentication();
-app.UseMiddleware<LogEnrichmentMiddleware>();
-app.UseSerilogRequestLogging(options =>
-{
-    options.EnrichDiagnosticContext = LogEnrichmentMiddlewareExtensions.EnrichDiagnosticContext;
-});
+app.UseLogEnrichment();
 app.UseRateLimiter();
 app.UseAuthorization();
 
