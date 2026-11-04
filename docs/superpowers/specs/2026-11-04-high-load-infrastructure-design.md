@@ -162,10 +162,11 @@ To comply with `ArchitectureTests`:
 ### 4.1. Multi-Container Scale-Out & Edge Hardening
 
 #### 4.1.1. Shared DataProtection Key Ring
-* **Package:** `Microsoft.AspNetCore.DataProtection.StackExchangeRedis`.
+* **Implementation (`RedisXmlRepository : IXmlRepository` in `ExamPrism.Infrastructure.MultiTenancy`):**
+  * Uses the shared `IConnectionMultiplexer` (`StackExchange.Redis`) to store and retrieve DataProtection XML key elements in a Redis List key (`$"{cachePrefix}dataprotection:keys"`), with fail-open fallback to an in-memory list if Redis is momentarily unreachable.
 * **Setup (`MultiTenancySetup.AddMultiTenancy`):**
   * Always configures `services.AddDataProtection().SetApplicationName("ExamPrism")`.
-  * When `ConnectionStrings:Redis` is configured (`!string.IsNullOrWhiteSpace(redisConnectionString)`), resolves the singleton `IConnectionMultiplexer` and calls `.PersistKeysToStackExchangeRedis(multiplexer, $"{cachePrefix}dataprotection:keys")`.
+  * When `ConnectionStrings:Redis` is configured (`!string.IsNullOrWhiteSpace(redisConnectionString)`), registers `KeyManagementOptions.XmlRepository = new RedisXmlRepository(multiplexer, $"{cachePrefix}dataprotection:keys", logger)`.
   * When Redis is absent, retains default local key storage so unit/integration tests require no Redis container unless testing Redis specifically.
 
 #### 4.1.2. HybridCache Redis Pub/Sub Backplane (`Common.Caching` & `ExamPrism.Infrastructure.Caching`)
@@ -357,25 +358,24 @@ To comply with `ArchitectureTests`:
   * Configures `services.ConfigureHttpClientDefaults(http => http.AddStandardResilienceHandler())`.
 
 #### 4.4.3. OpenTelemetry Observability Suite (`Common.Telemetry` & `ExamPrism.Infrastructure.Telemetry`)
-* **Packages:**
-  * `OpenTelemetry.Extensions.Hosting`
-  * `OpenTelemetry.Instrumentation.AspNetCore`
-  * `OpenTelemetry.Instrumentation.Http`
-  * `OpenTelemetry.Instrumentation.Runtime`
-  * `OpenTelemetry.Exporter.Prometheus.AspNetCore`
-  * `OpenTelemetry.Exporter.OpenTelemetryProtocol`
+* **Packages (cached in local NuGet store):**
+  * `OpenTelemetry.Extensions.Hosting` (`1.18.0`)
+  * `OpenTelemetry.Instrumentation.AspNetCore` (`1.18.0`)
+  * `OpenTelemetry.Instrumentation.Http` (`1.18.0`)
+  * `OpenTelemetry.Instrumentation.Runtime` (`1.18.0`)
+  * `OpenTelemetry.Exporter.OpenTelemetryProtocol` (`1.18.0`)
 * **`ExamPrismDiagnostics` (`Common/Telemetry/ExamPrismDiagnostics.cs`):**
   * `ActivitySourceName = "ExamPrism"`, `MeterName = "ExamPrism"`.
-  * Static `ActivitySource` and `Meter` with counters:
+  * Static `ActivitySource` and `Meter` with counters (plus thread-safe snapshot values for `/metrics` scraping):
     * `examprism.db.slow_queries` (`Counter<long>`)
     * `examprism.cache.backplane_evictions` (`Counter<long>`)
     * `examprism.idempotency.replays` (`Counter<long>`)
     * `examprism.idempotency.conflicts` (`Counter<long>`)
 * **`TelemetrySetup` (`ExamPrism.Infrastructure.Telemetry`):**
   * Configures OpenTelemetry Tracing (`AddAspNetCoreInstrumentation` filtering out `/health*` and `/metrics`, `AddHttpClientInstrumentation`, `AddSource("ExamPrism", "Microsoft.Orleans.Runtime", "Microsoft.Orleans.Application", "Wolverine", "Npgsql")`).
-  * Configures OpenTelemetry Metrics (`AddAspNetCoreInstrumentation`, `AddHttpClientInstrumentation`, `AddRuntimeInstrumentation`, `AddMeter("ExamPrism", "Microsoft.Orleans", "Npgsql", "Microsoft.AspNetCore.RateLimiting")` + `AddPrometheusExporter()`).
+  * Configures OpenTelemetry Metrics (`AddAspNetCoreInstrumentation`, `AddHttpClientInstrumentation`, `AddRuntimeInstrumentation`, `AddMeter("ExamPrism", "Microsoft.Orleans", "Npgsql", "Microsoft.AspNetCore.RateLimiting")`).
   * If `TelemetryOptions.OtlpEndpoint` is non-empty, enables `.UseOtlpExporter()`.
-  * Maps `/metrics` via `app.UseOpenTelemetryPrometheusScrapingEndpoint()` when `EnablePrometheusEndpoint == true`, and exempts `/metrics` in `RateLimitingSetup`.
+  * Exposes `GET /metrics` (OpenMetrics / Prometheus text format `text/plain; version=0.0.4; charset=utf-8`) when `EnablePrometheusEndpoint == true`, and exempts `/metrics` in `RateLimitingSetup`.
 
 ---
 
@@ -428,3 +428,4 @@ app.MapEndpoints();
    * `TenantWolverineMiddlewareTests`: Verify true async tenant resolution without thread blocking.
    * `HealthAndDrainTests`: Verify `/health/live` returns `200 OK` even when dependencies fail, and `/health/ready` returns `503` immediately when `HostDrainState.IsDraining` is set.
    * `TelemetryAndResilienceTests`: Verify OpenTelemetry `/metrics` endpoint, `ExamPrismDiagnostics` counters, and Polly v8 `"default-io"` pipeline registration.
+
