@@ -1,6 +1,7 @@
 namespace ExamPrism.Endpoints.Tenants;
 
 using Common.Endpoints;
+using Common.Http;
 using Common.RateLimiting;
 using Common.Results;
 using ExamPrism.Features.Tenants;
@@ -30,6 +31,7 @@ public sealed class ProvisionTenantPublicEndpoint : IEndpoint
         .WithTags("Tenant Onboarding")
         .WithSummary("Registers a new organization workspace and initiates background provisioning")
         .RequirePlatform()
-        .RequireRateLimiting(RateLimitPolicies.Auth);
+        .RequireRateLimiting(RateLimitPolicies.TenantOnboarding)
+        .WithRequestPriority(RequestPriority.Low);
     }
 }

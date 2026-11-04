@@ -6,6 +6,7 @@ using ExamPrism.Infrastructure.Localization;
 using ExamPrism.Infrastructure.Logging;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.OpenApi;
+using ExamPrism.Infrastructure.Security;
 using ExamPrism.Infrastructure.Telemetry;
 using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using Serilog;
@@ -19,11 +20,13 @@ var app = builder.Build();
 app.UseAppReverseProxy();
 app.UseAppLocalization();
 app.UseExceptionHandler();
-app.UseRequestDecompression();
-app.UseResponseCompression();
+app.UseIpPenaltyBox();
 app.UseRouting();
 app.UseAdaptiveLoadShedding();
 app.UseRequestTimeouts();
+app.UseRequestDecompression();
+app.UseDecompressionBombGuard();
+app.UseResponseCompression();
 app.UseSerilogRequestLogging(options =>
 {
     options.EnrichDiagnosticContext = LogEnrichmentMiddlewareExtensions.EnrichDiagnosticContext;

@@ -8,6 +8,8 @@ using System.Threading.RateLimiting;
 using Common.Localization;
 using Common.MultiTenancy;
 using Common.RateLimiting;
+using Common.Security;
+using Common.Telemetry;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Http;
 using ExamPrism.Infrastructure.MultiTenancy;
@@ -49,6 +51,20 @@ public static class RateLimitingSetup
 
             options.OnRejected = async (context, cancellationToken) =>
             {
+                ExamPrismDiagnostics.RecordRateLimitRejection();
+
+                if (context.HttpContext.User.Identity?.IsAuthenticated != true)
+                {
+                    var reputation = context.HttpContext.RequestServices.GetService<IIpReputationService>();
+                    if (reputation is not null)
+                    {
+                        await reputation.RecordStrikeAsync(
+                            GetClientIp(context.HttpContext),
+                            IpStrikeReason.RateLimitExceeded,
+                            cancellationToken: cancellationToken);
+                    }
+                }
+
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
                 context.HttpContext.Response.ContentType = "application/problem+json";
 
@@ -94,6 +110,26 @@ public static class RateLimitingSetup
                     : new InMemoryFixedWindowRateLimiter(
                         rateLimitingOptions.Auth.PermitLimit,
                         TimeSpan.FromSeconds(rateLimitingOptions.Auth.WindowSeconds),
+                        timeProvider));
+            });
+
+            options.AddPolicy(RateLimitPolicies.TenantOnboarding, httpContext =>
+            {
+                var ip = GetClientIp(httpContext);
+                var partitionKey = $"platform:onboarding:ip:{ip}";
+
+                return RateLimitPartition.Get(partitionKey, _ => useRedis && multiplexer is not null
+                    ? new RedisSlidingWindowRateLimiter(
+                        multiplexer,
+                        $"{cacheOptions.KeyPrefix}ratelimit:{partitionKey}",
+                        rateLimitingOptions.TenantOnboarding.PermitLimit,
+                        TimeSpan.FromSeconds(rateLimitingOptions.TenantOnboarding.WindowSeconds),
+                        timeProvider,
+                        redisLogger)
+                    : new InMemorySlidingWindowRateLimiter(
+                        rateLimitingOptions.TenantOnboarding.PermitLimit,
+                        TimeSpan.FromSeconds(rateLimitingOptions.TenantOnboarding.WindowSeconds),
+                        rateLimitingOptions.TenantOnboarding.SegmentsPerWindow,
                         timeProvider));
             });
 

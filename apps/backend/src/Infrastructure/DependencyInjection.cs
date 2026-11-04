@@ -17,6 +17,7 @@ using ExamPrism.Infrastructure.Orleans;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.RateLimiting;
 using ExamPrism.Infrastructure.Resilience;
+using ExamPrism.Infrastructure.Security;
 using ExamPrism.Infrastructure.Telemetry;
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
@@ -57,6 +58,7 @@ public static class DependencyInjection
         var healthChecksBuilder = services.AddHealthChecks();
 
         services.AddAppReverseProxy(configuration);
+        services.AddAppDdosProtection(configuration);
         services.AddAppHttpPerformance(configuration);
         services.AddAppBatching(configuration);
         services.AddAppIdempotency(configuration);

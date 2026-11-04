@@ -18,7 +18,9 @@ using ExamPrism.Infrastructure.Persistence.Catalog;
 using ExamPrism.Infrastructure.Security;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -27,6 +29,7 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.Tokens;
@@ -299,6 +302,94 @@ public class DdosProtectionSuiteTests
         // Initial 1 query from missing-tenant-1 + at most 5 permitted misses = at most 6 queries total
         interceptor.ExecutedSelectCount.Should().BeInRange(1, 6);
         ExamPrismDiagnostics.TenantCatalogShieldRejectedCount.Should().BeGreaterThanOrEqualTo(14);
+    }
+
+    [Fact]
+    public async Task EndToEndPipeline_ExposesDdosPrometheusMetrics_EnforcesTenantOnboardingPolicy_AndEscalatesRepeatedViolationsToPenaltyBox()
+    {
+        ExamPrismDiagnostics.ResetForTesting();
+
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("ConnectionStrings:CatalogConnection", "Host=127.0.0.1;Port=5432;Database=examprism_dummy;Username=postgres;Password=postgres");
+            builder.UseSetting("ConnectionStrings:Redis", "");
+            builder.UseSetting("PlatformAdmin:SeedOnStartup", "false");
+            builder.UseSetting("MultiTenancy:Provisioning:RecoverStuckProvisioningOnStartup", "false");
+            builder.UseSetting("MultiTenancy:FleetMigration:MigrateOnStartup", "false");
+            builder.UseSetting("Orleans:SiloPort", "0");
+            builder.UseSetting("Orleans:GatewayPort", "0");
+            builder.UseSetting("Persistence:MaxRetryCount", "0");
+            builder.UseSetting("DdosProtection:Enabled", "true");
+            builder.UseSetting("DdosProtection:BanThresholdScore", "30");
+            builder.UseSetting("DdosProtection:UnknownTenantProbeWeight", "15");
+            builder.UseSetting("RateLimiting:TenantOnboarding:PermitLimit", "2");
+            builder.UseSetting("RateLimiting:TenantOnboarding:WindowSeconds", "60");
+
+            builder.ConfigureServices(services =>
+            {
+                var fakeDbInterceptor = new EmptyQueryCountingInterceptor();
+                var dbOptions = new DbContextOptionsBuilder<CatalogDbContext>()
+                    .UseNpgsql("Host=127.0.0.1;Database=fake")
+                    .AddInterceptors(fakeDbInterceptor, new SuppressConnectionInterceptor())
+                    .Options;
+
+                services.RemoveAll<DbContextOptions<CatalogDbContext>>();
+                services.AddSingleton(dbOptions);
+                services.RemoveAll<CatalogDbContext>();
+                services.AddScoped(_ => new CatalogDbContext(dbOptions));
+            });
+        });
+
+        using var client = factory.CreateClient();
+
+        // 1. Send 2 requests with non-existent tenant candidate from trusted proxy (RFC 1918) forwarding 203.0.113.200
+        using var req1 = new HttpRequestMessage(HttpMethod.Get, "/api/test/ddos-probe");
+        req1.Headers.Add("X-Tenant", "unknown-probe-1");
+        req1.Headers.Add("X-Forwarded-For", "203.0.113.200");
+        var res1 = await client.SendAsync(req1);
+        res1.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        using var req2 = new HttpRequestMessage(HttpMethod.Get, "/api/test/ddos-probe");
+        req2.Headers.Add("X-Tenant", "unknown-probe-2");
+        req2.Headers.Add("X-Forwarded-For", "203.0.113.200");
+        var res2 = await client.SendAsync(req2);
+        res2.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // 2. 3rd request from 203.0.113.200 is blocked early by IpPenaltyBoxMiddleware
+        using var req3 = new HttpRequestMessage(HttpMethod.Get, "/api/test/ddos-probe");
+        req3.Headers.Add("X-Forwarded-For", "203.0.113.200");
+        var res3 = await client.SendAsync(req3);
+        res3.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        res3.Headers.Contains("X-Penalty-Box").Should().BeTrue();
+        res3.Headers.GetValues("X-Penalty-Box").First().Should().Be("true");
+
+        // 3. Rate limiting on Tenant Onboarding: 3rd request rejected
+        for (var i = 1; i <= 3; i++)
+        {
+            using var onboardReq = new HttpRequestMessage(HttpMethod.Post, "/api/tenants");
+            onboardReq.Headers.Add("X-Forwarded-For", "203.0.113.205");
+            onboardReq.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+            var onboardRes = await client.SendAsync(onboardReq);
+            if (i <= 2)
+            {
+                onboardRes.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+            }
+            else
+            {
+                onboardRes.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+            }
+        }
+
+        // 4. Prometheus /metrics exposes all 6 DDoS metrics
+        var metricsRes = await client.GetAsync("/metrics");
+        metricsRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        var metricsBody = await metricsRes.Content.ReadAsStringAsync();
+        metricsBody.Should().Contain("examprism_security_ip_penalty_box_rejected_total");
+        metricsBody.Should().Contain("examprism_security_ip_bans_issued_total");
+        metricsBody.Should().Contain("examprism_security_decompression_bomb_rejected_total");
+        metricsBody.Should().Contain("examprism_security_tenant_catalog_shield_rejected_total");
+        metricsBody.Should().Contain("examprism_security_spoofed_ip_ignored_total");
+        metricsBody.Should().Contain("examprism_http_rate_limit_rejected_total");
     }
 
     private sealed class EmptyQueryCountingInterceptor : DbCommandInterceptor
