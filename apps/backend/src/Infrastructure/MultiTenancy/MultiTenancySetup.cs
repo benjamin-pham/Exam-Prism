@@ -2,16 +2,20 @@ namespace ExamPrism.Infrastructure.MultiTenancy;
 
 using Common.MultiTenancy;
 using ExamPrism.Features.Tenants;
+using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.Abstractions;
 using Finbuckle.MultiTenant.Extensions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 using Wolverine;
 using Wolverine.FluentValidation;
 
@@ -50,7 +54,28 @@ public static class MultiTenancySetup
         }
 
         services.Configure<MultiTenancyOptions>(configuration.GetSection(MultiTenancyOptions.SectionName));
-        services.AddDataProtection();
+        services.AddDataProtection()
+            .SetApplicationName("ExamPrism");
+
+        var redisConnectionString = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrWhiteSpace(redisConnectionString))
+        {
+            services.AddSingleton<IConfigureOptions<KeyManagementOptions>>(sp =>
+                new ConfigureNamedOptions<KeyManagementOptions>(Options.DefaultName, options =>
+                {
+                    var multiplexer = sp.GetService<IConnectionMultiplexer>();
+                    if (multiplexer is not null)
+                    {
+                        var cacheOpts = sp.GetRequiredService<IOptions<CacheOptions>>().Value;
+                        var logger = sp.GetService<ILogger<RedisXmlRepository>>();
+                        options.XmlRepository = new RedisXmlRepository(
+                            multiplexer,
+                            $"{cacheOpts.KeyPrefix}dataprotection:keys",
+                            logger);
+                    }
+                }));
+        }
+
         services.AddSingleton<IConnectionStringProtector, DataProtectionConnectionStringProtector>();
         services.AddSingleton<ITenantConnectionStringNormalizer, TenantConnectionStringNormalizer>();
         services.AddScoped<ITenantContext, TenantContext>();

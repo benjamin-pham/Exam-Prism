@@ -10,16 +10,19 @@ using Microsoft.Extensions.Options;
 public sealed class HybridCacheService : ICacheService
 {
     private readonly HybridCache _hybridCache;
+    private readonly ICacheBackplane _backplane;
     private readonly CacheOptions _options;
     private readonly IMultiTenantContextAccessor<ExamPrismTenantInfo>? _tenantAccessor;
 
     public HybridCacheService(
         HybridCache hybridCache,
         IOptions<CacheOptions> options,
+        ICacheBackplane? backplane = null,
         IMultiTenantContextAccessor<ExamPrismTenantInfo>? tenantAccessor = null)
     {
         _hybridCache = hybridCache ?? throw new ArgumentNullException(nameof(hybridCache));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _backplane = backplane ?? new NoOpCacheBackplane();
         _tenantAccessor = tenantAccessor;
     }
 
@@ -100,7 +103,9 @@ public sealed class HybridCacheService : ICacheService
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
         var (scopePrefix, _) = GetCurrentScope();
-        await _hybridCache.RemoveAsync(scopePrefix + key, cancellationToken);
+        var scopedKey = scopePrefix + key;
+        await _hybridCache.RemoveAsync(scopedKey, cancellationToken);
+        await _backplane.PublishKeyInvalidationAsync(scopedKey, cancellationToken);
     }
 
     public async ValueTask RemoveByTagAsync(
@@ -110,7 +115,9 @@ public sealed class HybridCacheService : ICacheService
         ArgumentException.ThrowIfNullOrWhiteSpace(tag);
 
         var (scopePrefix, _) = GetCurrentScope();
-        await _hybridCache.RemoveByTagAsync(scopePrefix + tag, cancellationToken);
+        var scopedTag = scopePrefix + tag;
+        await _hybridCache.RemoveByTagAsync(scopedTag, cancellationToken);
+        await _backplane.PublishTagInvalidationAsync(scopedTag, cancellationToken);
     }
 
     private (string ScopePrefix, ExamPrismTenantInfo? TenantInfo) GetCurrentScope()

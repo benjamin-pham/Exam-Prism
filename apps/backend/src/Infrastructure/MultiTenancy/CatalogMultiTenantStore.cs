@@ -1,5 +1,6 @@
 namespace ExamPrism.Infrastructure.MultiTenancy;
 
+using Common.Caching;
 using Common.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.Abstractions;
@@ -19,6 +20,7 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
 {
     private readonly CatalogDbContext _db;
     private readonly HybridCache _hybridCache;
+    private readonly ICacheBackplane _backplane;
     private readonly IConnectionStringProtector _protector;
     private readonly MultiTenancyOptions _options;
 
@@ -26,12 +28,14 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         CatalogDbContext db,
         HybridCache hybridCache,
         IConnectionStringProtector protector,
-        IOptions<MultiTenancyOptions> options)
+        IOptions<MultiTenancyOptions> options,
+        ICacheBackplane? backplane = null)
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
         _hybridCache = hybridCache ?? throw new ArgumentNullException(nameof(hybridCache));
         _protector = protector ?? throw new ArgumentNullException(nameof(protector));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _backplane = backplane ?? new NoOpCacheBackplane();
     }
 
     public async Task<ExamPrismTenantInfo?> GetByIdentifierAsync(string identifier)
@@ -298,11 +302,13 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         foreach (var key in keys)
         {
             await _hybridCache.RemoveAsync(key, ct);
+            await _backplane.PublishKeyInvalidationAsync(key, ct);
         }
 
         foreach (var tag in tags)
         {
             await _hybridCache.RemoveByTagAsync(tag, ct);
+            await _backplane.PublishTagInvalidationAsync(tag, ct);
         }
     }
 
@@ -334,7 +340,14 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         string? connectionString = null;
         if (entry.Status == TenantStatus.Active && !string.IsNullOrWhiteSpace(entry.EncryptedConnectionString))
         {
-            connectionString = _protector.Unprotect(entry.EncryptedConnectionString);
+            try
+            {
+                connectionString = _protector.Unprotect(entry.EncryptedConnectionString);
+            }
+            catch
+            {
+                connectionString = null;
+            }
         }
 
         return new ExamPrismTenantInfo(entry.Id.ToString("D"), entry.Slug)

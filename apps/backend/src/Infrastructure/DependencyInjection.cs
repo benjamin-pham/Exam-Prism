@@ -5,6 +5,7 @@ using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Cors;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Localization;
+using ExamPrism.Infrastructure.Locking;
 using ExamPrism.Infrastructure.Logging;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.OpenApi;
@@ -51,6 +52,7 @@ public static class DependencyInjection
         services.AddPersistence(configuration, healthChecksBuilder);
         services.AddMultiTenancy(configuration);
         services.AddCaching(configuration, healthChecksBuilder, out var useRedis);
+        services.AddLocking(configuration, useRedis);
         services.AddRateLimiting(configuration, useRedis);
         services.AddOrleans(configuration, healthChecksBuilder);
         services.AddIdentity(configuration);

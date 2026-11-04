@@ -30,6 +30,7 @@ public static class CachingSetup
         useRedis = !string.IsNullOrWhiteSpace(redisConnectionString);
 
         services.Configure<CacheOptions>(configuration.GetSection(CacheOptions.SectionName));
+        var initialCacheOpts = configuration.GetSection(CacheOptions.SectionName).Get<CacheOptions>() ?? new CacheOptions();
 
         if (useRedis)
         {
@@ -50,9 +51,23 @@ public static class CachingSetup
             });
 
             healthChecksBuilder.AddCheck<RedisHealthCheck>("redis");
+
+            if (initialCacheOpts.EnableBackplane)
+            {
+                services.AddSingleton<RedisCacheBackplane>();
+                services.AddSingleton<ICacheBackplane>(sp => sp.GetRequiredService<RedisCacheBackplane>());
+                services.AddHostedService(sp => sp.GetRequiredService<RedisCacheBackplane>());
+            }
+            else
+            {
+                services.AddSingleton<ICacheBackplane, NoOpCacheBackplane>();
+            }
+        }
+        else
+        {
+            services.AddSingleton<ICacheBackplane, NoOpCacheBackplane>();
         }
 
-        var initialCacheOpts = configuration.GetSection(CacheOptions.SectionName).Get<CacheOptions>() ?? new CacheOptions();
         services.AddHybridCache(options =>
         {
             options.DefaultEntryOptions = new HybridCacheEntryOptions
