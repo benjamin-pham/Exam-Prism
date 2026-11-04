@@ -48,8 +48,14 @@ if (app.Environment.IsDevelopment())
 
 app.MapEndpoints();
 
-await app.InitializeInfrastructureAsync();
-
-app.Run();
+try
+{
+    await app.InitializeInfrastructureAsync();
+    app.Run();
+}
+finally
+{
+    Serilog.Log.CloseAndFlush();
+}
 
 public partial class Program { }
