@@ -3,6 +3,7 @@ namespace ExamPrism.Features.Platform.Auth;
 using System.Text.Json.Serialization;
 using Common.Handlers;
 using Common.Results;
+using Common.Security;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Microsoft.AspNetCore.Identity;
@@ -60,7 +61,7 @@ public sealed class PlatformRefreshTokenHandler(
         // Rotate
         var (newRaw, newHash) = tokenService.GenerateRefreshToken();
         var roles = await userManager.GetRolesAsync(token.User);
-        var newAccessToken = tokenService.GeneratePlatformAccessToken(token.User, roles);
+        var newAccessToken = tokenService.GeneratePlatformAccessToken(token.User.Id, token.User.Email, roles);
 
         token.RevokedAt = now;
         token.ReplacedByTokenHash = newHash;

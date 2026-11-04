@@ -13,7 +13,7 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
 {
     private readonly JwtOptions _options = options.Value;
 
-    public string GenerateAccessToken(ApplicationUser user)
+    public string GenerateAccessToken(Guid userId, string? email)
     {
         if (!tenantContext.HasTenant || !tenantContext.TenantId.HasValue)
         {
@@ -22,10 +22,10 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
 
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-            new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
+            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, email ?? string.Empty),
+            new Claim(ClaimTypes.Email, email ?? string.Empty),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(CustomClaimTypes.TenantId, tenantContext.TenantId.Value.ToString("D"))
         };
@@ -45,7 +45,7 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    public string GeneratePlatformAccessToken(PlatformUser user, IEnumerable<string> roles)
+    public string GeneratePlatformAccessToken(Guid userId, string? email, IEnumerable<string> roles)
     {
         if (tenantContext.HasTenant)
         {
@@ -54,10 +54,10 @@ public class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvide
 
         var claimsList = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-            new(ClaimTypes.Email, user.Email ?? string.Empty),
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(ClaimTypes.NameIdentifier, userId.ToString()),
+            new(JwtRegisteredClaimNames.Email, email ?? string.Empty),
+            new(ClaimTypes.Email, email ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(CustomClaimTypes.TokenScope, CustomClaimTypes.PlatformScopeValue)
         };

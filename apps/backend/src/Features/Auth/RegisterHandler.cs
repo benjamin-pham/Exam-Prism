@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Common.Handlers;
 using Common.Results;
+using Common.Security;
 using Common.Validation;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
@@ -71,7 +72,7 @@ public sealed class RegisterHandler(
             return Error.Validation(failures);
         }
 
-        var accessToken = tokenService.GenerateAccessToken(user);
+        var accessToken = tokenService.GenerateAccessToken(user.Id, user.Email);
         var (rawRefresh, refreshHash) = tokenService.GenerateRefreshToken();
 
         if (db is not null)

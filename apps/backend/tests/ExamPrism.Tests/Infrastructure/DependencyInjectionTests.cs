@@ -3,6 +3,7 @@ namespace Tests.Infrastructure;
 using Common.Caching;
 using Common.MultiTenancy;
 using Common.Orleans;
+using Common.Security;
 using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Identity;

@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Common.Handlers;
 using Common.Results;
+using Common.Security;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using FluentValidation;
@@ -53,7 +54,7 @@ public sealed class LoginHandler(
             return Error.Unauthorized("INVALID_CREDENTIALS", "Invalid email or password.");
         }
 
-        var accessToken = tokenService.GenerateAccessToken(user);
+        var accessToken = tokenService.GenerateAccessToken(user.Id, user.Email);
         var (rawRefresh, refreshHash) = tokenService.GenerateRefreshToken();
 
         if (db is not null)

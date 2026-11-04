@@ -4,7 +4,6 @@ using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
 using ExamPrism.Features.Tenants;
-using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Microsoft.EntityFrameworkCore;
 using Wolverine;

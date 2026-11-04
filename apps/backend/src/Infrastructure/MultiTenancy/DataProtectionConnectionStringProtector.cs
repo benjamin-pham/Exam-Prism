@@ -1,5 +1,6 @@
 namespace ExamPrism.Infrastructure.MultiTenancy;
 
+using Common.MultiTenancy;
 using Microsoft.AspNetCore.DataProtection;
 
 public sealed class DataProtectionConnectionStringProtector(IDataProtectionProvider provider) : IConnectionStringProtector

@@ -62,7 +62,7 @@ public class PlatformAuthHandlersTests : IClassFixture<CatalogDbFixture>
         userManager.GetRolesAsync(user).Returns(new List<string> { PlatformRoles.SuperAdmin });
 
         var tokenService = Substitute.For<ITokenService>();
-        tokenService.GeneratePlatformAccessToken(user, Arg.Any<IEnumerable<string>>())
+        tokenService.GeneratePlatformAccessToken(user.Id, user.Email, Arg.Any<IEnumerable<string>>())
             .Returns("platform-access-token-xyz");
         tokenService.GenerateRefreshToken()
             .Returns(("raw-refresh-123", "hash-refresh-123"));
@@ -160,7 +160,7 @@ public class PlatformAuthHandlersTests : IClassFixture<CatalogDbFixture>
         tokenService.HashToken("raw-token-1").Returns(initialHash);
         var rotatedHash = $"rotated-hash-{Guid.NewGuid():N}";
         tokenService.GenerateRefreshToken().Returns(("raw-token-2", rotatedHash));
-        tokenService.GeneratePlatformAccessToken(Arg.Any<PlatformUser>(), Arg.Any<IEnumerable<string>>())
+        tokenService.GeneratePlatformAccessToken(Arg.Any<Guid>(), Arg.Any<string?>(), Arg.Any<IEnumerable<string>>())
             .Returns("new-access-token-456");
 
         var jwtOptions = Options.Create(new JwtOptions { RefreshTokenExpirationDays = 7 });

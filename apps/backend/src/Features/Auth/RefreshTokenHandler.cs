@@ -3,6 +3,7 @@ namespace ExamPrism.Features.Auth;
 using System.Text.Json.Serialization;
 using Common.Handlers;
 using Common.Results;
+using Common.Security;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +58,7 @@ public sealed class RefreshTokenHandler(
 
         // Rotate
         var (newRaw, newHash) = tokenService.GenerateRefreshToken();
-        var newAccessToken = tokenService.GenerateAccessToken(token.User);
+        var newAccessToken = tokenService.GenerateAccessToken(token.User.Id, token.User.Email);
 
         token.RevokedAt = now;
         token.ReplacedByTokenHash = newHash;

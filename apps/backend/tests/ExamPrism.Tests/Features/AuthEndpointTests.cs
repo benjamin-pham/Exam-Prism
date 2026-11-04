@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
+using Common.Security;
 using ExamPrism.Endpoints.Auth;
 using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure.Identity;

@@ -2,6 +2,7 @@ namespace ExamPrism.Features.Auth;
 
 using Common.Handlers;
 using Common.Results;
+using Common.Security;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;

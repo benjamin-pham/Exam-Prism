@@ -39,7 +39,7 @@ public class TokenServiceTests
             UserName = "user@example.com"
         };
 
-        var tokenString = service.GenerateAccessToken(user);
+        var tokenString = service.GenerateAccessToken(user.Id, user.Email);
         tokenString.Should().NotBeNullOrWhiteSpace();
 
         var handler = new JwtSecurityTokenHandler();
@@ -68,7 +68,7 @@ public class TokenServiceTests
             UserName = "user@example.com"
         };
 
-        var act = () => service.GenerateAccessToken(user);
+        var act = () => service.GenerateAccessToken(user.Id, user.Email);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*tenant*");
@@ -89,7 +89,7 @@ public class TokenServiceTests
             UserName = "admin@examprism.com"
         };
 
-        var tokenString = service.GeneratePlatformAccessToken(user, ["SuperAdmin"]);
+        var tokenString = service.GeneratePlatformAccessToken(user.Id, user.Email, ["SuperAdmin"]);
         tokenString.Should().NotBeNullOrWhiteSpace();
 
         var handler = new JwtSecurityTokenHandler();
@@ -120,7 +120,7 @@ public class TokenServiceTests
             UserName = "admin@examprism.com"
         };
 
-        var act = () => service.GeneratePlatformAccessToken(user, ["SuperAdmin"]);
+        var act = () => service.GeneratePlatformAccessToken(user.Id, user.Email, ["SuperAdmin"]);
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*tenant*");

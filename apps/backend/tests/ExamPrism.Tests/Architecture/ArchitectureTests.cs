@@ -453,6 +453,136 @@ public class ArchitectureTests
         }
     }
 
+    [Fact]
+    public void TypesInCommon_MustNotReferenceInfrastructureFeaturesOrEndpoints()
+    {
+        var forbiddenPrefixes = new[]
+        {
+            "ExamPrism.Infrastructure",
+            "ExamPrism.Features",
+            "ExamPrism.Endpoints"
+        };
+
+        var commonTypes = AppAssembly.GetTypes()
+            .Where(t => t.Namespace != null && (t.Namespace == "Common" || t.Namespace.StartsWith("Common.") || t.Namespace == "ExamPrism.Common" || t.Namespace.StartsWith("ExamPrism.Common.")))
+            .ToList();
+
+        commonTypes.Should().NotBeEmpty();
+
+        foreach (var type in commonTypes)
+        {
+            if (type.BaseType != null && type.BaseType != typeof(object) && type.BaseType != typeof(ValueType))
+            {
+                AssertNotForbiddenNamespace(type.BaseType, type, "BaseType", forbiddenPrefixes);
+            }
+
+            foreach (var iface in type.GetInterfaces())
+            {
+                AssertNotForbiddenNamespace(iface, type, $"Interface {iface.Name}", forbiddenPrefixes);
+            }
+
+            var members = type.GetMembers(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
+
+            foreach (var member in members)
+            {
+                switch (member)
+                {
+                    case FieldInfo f:
+                        AssertNotForbiddenNamespace(f.FieldType, type, f.Name, forbiddenPrefixes);
+                        break;
+                    case PropertyInfo p:
+                        AssertNotForbiddenNamespace(p.PropertyType, type, p.Name, forbiddenPrefixes);
+                        break;
+                    case MethodBase m:
+                        if (m is MethodInfo mi)
+                        {
+                            AssertNotForbiddenNamespace(mi.ReturnType, type, m.Name, forbiddenPrefixes);
+                        }
+                        foreach (var param in m.GetParameters())
+                        {
+                            AssertNotForbiddenNamespace(param.ParameterType, type, $"{m.Name}({param.Name})", forbiddenPrefixes);
+                        }
+                        break;
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void TypesInFeatures_MustNotDependOnInfrastructureInterfaces()
+    {
+        var featureTypes = AppAssembly.GetTypes()
+            .Where(t => t.Namespace != null && t.Namespace.StartsWith("ExamPrism.Features"))
+            .ToList();
+
+        featureTypes.Should().NotBeEmpty();
+
+        foreach (var type in featureTypes)
+        {
+            foreach (var iface in type.GetInterfaces())
+            {
+                AssertNotInfrastructureInterface(iface, type, $"Interface {iface.Name}");
+            }
+
+            var members = type.GetMembers(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
+
+            foreach (var member in members)
+            {
+                switch (member)
+                {
+                    case FieldInfo f:
+                        AssertNotInfrastructureInterface(f.FieldType, type, f.Name);
+                        break;
+                    case PropertyInfo p:
+                        AssertNotInfrastructureInterface(p.PropertyType, type, p.Name);
+                        break;
+                    case MethodBase m:
+                        if (m is MethodInfo mi)
+                        {
+                            AssertNotInfrastructureInterface(mi.ReturnType, type, m.Name);
+                        }
+                        foreach (var param in m.GetParameters())
+                        {
+                            AssertNotInfrastructureInterface(param.ParameterType, type, $"{m.Name}({param.Name})");
+                        }
+                        break;
+                }
+            }
+        }
+    }
+
+    private static void AssertNotInfrastructureInterface(Type type, Type declaringType, string memberName)
+    {
+        var unwrappedTypes = UnwrapTypes(type);
+        foreach (var t in unwrappedTypes)
+        {
+            if (t.IsInterface && t.Namespace != null && t.Namespace.StartsWith("ExamPrism.Infrastructure", StringComparison.Ordinal))
+            {
+                t.Namespace.Should().NotStartWith(
+                    "ExamPrism.Infrastructure",
+                    $"{declaringType.FullName}.{memberName} must not depend on Infrastructure interface '{t.FullName}'");
+            }
+        }
+    }
+
+    private static void AssertNotForbiddenNamespace(Type type, Type declaringType, string memberName, string[] forbiddenPrefixes)
+    {
+        var unwrappedTypes = UnwrapTypes(type);
+        foreach (var t in unwrappedTypes)
+        {
+            var ns = t.Namespace;
+            if (ns is null) continue;
+
+            foreach (var prefix in forbiddenPrefixes)
+            {
+                ns.StartsWith(prefix, StringComparison.Ordinal).Should().BeFalse(
+                    $"{declaringType.FullName}.{memberName} must not reference type '{t.FullName}' from forbidden namespace '{prefix}'");
+            }
+        }
+    }
+
     private static void AssertNotReferencingForbiddenOrleansTypes(Type typeToCheck, Type declaringType, string memberName, Type[] forbiddenTypes)
     {
         var unwrapped = UnwrapTypes(typeToCheck);

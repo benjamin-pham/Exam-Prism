@@ -3,7 +3,6 @@ namespace ExamPrism.Features.Platform.Tenants;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
-using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Microsoft.EntityFrameworkCore;
 

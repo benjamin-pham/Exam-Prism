@@ -1,5 +1,6 @@
 namespace ExamPrism.Infrastructure.MultiTenancy;
 
+using Common.MultiTenancy;
 using Microsoft.Extensions.Options;
 using Npgsql;
 

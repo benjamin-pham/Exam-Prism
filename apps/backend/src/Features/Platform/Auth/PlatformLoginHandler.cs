@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Common.Handlers;
 using Common.Results;
+using Common.Security;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentValidation;
@@ -55,7 +56,7 @@ public sealed class PlatformLoginHandler(
         }
 
         var roles = await userManager.GetRolesAsync(user);
-        var accessToken = tokenService.GeneratePlatformAccessToken(user, roles);
+        var accessToken = tokenService.GeneratePlatformAccessToken(user.Id, user.Email, roles);
         var (rawRefresh, refreshHash) = tokenService.GenerateRefreshToken();
 
         if (db is not null)
