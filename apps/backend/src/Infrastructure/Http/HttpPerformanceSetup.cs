@@ -5,9 +5,12 @@ using Common.Http;
 using ExamPrism.Infrastructure.Caching;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Timeouts;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
 
 public static class HttpPerformanceSetup
 {
@@ -62,6 +65,13 @@ public static class HttpPerformanceSetup
                 builder.Expire(TimeSpan.FromSeconds(outputCacheSeconds))
                     .SetVaryByHeader("X-Tenant", "Host", "Accept-Language");
             });
+        });
+
+        services.AddSingleton<IOutputCacheStore>(sp =>
+        {
+            var multiplexer = sp.GetService<IConnectionMultiplexer>();
+            var logger = sp.GetService<ILogger<RedisOutputCacheStore>>();
+            return new RedisOutputCacheStore(multiplexer, fallbackStore: null, logger);
         });
 
         services.Configure<LoadSheddingOptions>(configuration.GetSection(LoadSheddingOptions.SectionName));

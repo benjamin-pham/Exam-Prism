@@ -18,6 +18,10 @@ public sealed record CatalogTenantCacheEntry(
 
 public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, ITenantCacheInvalidator
 {
+    private static readonly SemaphoreSlim[] KeyStripes = Enumerable.Range(0, 256)
+        .Select(_ => new SemaphoreSlim(1, 1))
+        .ToArray();
+
     private readonly CatalogDbContext _db;
     private readonly HybridCache _hybridCache;
     private readonly ICacheBackplane _backplane;
@@ -38,6 +42,24 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         _backplane = backplane ?? new NoOpCacheBackplane();
     }
 
+    private static SemaphoreSlim GetStripe(string key)
+    {
+        var hash = (uint)key.GetHashCode();
+        return KeyStripes[hash % (uint)KeyStripes.Length];
+    }
+
+    private static TimeSpan ComputePositiveTtl(int minutes)
+    {
+        if (minutes <= 1)
+        {
+            return TimeSpan.FromMinutes(minutes);
+        }
+
+        // ±10% jitter: range [0.90, 1.10]
+        var jitterFactor = 0.90 + (Random.Shared.NextDouble() * 0.20);
+        return TimeSpan.FromMinutes(minutes * jitterFactor);
+    }
+
     public async Task<ExamPrismTenantInfo?> GetByIdentifierAsync(string identifier)
     {
         if (string.IsNullOrWhiteSpace(identifier))
@@ -54,51 +76,66 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
             return MapToTenantInfo(cached);
         }
 
-        var row = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug);
-        if (row is null)
+        var stripe = GetStripe(key);
+        await stripe.WaitAsync();
+        try
         {
-            var notFoundEntry = new CatalogTenantCacheEntry(
-                Exists: false,
-                Id: Guid.Empty,
-                Slug: slug,
-                Name: string.Empty,
-                Status: TenantStatus.Provisioning,
-                EncryptedConnectionString: null);
-
-            var notFoundOptions = new HybridCacheEntryOptions
+            cached = await GetCacheEntryOrDefaultAsync(key);
+            if (cached is not null)
             {
-                Expiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds),
-                LocalCacheExpiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds)
+                return MapToTenantInfo(cached);
+            }
+
+            var row = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug);
+            if (row is null)
+            {
+                var notFoundEntry = new CatalogTenantCacheEntry(
+                    Exists: false,
+                    Id: Guid.Empty,
+                    Slug: slug,
+                    Name: string.Empty,
+                    Status: TenantStatus.Provisioning,
+                    EncryptedConnectionString: null);
+
+                var notFoundOptions = new HybridCacheEntryOptions
+                {
+                    Expiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds),
+                    LocalCacheExpiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds)
+                };
+
+                await _hybridCache.SetAsync(
+                    key,
+                    notFoundEntry,
+                    notFoundOptions,
+                    [$"catalog:tenant:slug:{slug}"]);
+
+                return null;
+            }
+
+            var foundEntry = new CatalogTenantCacheEntry(
+                Exists: true,
+                Id: row.Id,
+                Slug: row.Slug,
+                Name: row.Name,
+                Status: row.Status,
+                EncryptedConnectionString: row.EncryptedConnectionString);
+
+            var existingOptions = new HybridCacheEntryOptions
+            {
+                Expiration = ComputePositiveTtl(_options.CatalogCacheExpirationMinutes),
+                LocalCacheExpiration = ComputePositiveTtl(_options.CatalogLocalCacheExpirationMinutes)
             };
+            var tags = new[] { "catalog:tenants", $"catalog:tenant:{row.Id:D}", $"catalog:tenant:slug:{row.Slug}" };
 
-            await _hybridCache.SetAsync(
-                key,
-                notFoundEntry,
-                notFoundOptions,
-                [$"catalog:tenant:slug:{slug}"]);
+            await _hybridCache.SetAsync(key, foundEntry, existingOptions, tags);
+            await _hybridCache.SetAsync($"catalog:tenant:id:{row.Id:D}", foundEntry, existingOptions, tags);
 
-            return null;
+            return MapToTenantInfo(foundEntry);
         }
-
-        var foundEntry = new CatalogTenantCacheEntry(
-            Exists: true,
-            Id: row.Id,
-            Slug: row.Slug,
-            Name: row.Name,
-            Status: row.Status,
-            EncryptedConnectionString: row.EncryptedConnectionString);
-
-        var existingOptions = new HybridCacheEntryOptions
+        finally
         {
-            Expiration = TimeSpan.FromMinutes(_options.CatalogCacheExpirationMinutes),
-            LocalCacheExpiration = TimeSpan.FromMinutes(_options.CatalogLocalCacheExpirationMinutes)
-        };
-        var tags = new[] { "catalog:tenants", $"catalog:tenant:{row.Id:D}", $"catalog:tenant:slug:{row.Slug}" };
-
-        await _hybridCache.SetAsync(key, foundEntry, existingOptions, tags);
-        await _hybridCache.SetAsync($"catalog:tenant:id:{row.Id:D}", foundEntry, existingOptions, tags);
-
-        return MapToTenantInfo(foundEntry);
+            stripe.Release();
+        }
     }
 
     public async Task<ExamPrismTenantInfo?> GetAsync(string id)
@@ -116,51 +153,66 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
             return MapToTenantInfo(cached);
         }
 
-        var row = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == guid);
-        if (row is null)
+        var stripe = GetStripe(key);
+        await stripe.WaitAsync();
+        try
         {
-            var notFoundEntry = new CatalogTenantCacheEntry(
-                Exists: false,
-                Id: guid,
-                Slug: string.Empty,
-                Name: string.Empty,
-                Status: TenantStatus.Provisioning,
-                EncryptedConnectionString: null);
-
-            var notFoundOptions = new HybridCacheEntryOptions
+            cached = await GetCacheEntryOrDefaultAsync(key);
+            if (cached is not null)
             {
-                Expiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds),
-                LocalCacheExpiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds)
+                return MapToTenantInfo(cached);
+            }
+
+            var row = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == guid);
+            if (row is null)
+            {
+                var notFoundEntry = new CatalogTenantCacheEntry(
+                    Exists: false,
+                    Id: guid,
+                    Slug: string.Empty,
+                    Name: string.Empty,
+                    Status: TenantStatus.Provisioning,
+                    EncryptedConnectionString: null);
+
+                var notFoundOptions = new HybridCacheEntryOptions
+                {
+                    Expiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds),
+                    LocalCacheExpiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds)
+                };
+
+                await _hybridCache.SetAsync(
+                    key,
+                    notFoundEntry,
+                    notFoundOptions,
+                    [$"catalog:tenant:id:{guid:D}"]);
+
+                return null;
+            }
+
+            var foundEntry = new CatalogTenantCacheEntry(
+                Exists: true,
+                Id: row.Id,
+                Slug: row.Slug,
+                Name: row.Name,
+                Status: row.Status,
+                EncryptedConnectionString: row.EncryptedConnectionString);
+
+            var existingOptions = new HybridCacheEntryOptions
+            {
+                Expiration = ComputePositiveTtl(_options.CatalogCacheExpirationMinutes),
+                LocalCacheExpiration = ComputePositiveTtl(_options.CatalogLocalCacheExpirationMinutes)
             };
+            var tags = new[] { "catalog:tenants", $"catalog:tenant:{row.Id:D}", $"catalog:tenant:slug:{row.Slug}" };
 
-            await _hybridCache.SetAsync(
-                key,
-                notFoundEntry,
-                notFoundOptions,
-                [$"catalog:tenant:id:{guid:D}"]);
+            await _hybridCache.SetAsync(key, foundEntry, existingOptions, tags);
+            await _hybridCache.SetAsync($"catalog:tenant:slug:{row.Slug}", foundEntry, existingOptions, tags);
 
-            return null;
+            return MapToTenantInfo(foundEntry);
         }
-
-        var foundEntry = new CatalogTenantCacheEntry(
-            Exists: true,
-            Id: row.Id,
-            Slug: row.Slug,
-            Name: row.Name,
-            Status: row.Status,
-            EncryptedConnectionString: row.EncryptedConnectionString);
-
-        var existingOptions = new HybridCacheEntryOptions
+        finally
         {
-            Expiration = TimeSpan.FromMinutes(_options.CatalogCacheExpirationMinutes),
-            LocalCacheExpiration = TimeSpan.FromMinutes(_options.CatalogLocalCacheExpirationMinutes)
-        };
-        var tags = new[] { "catalog:tenants", $"catalog:tenant:{row.Id:D}", $"catalog:tenant:slug:{row.Slug}" };
-
-        await _hybridCache.SetAsync(key, foundEntry, existingOptions, tags);
-        await _hybridCache.SetAsync($"catalog:tenant:slug:{row.Slug}", foundEntry, existingOptions, tags);
-
-        return MapToTenantInfo(foundEntry);
+            stripe.Release();
+        }
     }
 
     public async Task<IEnumerable<ExamPrismTenantInfo>> GetAllAsync()
