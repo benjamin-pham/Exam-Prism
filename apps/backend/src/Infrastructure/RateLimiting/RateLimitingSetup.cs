@@ -97,6 +97,56 @@ public static class RateLimitingSetup
                         timeProvider));
             });
 
+            options.AddPolicy(RateLimitPolicies.ExamCritical, httpContext =>
+            {
+                var tenantInfo = httpContext.GetMultiTenantContext<ExamPrismTenantInfo>()?.TenantInfo;
+                var scope = tenantInfo is { Status: TenantStatus.Active } ? $"t:{tenantInfo.Id}" : "platform";
+
+                string userOrIp;
+                if (httpContext.User.Identity?.IsAuthenticated == true)
+                {
+                    var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                        ?? httpContext.User.FindFirst("sub")?.Value;
+                    userOrIp = !string.IsNullOrWhiteSpace(userId) ? $"user:{userId}" : $"ip:{GetClientIp(httpContext)}";
+                }
+                else
+                {
+                    userOrIp = $"ip:{GetClientIp(httpContext)}";
+                }
+
+                var partitionKey = $"{scope}:exam:{userOrIp}";
+
+                return RateLimitPartition.Get(partitionKey, _ => useRedis && multiplexer is not null
+                    ? new RedisSlidingWindowRateLimiter(
+                        multiplexer,
+                        $"{cacheOptions.KeyPrefix}ratelimit:{partitionKey}",
+                        rateLimitingOptions.ExamCritical.PermitLimit,
+                        TimeSpan.FromSeconds(rateLimitingOptions.ExamCritical.WindowSeconds),
+                        timeProvider,
+                        redisLogger)
+                    : new InMemorySlidingWindowRateLimiter(
+                        rateLimitingOptions.ExamCritical.PermitLimit,
+                        TimeSpan.FromSeconds(rateLimitingOptions.ExamCritical.WindowSeconds),
+                        rateLimitingOptions.ExamCritical.SegmentsPerWindow,
+                        timeProvider));
+            });
+
+            options.AddPolicy(RateLimitPolicies.HeavyOperationBulkhead, httpContext =>
+            {
+                var tenantInfo = httpContext.GetMultiTenantContext<ExamPrismTenantInfo>()?.TenantInfo;
+                var scope = tenantInfo is { Status: TenantStatus.Active } ? $"t:{tenantInfo.Id}" : "platform";
+                var partitionKey = $"{scope}:bulkhead";
+
+                return RateLimitPartition.GetConcurrencyLimiter(
+                    partitionKey,
+                    _ => new ConcurrencyLimiterOptions
+                    {
+                        PermitLimit = rateLimitingOptions.HeavyOperationBulkhead.PermitLimit,
+                        QueueLimit = rateLimitingOptions.HeavyOperationBulkhead.QueueLimit,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                    });
+            });
+
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
             {
                 var endpoint = httpContext.GetEndpoint();
@@ -119,7 +169,9 @@ public static class RateLimitingSetup
                     path.Equals("/openapi", StringComparison.OrdinalIgnoreCase) ||
                     path.StartsWith("/openapi/", StringComparison.OrdinalIgnoreCase) ||
                     path.Equals("/scalar", StringComparison.OrdinalIgnoreCase) ||
-                    path.StartsWith("/scalar/", StringComparison.OrdinalIgnoreCase))
+                    path.StartsWith("/scalar/", StringComparison.OrdinalIgnoreCase) ||
+                    path.Equals("/metrics", StringComparison.OrdinalIgnoreCase) ||
+                    path.StartsWith("/metrics/", StringComparison.OrdinalIgnoreCase))
                 {
                     return RateLimitPartition.GetNoLimiter("infra");
                 }
