@@ -31,6 +31,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using StackExchange.Redis;
 using Wolverine;
 using Wolverine.FluentValidation;
@@ -66,6 +67,14 @@ public static class DependencyInjection
                 });
             });
         }
+
+        builder.Host.UseSerilog((context, services, configuration) =>
+        {
+            configuration
+                .ReadFrom.Configuration(context.Configuration)
+                .ReadFrom.Services(services)
+                .Enrich.FromLogContext();
+        });
 
         builder.Host.UseWolverine(opts =>
         {

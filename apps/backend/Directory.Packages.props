@@ -25,6 +25,8 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.12" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.18.0" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Orleans.Persistence.Redis" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Orleans.Reminders.Redis" Version="10.4.2" />
