@@ -1,9 +1,11 @@
 namespace Tests.Infrastructure;
 
 using Common.Caching;
+using Common.Exceptions;
 using Common.MultiTenancy;
 using Common.Orleans;
 using Common.Security;
+using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Identity;
@@ -12,15 +14,21 @@ using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.Abstractions;
 using FluentAssertions;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using StackExchange.Redis;
 using Xunit;
 
@@ -330,5 +338,60 @@ public class DependencyInjectionTests
 
         var appUserManager = scopeWithTenant.ServiceProvider.GetService<UserManager<ApplicationUser>>();
         appUserManager.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task AddInfrastructure_OnWebApplicationBuilder_ConfiguresLocalizationExceptionHandlingValidationAndDevCors()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Development
+        });
+        builder.Configuration.AddInMemoryCollection(CreateValidSettings());
+
+        builder.AddInfrastructure();
+
+        using var provider = builder.Services.BuildServiceProvider();
+
+        var localizationOptions = provider.GetRequiredService<IOptions<RequestLocalizationOptions>>().Value;
+        localizationOptions.DefaultRequestCulture.Culture.Name.Should().Be("vi-VN");
+        localizationOptions.SupportedCultures.Should().Contain(c => c.Name == "en-US");
+
+        builder.Services.Should().Contain(s =>
+            s.ServiceType == typeof(IExceptionHandler) &&
+            s.ImplementationType == typeof(GlobalExceptionHandler));
+
+        using var scope = provider.CreateScope();
+        scope.ServiceProvider.GetService<IValidator<LoginCommand>>().Should().NotBeNull();
+
+        var corsProvider = provider.GetRequiredService<ICorsPolicyProvider>();
+        var corsPolicy = await corsProvider.GetPolicyAsync(new DefaultHttpContext(), DependencyInjection.DevCorsPolicyName);
+        corsPolicy.Should().NotBeNull();
+        corsPolicy!.IsOriginAllowed("http://school-a.localhost:5000").Should().BeTrue();
+        corsPolicy.IsOriginAllowed("https://evil.com").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task InitializeInfrastructureAsync_WhenFleetMigrationEnabled_InvokesMigrateAllActiveTenantsAsync()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Production
+        });
+        var settings = CreateValidSettings();
+        settings["PlatformAdmin:SeedOnStartup"] = "false";
+        settings["MultiTenancy:Provisioning:RecoverStuckProvisioningOnStartup"] = "false";
+        settings["MultiTenancy:FleetMigration:MigrateOnStartup"] = "true";
+        builder.Configuration.AddInMemoryCollection(settings);
+
+        builder.Services.AddInfrastructure(builder.Configuration);
+
+        var fleetMigrator = Substitute.For<ITenantFleetMigrator>();
+        builder.Services.AddScoped(_ => fleetMigrator);
+
+        await using var app = builder.Build();
+        await app.InitializeInfrastructureAsync();
+
+        await fleetMigrator.Received(1).MigrateAllActiveTenantsAsync(Arg.Any<CancellationToken>());
     }
 }

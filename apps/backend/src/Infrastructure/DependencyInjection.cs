@@ -2,18 +2,22 @@ namespace ExamPrism.Infrastructure;
 
 using System.Text;
 using Common.Caching;
+using Common.Exceptions;
 using Common.MultiTenancy;
 using Common.Security;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.MultiTenancy;
+using ExamPrism.Infrastructure.OpenApi;
 using ExamPrism.Infrastructure.Orleans;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using ExamPrism.Infrastructure.RateLimiting;
 using Finbuckle.MultiTenant.Abstractions;
 using Finbuckle.MultiTenant.Extensions;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -23,14 +27,72 @@ using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
 using Wolverine;
+using Wolverine.FluentValidation;
 
 public static class DependencyInjection
 {
+    public const string DevCorsPolicyName = "DevSubdomainCors";
+
+    private static readonly string[] SupportedCultures = ["vi-VN", "vi", "en-US", "en"];
+
+    public static WebApplicationBuilder AddInfrastructure(this WebApplicationBuilder builder)
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy(DevCorsPolicyName, policy =>
+                {
+                    policy.SetIsOriginAllowed(origin =>
+                    {
+                        if (Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
+                            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                        {
+                            var host = uri.Host;
+                            return host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                                   host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
+                        }
+                        return false;
+                    })
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+                });
+            });
+        }
+
+        builder.Host.UseWolverine(opts =>
+        {
+            opts.Discovery.IncludeAssembly(typeof(DependencyInjection).Assembly);
+            opts.UseFluentValidation();
+            opts.Policies.AddMiddleware<TenantWolverineMiddleware>();
+        });
+
+        builder.Host.UseExamPrismOrleans();
+
+        builder.Services.AddExamPrismOpenApi();
+        builder.Services.AddInfrastructure(builder.Configuration);
+        builder.Services.AddLocalization(options => options.ResourcesPath = "Common/Localization/Resources");
+        builder.Services.AddProblemDetails();
+        builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+        builder.Services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
+
+        builder.Services.Configure<RequestLocalizationOptions>(options =>
+        {
+            options.SetDefaultCulture("vi-VN")
+                   .AddSupportedCultures(SupportedCultures)
+                   .AddSupportedUICultures(SupportedCultures);
+        });
+
+        return builder;
+    }
+
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddLogging();
