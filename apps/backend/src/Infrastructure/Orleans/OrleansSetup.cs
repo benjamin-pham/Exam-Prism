@@ -102,10 +102,12 @@ public static class OrleansSetup
                 {
                     redisOptions = ConfigurationOptions.Parse(redisConnectionString);
                     redisOptions.AbortOnConnectFail = false;
-                    redisOptions.ConnectTimeout = 1000;
-                    redisOptions.SyncTimeout = 1000;
 
-                    using var testMux = ConnectionMultiplexer.Connect(redisOptions);
+                    var probeOptions = redisOptions.Clone();
+                    probeOptions.ConnectTimeout = 1000;
+                    probeOptions.SyncTimeout = 1000;
+
+                    using var testMux = ConnectionMultiplexer.Connect(probeOptions);
                     isRedisReachable = testMux.IsConnected;
                     if (!isRedisReachable)
                     {
