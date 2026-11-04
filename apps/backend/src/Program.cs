@@ -1,9 +1,11 @@
 using Common.Endpoints;
 using ExamPrism.Infrastructure;
+using ExamPrism.Infrastructure.Logging;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.OpenApi;
 using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using Microsoft.AspNetCore.HttpOverrides;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +32,11 @@ app.UseMultiTenant();
 app.UseMiddleware<TenantAccessGuardMiddleware>();
 
 app.UseAuthentication();
+app.UseMiddleware<LogEnrichmentMiddleware>();
+app.UseSerilogRequestLogging(options =>
+{
+    options.EnrichDiagnosticContext = LogEnrichmentMiddlewareExtensions.EnrichDiagnosticContext;
+});
 app.UseRateLimiter();
 app.UseAuthorization();
 
