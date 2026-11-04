@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 public static class LocalizationSetup
 {
-    public static readonly string[] SupportedCultures = ["vi-VN", "vi", "en-US", "en"];
+    public static readonly IReadOnlyList<string> SupportedCultures = ["vi-VN", "vi", "en-US", "en"];
 
     public static IServiceCollection AddExamPrismLocalization(this IServiceCollection services)
     {
@@ -14,8 +14,8 @@ public static class LocalizationSetup
         services.Configure<RequestLocalizationOptions>(options =>
         {
             options.SetDefaultCulture("vi-VN")
-                   .AddSupportedCultures(SupportedCultures)
-                   .AddSupportedUICultures(SupportedCultures);
+                   .AddSupportedCultures([.. SupportedCultures])
+                   .AddSupportedUICultures([.. SupportedCultures]);
         });
 
         return services;

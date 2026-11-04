@@ -15,6 +15,14 @@ public static class CachingSetup
     public static IServiceCollection AddExamPrismCaching(
         this IServiceCollection services,
         IConfiguration configuration,
+        IHealthChecksBuilder healthChecksBuilder)
+    {
+        return services.AddExamPrismCaching(configuration, healthChecksBuilder, out _);
+    }
+
+    public static IServiceCollection AddExamPrismCaching(
+        this IServiceCollection services,
+        IConfiguration configuration,
         IHealthChecksBuilder healthChecksBuilder,
         out bool useRedis)
     {

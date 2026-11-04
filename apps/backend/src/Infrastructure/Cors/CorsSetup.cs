@@ -38,6 +38,12 @@ public static class CorsSetup
         return services;
     }
 
+    public static IApplicationBuilder UseExamPrismCors(this IApplicationBuilder app)
+    {
+        var environment = app.ApplicationServices.GetRequiredService<IHostEnvironment>();
+        return app.UseExamPrismCors(environment);
+    }
+
     public static IApplicationBuilder UseExamPrismCors(this IApplicationBuilder app, IHostEnvironment environment)
     {
         if (environment.IsDevelopment())

@@ -428,7 +428,7 @@ public class DependencyInjectionTests
         builder.Services.AddScoped(_ => fleetMigrator);
 
         await using var app = builder.Build();
-        app.UseExamPrismCors(app.Environment);
+        app.UseExamPrismCors();
         app.UseExamPrismLocalization();
         await app.InitializeExamPrismIdentityAsync();
         await app.InitializeExamPrismMultiTenancyAsync();

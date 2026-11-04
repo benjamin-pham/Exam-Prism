@@ -30,7 +30,7 @@ app.UseSerilogRequestLogging(options =>
     options.EnrichDiagnosticContext = LogEnrichmentMiddlewareExtensions.EnrichDiagnosticContext;
 });
 
-app.UseExamPrismCors(app.Environment);
+app.UseExamPrismCors();
 
 app.UseMultiTenant();
 app.UseMiddleware<TenantAccessGuardMiddleware>();
