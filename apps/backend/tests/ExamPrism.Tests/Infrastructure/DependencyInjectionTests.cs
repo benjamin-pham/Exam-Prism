@@ -8,7 +8,10 @@ using Common.Security;
 using ExamPrism.Features.Auth;
 using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Caching;
+using ExamPrism.Infrastructure.Cors;
 using ExamPrism.Infrastructure.Identity;
+using ExamPrism.Infrastructure.Localization;
+using ExamPrism.Infrastructure.Logging;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
@@ -391,6 +394,44 @@ public class DependencyInjectionTests
 
         await using var app = builder.Build();
         await app.InitializeInfrastructureAsync();
+
+        await fleetMigrator.Received(1).MigrateAllActiveTenantsAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FolderSetupExtensions_RegisterAndInitializeIndependently()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Production
+        });
+        var settings = CreateValidSettings();
+        settings["PlatformAdmin:SeedOnStartup"] = "false";
+        settings["MultiTenancy:Provisioning:RecoverStuckProvisioningOnStartup"] = "false";
+        settings["MultiTenancy:FleetMigration:MigrateOnStartup"] = "true";
+        builder.Configuration.AddInMemoryCollection(settings);
+
+        builder.Host.UseExamPrismLogging();
+        builder.Host.UseExamPrismWolverine();
+
+        var healthChecksBuilder = builder.Services.AddHealthChecks();
+        builder.Services.AddExamPrismCors(builder.Environment);
+        builder.Services.AddExamPrismLocalization();
+        builder.Services.AddExamPrismPersistence(builder.Configuration, healthChecksBuilder);
+        builder.Services.AddExamPrismMultiTenancy(builder.Configuration);
+        builder.Services.AddExamPrismCaching(builder.Configuration, healthChecksBuilder, out var useRedis);
+        builder.Services.AddExamPrismIdentity(builder.Configuration);
+
+        useRedis.Should().BeFalse();
+
+        var fleetMigrator = Substitute.For<ITenantFleetMigrator>();
+        builder.Services.AddScoped(_ => fleetMigrator);
+
+        await using var app = builder.Build();
+        app.UseExamPrismCors(app.Environment);
+        app.UseExamPrismLocalization();
+        await app.InitializeExamPrismIdentityAsync();
+        await app.InitializeExamPrismMultiTenancyAsync();
 
         await fleetMigrator.Received(1).MigrateAllActiveTenantsAsync(Arg.Any<CancellationToken>());
     }

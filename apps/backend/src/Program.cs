@@ -1,5 +1,7 @@
 using Common.Endpoints;
 using ExamPrism.Infrastructure;
+using ExamPrism.Infrastructure.Cors;
+using ExamPrism.Infrastructure.Localization;
 using ExamPrism.Infrastructure.Logging;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.OpenApi;
@@ -13,7 +15,7 @@ builder.AddInfrastructure();
 
 var app = builder.Build();
 
-app.UseRequestLocalization();
+app.UseExamPrismLocalization();
 app.UseExceptionHandler();
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
@@ -28,10 +30,7 @@ app.UseSerilogRequestLogging(options =>
     options.EnrichDiagnosticContext = LogEnrichmentMiddlewareExtensions.EnrichDiagnosticContext;
 });
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseCors(DependencyInjection.DevCorsPolicyName);
-}
+app.UseExamPrismCors(app.Environment);
 
 app.UseMultiTenant();
 app.UseMiddleware<TenantAccessGuardMiddleware>();

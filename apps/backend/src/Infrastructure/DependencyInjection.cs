@@ -1,103 +1,41 @@
 namespace ExamPrism.Infrastructure;
 
-using System.Text;
-using Common.Caching;
 using Common.Exceptions;
-using Common.MultiTenancy;
-using Common.Security;
 using ExamPrism.Infrastructure.Caching;
+using ExamPrism.Infrastructure.Cors;
 using ExamPrism.Infrastructure.Identity;
+using ExamPrism.Infrastructure.Localization;
+using ExamPrism.Infrastructure.Logging;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.OpenApi;
 using ExamPrism.Infrastructure.Orleans;
 using ExamPrism.Infrastructure.Persistence;
-using ExamPrism.Infrastructure.Persistence.Catalog;
 using ExamPrism.Infrastructure.RateLimiting;
-using Finbuckle.MultiTenant.Abstractions;
-using Finbuckle.MultiTenant.Extensions;
 using FluentValidation;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Hybrid;
-using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using Serilog;
-using StackExchange.Redis;
-using Wolverine;
-using Wolverine.FluentValidation;
 
 public static class DependencyInjection
 {
-    public const string DevCorsPolicyName = "DevSubdomainCors";
-
-    private static readonly string[] SupportedCultures = ["vi-VN", "vi", "en-US", "en"];
+    public const string DevCorsPolicyName = CorsSetup.DevCorsPolicyName;
 
     public static WebApplicationBuilder AddInfrastructure(this WebApplicationBuilder builder)
     {
-        if (builder.Environment.IsDevelopment())
-        {
-            builder.Services.AddCors(options =>
-            {
-                options.AddPolicy(DevCorsPolicyName, policy =>
-                {
-                    policy.SetIsOriginAllowed(origin =>
-                    {
-                        if (Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
-                            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-                        {
-                            var host = uri.Host;
-                            return host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
-                                   host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
-                        }
-                        return false;
-                    })
-                    .AllowAnyHeader()
-                    .AllowAnyMethod()
-                    .AllowCredentials();
-                });
-            });
-        }
+        builder.Services.AddExamPrismCors(builder.Environment);
 
-        builder.Host.UseSerilog((context, services, configuration) =>
-        {
-            configuration
-                .ReadFrom.Configuration(context.Configuration)
-                .ReadFrom.Services(services)
-                .Enrich.FromLogContext();
-        });
-
-        builder.Host.UseWolverine(opts =>
-        {
-            opts.Discovery.IncludeAssembly(typeof(DependencyInjection).Assembly);
-            opts.UseFluentValidation();
-            opts.Policies.AddMiddleware<TenantWolverineMiddleware>();
-        });
-
+        builder.Host.UseExamPrismLogging();
+        builder.Host.UseExamPrismWolverine();
         builder.Host.UseExamPrismOrleans();
 
         builder.Services.AddExamPrismOpenApi();
+        builder.Services.AddExamPrismLocalization();
         builder.Services.AddInfrastructure(builder.Configuration);
-        builder.Services.AddLocalization(options => options.ResourcesPath = "Common/Localization/Resources");
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
         builder.Services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
-
-        builder.Services.Configure<RequestLocalizationOptions>(options =>
-        {
-            options.SetDefaultCulture("vi-VN")
-                   .AddSupportedCultures(SupportedCultures)
-                   .AddSupportedUICultures(SupportedCultures);
-        });
 
         return builder;
     }
@@ -106,212 +44,16 @@ public static class DependencyInjection
     {
         services.AddLogging();
         services.TryAddSingleton(configuration);
-
-        var catalogConnection = configuration.GetConnectionString("CatalogConnection")
-            ?? throw new InvalidOperationException("Connection string 'CatalogConnection' not found.");
-
-        services.AddDbContext<CatalogDbContext>(options =>
-            options.UseNpgsql(catalogConnection));
-
-        var busDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IMessageBus));
-        if (busDescriptor != null)
-        {
-            services.Remove(busDescriptor);
-            services.Add(new ServiceDescriptor(
-                typeof(Wolverine.Runtime.MessageContext),
-                busDescriptor.ImplementationType ?? typeof(Wolverine.Runtime.MessageContext),
-                busDescriptor.Lifetime));
-            services.Add(new ServiceDescriptor(
-                typeof(IMessageBus),
-                sp => new MultiTenantMessageBus(
-                    sp.GetRequiredService<Wolverine.Runtime.MessageContext>(),
-                    sp.GetRequiredService<IMultiTenantStore<ExamPrismTenantInfo>>(),
-                    sp.GetRequiredService<IMultiTenantContextSetter>(),
-                    sp.GetRequiredService<IMultiTenantContextAccessor<ExamPrismTenantInfo>>()),
-                busDescriptor.Lifetime));
-        }
-
-        services.Configure<MultiTenancyOptions>(configuration.GetSection(MultiTenancyOptions.SectionName));
-        services.AddDataProtection();
-        services.AddSingleton<IConnectionStringProtector, DataProtectionConnectionStringProtector>();
-        services.AddSingleton<ITenantConnectionStringNormalizer, TenantConnectionStringNormalizer>();
-        services.AddScoped<ITenantContext, TenantContext>();
-        services.AddScoped<CatalogMultiTenantStore>();
-        services.AddScoped<ITenantCacheInvalidator>(sp => sp.GetRequiredService<CatalogMultiTenantStore>());
-        services.AddScoped<ITenantProvisioner>(sp => new TenantProvisioner(
-            sp.GetRequiredService<CatalogDbContext>(),
-            sp.GetRequiredService<IConfiguration>(),
-            sp.GetRequiredService<IOptions<MultiTenancyOptions>>(),
-            sp.GetRequiredService<IConnectionStringProtector>(),
-            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
-            sp.GetRequiredService<ITenantCacheInvalidator>(),
-            sp.GetRequiredService<IServiceScopeFactory>(),
-            sp.GetRequiredService<TimeProvider>(),
-            sp.GetRequiredService<ILogger<TenantProvisioner>>()));
-        services.AddScoped<ITenantFleetMigrator>(sp => new TenantFleetMigrator(
-            sp.GetRequiredService<CatalogDbContext>(),
-            sp.GetRequiredService<IConnectionStringProtector>(),
-            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
-            sp.GetRequiredService<IOptions<MultiTenancyOptions>>(),
-            sp.GetRequiredService<ILogger<TenantFleetMigrator>>(),
-            sp.GetRequiredService<IServiceScopeFactory>()));
-
-        services.AddMultiTenant<ExamPrismTenantInfo>()
-            .WithStrategy<SubdomainMultiTenantStrategy>(ServiceLifetime.Scoped)
-            .WithStore<CatalogMultiTenantStore>(ServiceLifetime.Scoped);
-
-        services.AddDbContext<AppDbContext>((sp, options) =>
-        {
-            var tenantInfo = sp.GetRequiredService<IMultiTenantContextAccessor<ExamPrismTenantInfo>>()
-                .MultiTenantContext?.TenantInfo;
-
-            if (tenantInfo is null || tenantInfo.Status != TenantStatus.Active || string.IsNullOrWhiteSpace(tenantInfo.ConnectionString))
-            {
-                throw new InvalidOperationException(
-                    "An active tenant context with a valid connection string is required to resolve AppDbContext.");
-            }
-
-            var normalizer = sp.GetRequiredService<ITenantConnectionStringNormalizer>();
-            options.UseNpgsql(normalizer.Normalize(tenantInfo.ConnectionString));
-        });
-
-        var healthChecksBuilder = services.AddHealthChecks()
-            .AddDbContextCheck<CatalogDbContext>(name: "catalog_db");
-
-        var redisConnectionString = configuration.GetConnectionString("Redis");
-        var useRedis = !string.IsNullOrWhiteSpace(redisConnectionString);
-
-        services.Configure<CacheOptions>(configuration.GetSection(CacheOptions.SectionName));
-        services.Configure<RateLimitingOptions>(configuration.GetSection(RateLimitingOptions.SectionName));
-
-        if (useRedis)
-        {
-            var redisOptions = ConfigurationOptions.Parse(redisConnectionString!);
-            redisOptions.AbortOnConnectFail = false;
-
-            services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisOptions));
-            services.AddSingleton<IDistributedCache>(sp =>
-            {
-                var cacheOpts = sp.GetRequiredService<IOptions<CacheOptions>>().Value;
-                var multiplexer = sp.GetRequiredService<IConnectionMultiplexer>();
-                var redisCache = new RedisCache(Options.Create(new RedisCacheOptions
-                {
-                    InstanceName = cacheOpts.KeyPrefix,
-                    ConnectionMultiplexerFactory = () => Task.FromResult(multiplexer)
-                }));
-                return new ResilientDistributedCache(redisCache, sp.GetRequiredService<ILogger<ResilientDistributedCache>>());
-            });
-
-            healthChecksBuilder.AddCheck<RedisHealthCheck>("redis");
-        }
-
         services.TryAddSingleton(TimeProvider.System);
 
-        var initialCacheOpts = configuration.GetSection(CacheOptions.SectionName).Get<CacheOptions>() ?? new CacheOptions();
-        services.AddHybridCache(options =>
-        {
-            options.DefaultEntryOptions = new HybridCacheEntryOptions
-            {
-                Expiration = TimeSpan.FromMinutes(initialCacheOpts.DefaultExpirationMinutes),
-                LocalCacheExpiration = TimeSpan.FromMinutes(initialCacheOpts.DefaultLocalExpirationMinutes)
-            };
-        });
-        services.AddSingleton<ICacheService, HybridCacheService>();
+        var healthChecksBuilder = services.AddHealthChecks();
 
+        services.AddExamPrismPersistence(configuration, healthChecksBuilder);
+        services.AddExamPrismMultiTenancy(configuration);
+        services.AddExamPrismCaching(configuration, healthChecksBuilder, out var useRedis);
         services.AddExamPrismRateLimiting(configuration, useRedis);
         services.AddExamPrismOrleans(configuration, healthChecksBuilder);
-
-        services.AddHttpContextAccessor();
-        services.AddScoped<Common.Security.IUserContext, UserContext>();
-
-        // Identity setup
-        Action<IdentityOptions> configureIdentity = options =>
-        {
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireUppercase = false;
-            options.Password.RequireNonAlphanumeric = false;
-            options.Password.RequiredLength = 6;
-            options.User.RequireUniqueEmail = true;
-        };
-
-        services.AddIdentityCore<ApplicationUser>(configureIdentity)
-            .AddRoles<IdentityRole<Guid>>()
-            .AddEntityFrameworkStores<AppDbContext>()
-            .AddDefaultTokenProviders();
-
-        services.AddIdentityCore<PlatformUser>(configureIdentity)
-            .AddRoles<PlatformRole>()
-            .AddEntityFrameworkStores<CatalogDbContext>()
-            .AddDefaultTokenProviders();
-
-        // JwtOptions & TokenService
-        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
-        services.AddScoped<ITokenService, TokenService>();
-        services.AddSingleton<JwtTenantValidator>();
-
-        // PlatformAdmin
-        services.Configure<PlatformAdminOptions>(configuration.GetSection(PlatformAdminOptions.SectionName));
-        services.AddScoped<PlatformAdminSeeder>();
-
-        var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
-            ?? throw new InvalidOperationException("Jwt configuration section is missing.");
-
-        if (string.IsNullOrWhiteSpace(jwtOptions.SecretKey) || Encoding.UTF8.GetByteCount(jwtOptions.SecretKey) < 32)
-        {
-            throw new InvalidOperationException("Jwt:SecretKey must be configured and be at least 256 bits (32 bytes).");
-        }
-
-        services.AddAuthentication(options =>
-        {
-            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        })
-        .AddJwtBearer(options =>
-        {
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = jwtOptions.Issuer,
-                ValidAudience = jwtOptions.Audience,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey)),
-                ClockSkew = TimeSpan.Zero
-            };
-
-            options.Events = new JwtBearerEvents
-            {
-                OnMessageReceived = context =>
-                {
-                    if (string.IsNullOrEmpty(context.Token) &&
-                        context.Request.Cookies.TryGetValue("access_token", out var cookieToken))
-                    {
-                        context.Token = cookieToken;
-                    }
-                    return Task.CompletedTask;
-                },
-                OnTokenValidated = context =>
-                {
-                    var validator = context.HttpContext.RequestServices.GetService<JwtTenantValidator>()
-                        ?? new JwtTenantValidator();
-                    return validator.ValidateAsync(context);
-                },
-                OnChallenge = context =>
-                {
-                    var validator = context.HttpContext.RequestServices.GetService<JwtTenantValidator>()
-                        ?? new JwtTenantValidator();
-                    return validator.HandleChallengeAsync(context);
-                }
-            };
-        });
-
-        services.AddAuthorizationBuilder()
-            .AddPolicy(PlatformRoles.PolicyName, policy =>
-                policy.RequireAuthenticatedUser()
-                      .RequireClaim(CustomClaimTypes.TokenScope, CustomClaimTypes.PlatformScopeValue)
-                      .RequireRole(PlatformRoles.SuperAdmin));
+        services.AddExamPrismIdentity(configuration);
 
         return services;
     }
