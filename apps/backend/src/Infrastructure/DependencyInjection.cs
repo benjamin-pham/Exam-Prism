@@ -3,6 +3,8 @@ namespace ExamPrism.Infrastructure;
 using Common.Exceptions;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Cors;
+using ExamPrism.Infrastructure.Health;
+using ExamPrism.Infrastructure.Http;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Localization;
 using ExamPrism.Infrastructure.Locking;
@@ -49,6 +51,8 @@ public static class DependencyInjection
 
         var healthChecksBuilder = services.AddHealthChecks();
 
+        services.AddAppReverseProxy(configuration);
+        services.AddAppHealthDrain(configuration);
         services.AddPersistence(configuration, healthChecksBuilder);
         services.AddMultiTenancy(configuration);
         services.AddCaching(configuration, healthChecksBuilder, out var useRedis);

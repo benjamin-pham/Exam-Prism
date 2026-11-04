@@ -9,6 +9,7 @@ using Common.Localization;
 using Common.MultiTenancy;
 using Common.RateLimiting;
 using ExamPrism.Infrastructure.Caching;
+using ExamPrism.Infrastructure.Http;
 using ExamPrism.Infrastructure.MultiTenancy;
 using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using Microsoft.AspNetCore.Builder;
@@ -161,6 +162,6 @@ public static class RateLimitingSetup
 
     private static string GetClientIp(HttpContext context)
     {
-        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return ReverseProxySetup.ResolveClientIp(context);
     }
 }

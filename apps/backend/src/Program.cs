@@ -1,6 +1,7 @@
 using Common.Endpoints;
 using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Cors;
+using ExamPrism.Infrastructure.Http;
 using ExamPrism.Infrastructure.Localization;
 using ExamPrism.Infrastructure.Logging;
 using ExamPrism.Infrastructure.MultiTenancy;
@@ -18,10 +19,7 @@ var app = builder.Build();
 app.UseAppLocalization();
 app.UseExceptionHandler();
 
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-});
+app.UseAppReverseProxy();
 
 app.UseRouting();
 
