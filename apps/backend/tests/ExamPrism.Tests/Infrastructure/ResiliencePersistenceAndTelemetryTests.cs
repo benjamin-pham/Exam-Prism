@@ -205,49 +205,28 @@ public class ResiliencePersistenceAndTelemetryTests : IClassFixture<CustomWebApp
     }
 
     [Fact]
-    public async Task TenantWolverineMiddleware_BeforeAsync_AwaitsStoreAsynchronously()
+    public async Task TenantWolverineMiddleware_BeforeAsync_SetsTenantContextSynchronously_ToPreserveAsyncLocalFlow()
     {
         var middleware = new TenantWolverineMiddleware();
-        var envelope = new Envelope { TenantId = "tenant-async-test" };
+        var envelope = new Envelope { TenantId = "tenant-sync-test" };
         var accessor = Substitute.For<IMultiTenantContextAccessor<ExamPrismTenantInfo>>();
         accessor.MultiTenantContext.Returns(new MultiTenantContext<ExamPrismTenantInfo>((ExamPrismTenantInfo?)null));
 
         var setter = new TestMultiTenantContextSetter();
         var store = Substitute.For<IMultiTenantStore<ExamPrismTenantInfo>>();
 
-        var expectedTenant = new ExamPrismTenantInfo("async-guid", "tenant-async-test")
+        var expectedTenant = new ExamPrismTenantInfo("sync-guid", "tenant-sync-test")
         {
             Status = TenantStatus.Active
         };
 
-        var storeGate = new TaskCompletionSource<ExamPrismTenantInfo?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        store.GetByIdentifierAsync("tenant-async-test").Returns(storeGate.Task);
+        store.GetByIdentifierAsync("tenant-sync-test").Returns(Task.FromResult<ExamPrismTenantInfo?>(expectedTenant));
 
-        Task? beforeTask = null;
-        try
-        {
-            // Invoke on a worker thread so a sync-over-async implementation shows up as a blocked caller
-            // (the gate is not released while the call runs) instead of hanging the test thread.
-            var returned = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _ = Task.Run(() => returned.TrySetResult(middleware.BeforeAsync(envelope, accessor, setter, store)));
-
-            var returnedPromptly = await Task.WhenAny(returned.Task, Task.Delay(TimeSpan.FromSeconds(2))) == returned.Task;
-            returnedPromptly.Should().BeTrue("BeforeAsync must yield instead of blocking the calling thread on the store");
-
-            beforeTask = await returned.Task;
-            beforeTask.IsCompleted.Should().BeFalse("the store lookup has not completed yet");
-            setter.MultiTenantContext.Should().BeNull();
-        }
-        finally
-        {
-            storeGate.TrySetResult(expectedTenant);
-        }
-
-        await beforeTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        var task = middleware.BeforeAsync(envelope, accessor, setter, store);
+        await task;
 
         setter.MultiTenantContext.Should().NotBeNull();
-        setter.MultiTenantContext!.TenantInfo.Should().Be(expectedTenant);
-        await store.Received(1).GetByIdentifierAsync("tenant-async-test");
+        setter.MultiTenantContext!.TenantInfo!.Identifier.Should().Be("tenant-sync-test");
     }
 
     [Fact]

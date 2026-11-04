@@ -13,7 +13,7 @@ public sealed class TenantWolverineMiddleware
     private IMultiTenantContextSetter? _setter;
     private IDisposable? _logContextToken;
 
-    public async Task BeforeAsync(
+    public Task BeforeAsync(
         Envelope envelope,
         IMultiTenantContextAccessor<ExamPrismTenantInfo> accessor,
         IMultiTenantContextSetter setter,
@@ -27,7 +27,7 @@ public sealed class TenantWolverineMiddleware
         if (string.IsNullOrWhiteSpace(envelope.TenantId) ||
             string.Equals(envelope.TenantId, "*DEFAULT*", StringComparison.OrdinalIgnoreCase))
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var currentTenant = accessor.MultiTenantContext?.TenantInfo;
@@ -42,18 +42,20 @@ public sealed class TenantWolverineMiddleware
 
             _logContextToken?.Dispose();
             _logContextToken = LogContext.PushProperty("TenantId", ResolveTenantLogProperty(currentTenant, envelope.TenantId));
-            return;
+            return Task.CompletedTask;
         }
 
         ExamPrismTenantInfo? tenantInfo = null;
         if (Guid.TryParse(envelope.TenantId, out var tenantGuid))
         {
-            tenantInfo = await store.GetAsync(tenantGuid.ToString("D"));
+            var task = store.GetAsync(tenantGuid.ToString("D"));
+            tenantInfo = task.IsCompletedSuccessfully ? task.Result : task.GetAwaiter().GetResult();
         }
 
         if (tenantInfo is null)
         {
-            tenantInfo = await store.GetByIdentifierAsync(envelope.TenantId.ToLowerInvariant());
+            var task = store.GetByIdentifierAsync(envelope.TenantId.ToLowerInvariant());
+            tenantInfo = task.IsCompletedSuccessfully ? task.Result : task.GetAwaiter().GetResult();
         }
 
         if (tenantInfo is null || tenantInfo.Status != TenantStatus.Active)
@@ -68,6 +70,8 @@ public sealed class TenantWolverineMiddleware
 
         _logContextToken?.Dispose();
         _logContextToken = LogContext.PushProperty("TenantId", ResolveTenantLogProperty(tenantInfo, envelope.TenantId));
+
+        return Task.CompletedTask;
     }
 
     public void Finally(IMultiTenantContextSetter? setter = null)
