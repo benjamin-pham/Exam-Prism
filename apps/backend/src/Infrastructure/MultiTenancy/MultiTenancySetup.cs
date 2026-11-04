@@ -33,6 +33,9 @@ public static class MultiTenancySetup
                 .RetryWithCooldown(TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(250));
             opts.Policies.OnException<TimeoutException>()
                 .RetryWithCooldown(TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(150));
+
+            opts.LocalQueue("critical").MaximumParallelMessages(Math.Max(4, Environment.ProcessorCount * 4));
+            opts.LocalQueue("background").MaximumParallelMessages(Math.Max(2, Environment.ProcessorCount));
         });
     }
 

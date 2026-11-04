@@ -25,6 +25,10 @@ public sealed class TenantDatabasePoolOptions
     public int ConnectionPruningIntervalSeconds { get; set; } = 10;
     public bool NoResetOnClose { get; set; } = true;
     public int KeepAliveSeconds { get; set; } = 30;
+    public int MaxAutoPrepare { get; set; } = 32;
+    public int AutoPrepareMinUsages { get; set; } = 2;
+    public int MaxCachedTenantDataSources { get; set; } = 500;
+    public int DataSourceIdleEvictionMinutes { get; set; } = 30;
 }
 
 public sealed class TenantProvisioningOptions

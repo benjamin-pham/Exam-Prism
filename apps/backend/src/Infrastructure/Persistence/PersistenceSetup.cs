@@ -1,14 +1,15 @@
 namespace ExamPrism.Infrastructure.Persistence;
 
+using System;
 using Common.MultiTenancy;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure;
 
 public static class PersistenceSetup
 {
@@ -19,6 +20,8 @@ public static class PersistenceSetup
     {
         services.Configure<PersistenceOptions>(configuration.GetSection(PersistenceOptions.SectionName));
         services.AddSingleton<SlowQueryTelemetryInterceptor>();
+        services.AddSingleton<TenantDataSourceRegistry>();
+        services.AddHostedService(sp => sp.GetRequiredService<TenantDataSourceRegistry>());
 
         var catalogConnection = configuration.GetConnectionString("CatalogConnection")
             ?? throw new InvalidOperationException("Connection string 'CatalogConnection' not found.");
@@ -45,12 +48,73 @@ public static class PersistenceSetup
             }
 
             var normalizer = sp.GetRequiredService<ITenantConnectionStringNormalizer>();
+            var registry = sp.GetRequiredService<TenantDataSourceRegistry>();
             var persistenceOptions = sp.GetRequiredService<IOptions<PersistenceOptions>>().Value;
             var interceptor = sp.GetRequiredService<SlowQueryTelemetryInterceptor>();
 
+            var normalized = normalizer.Normalize(tenantInfo.ConnectionString);
+            var dataSource = registry.GetOrCreate(normalized);
+
             options.AddInterceptors(interceptor);
-            options.UseNpgsql(normalizer.Normalize(tenantInfo.ConnectionString), npgsqlOptions =>
+            options.UseNpgsql(dataSource, npgsqlOptions =>
                 ConfigureNpgsql(npgsqlOptions, persistenceOptions));
+        });
+
+        services.AddScoped<ReadOnlyCatalogDbContext>(sp =>
+        {
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var persistenceOptions = sp.GetRequiredService<IOptions<PersistenceOptions>>().Value;
+            var interceptor = sp.GetRequiredService<SlowQueryTelemetryInterceptor>();
+            var registry = sp.GetRequiredService<TenantDataSourceRegistry>();
+            var normalizer = sp.GetService<ITenantConnectionStringNormalizer>();
+
+            var defaultConnection = configuration.GetConnectionString("CatalogConnection")
+                ?? throw new InvalidOperationException("Connection string 'CatalogConnection' not found.");
+
+            var readConnection = !string.IsNullOrWhiteSpace(persistenceOptions.CatalogReadConnection)
+                ? persistenceOptions.CatalogReadConnection
+                : defaultConnection;
+
+            var normalized = normalizer != null ? normalizer.Normalize(readConnection) : readConnection;
+            var dataSource = registry.GetOrCreate(normalized);
+
+            var builder = new DbContextOptionsBuilder<CatalogDbContext>();
+            builder.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+            builder.AddInterceptors(interceptor);
+            builder.UseNpgsql(dataSource, npgsqlOptions =>
+                ConfigureNpgsql(npgsqlOptions, persistenceOptions));
+
+            var inner = new CatalogDbContext(builder.Options);
+            return new ReadOnlyCatalogDbContext(inner);
+        });
+
+        services.AddScoped<ReadOnlyAppDbContext>(sp =>
+        {
+            var tenantInfo = sp.GetRequiredService<IMultiTenantContextAccessor<ExamPrismTenantInfo>>()
+                .MultiTenantContext?.TenantInfo;
+
+            if (tenantInfo is null || tenantInfo.Status != TenantStatus.Active || string.IsNullOrWhiteSpace(tenantInfo.ConnectionString))
+            {
+                throw new InvalidOperationException(
+                    "An active tenant context with a valid connection string is required to resolve ReadOnlyAppDbContext.");
+            }
+
+            var normalizer = sp.GetRequiredService<ITenantConnectionStringNormalizer>();
+            var registry = sp.GetRequiredService<TenantDataSourceRegistry>();
+            var persistenceOptions = sp.GetRequiredService<IOptions<PersistenceOptions>>().Value;
+            var interceptor = sp.GetRequiredService<SlowQueryTelemetryInterceptor>();
+
+            var normalized = normalizer.NormalizeForReadReplica(tenantInfo.ConnectionString, persistenceOptions.TenantReadReplicaHost);
+            var dataSource = registry.GetOrCreate(normalized);
+
+            var builder = new DbContextOptionsBuilder<AppDbContext>();
+            builder.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+            builder.AddInterceptors(interceptor);
+            builder.UseNpgsql(dataSource, npgsqlOptions =>
+                ConfigureNpgsql(npgsqlOptions, persistenceOptions));
+
+            var inner = new AppDbContext(builder.Options);
+            return new ReadOnlyAppDbContext(inner);
         });
 
         healthChecksBuilder.AddDbContextCheck<CatalogDbContext>(name: "catalog_db");

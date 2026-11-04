@@ -25,6 +25,12 @@ public sealed class TenantConnectionStringNormalizer(IOptions<MultiTenancyOption
             KeepAlive = pool.KeepAliveSeconds
         };
 
+        if (pool.MaxAutoPrepare > 0)
+        {
+            builder.MaxAutoPrepare = pool.MaxAutoPrepare;
+            builder.AutoPrepareMinUsages = Math.Max(1, pool.AutoPrepareMinUsages);
+        }
+
         return builder.ConnectionString;
     }
 
