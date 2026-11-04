@@ -442,7 +442,7 @@ public class CrossCuttingTenantIsolationUnitTests
         builder.Configuration["Cache:KeyPrefix"] = "examprism:";
 
         builder.Services.AddMultiTenant<ExamPrismTenantInfo>();
-        builder.Services.AddExamPrismRateLimiting(builder.Configuration, useRedis: false);
+        builder.Services.AddRateLimiting(builder.Configuration, useRedis: false);
 
         var app = builder.Build();
         app.UseMultiTenant();

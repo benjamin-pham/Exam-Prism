@@ -7,15 +7,16 @@ using Microsoft.Extensions.Hosting;
 
 public static class CorsSetup
 {
-    public const string DevCorsPolicyName = "DevSubdomainCors";
+    public const string PolicyName = "DevSubdomainCors";
+    public const string DevCorsPolicyName = PolicyName;
 
-    public static IServiceCollection AddExamPrismCors(this IServiceCollection services, IHostEnvironment environment)
+    public static IServiceCollection AddAppCors(this IServiceCollection services, IHostEnvironment environment)
     {
         if (environment.IsDevelopment())
         {
             services.AddCors(options =>
             {
-                options.AddPolicy(DevCorsPolicyName, policy =>
+                options.AddPolicy(PolicyName, policy =>
                 {
                     policy.SetIsOriginAllowed(origin =>
                     {
@@ -38,20 +39,19 @@ public static class CorsSetup
         return services;
     }
 
-    public static IApplicationBuilder UseExamPrismCors(this IApplicationBuilder app)
+    public static IApplicationBuilder UseAppCors(this IApplicationBuilder app)
     {
         var environment = app.ApplicationServices.GetRequiredService<IHostEnvironment>();
-        return app.UseExamPrismCors(environment);
+        return app.UseAppCors(environment);
     }
 
-    public static IApplicationBuilder UseExamPrismCors(this IApplicationBuilder app, IHostEnvironment environment)
+    public static IApplicationBuilder UseAppCors(this IApplicationBuilder app, IHostEnvironment environment)
     {
         if (environment.IsDevelopment())
         {
-            app.UseCors(DevCorsPolicyName);
+            app.UseCors(PolicyName);
         }
 
         return app;
     }
 }
-

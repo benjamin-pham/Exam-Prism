@@ -7,7 +7,7 @@ public static class LocalizationSetup
 {
     public static readonly IReadOnlyList<string> SupportedCultures = ["vi-VN", "vi", "en-US", "en"];
 
-    public static IServiceCollection AddExamPrismLocalization(this IServiceCollection services)
+    public static IServiceCollection AddAppLocalization(this IServiceCollection services)
     {
         services.AddLocalization(options => options.ResourcesPath = "Common/Localization/Resources");
 
@@ -21,9 +21,8 @@ public static class LocalizationSetup
         return services;
     }
 
-    public static IApplicationBuilder UseExamPrismLocalization(this IApplicationBuilder app)
+    public static IApplicationBuilder UseAppLocalization(this IApplicationBuilder app)
     {
         return app.UseRequestLocalization();
     }
 }
-

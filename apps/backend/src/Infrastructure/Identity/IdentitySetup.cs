@@ -15,7 +15,7 @@ using Microsoft.IdentityModel.Tokens;
 
 public static class IdentitySetup
 {
-    public static IServiceCollection AddExamPrismIdentity(
+    public static IServiceCollection AddIdentity(
         this IServiceCollection services,
         IConfiguration configuration)
     {
@@ -114,7 +114,7 @@ public static class IdentitySetup
         return services;
     }
 
-    public static async Task InitializeExamPrismIdentityAsync(
+    public static async Task InitializeIdentityAsync(
         this WebApplication app,
         CancellationToken cancellationToken = default)
     {

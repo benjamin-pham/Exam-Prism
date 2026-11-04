@@ -411,16 +411,16 @@ public class DependencyInjectionTests
         settings["MultiTenancy:FleetMigration:MigrateOnStartup"] = "true";
         builder.Configuration.AddInMemoryCollection(settings);
 
-        builder.Host.UseExamPrismLogging();
-        builder.Host.UseExamPrismWolverine();
+        builder.Host.UseLogging();
+        builder.Host.UseWolverine();
 
         var healthChecksBuilder = builder.Services.AddHealthChecks();
-        builder.Services.AddExamPrismCors(builder.Environment);
-        builder.Services.AddExamPrismLocalization();
-        builder.Services.AddExamPrismPersistence(builder.Configuration, healthChecksBuilder);
-        builder.Services.AddExamPrismMultiTenancy(builder.Configuration);
-        builder.Services.AddExamPrismCaching(builder.Configuration, healthChecksBuilder, out var useRedis);
-        builder.Services.AddExamPrismIdentity(builder.Configuration);
+        builder.Services.AddAppCors(builder.Environment);
+        builder.Services.AddAppLocalization();
+        builder.Services.AddPersistence(builder.Configuration, healthChecksBuilder);
+        builder.Services.AddMultiTenancy(builder.Configuration);
+        builder.Services.AddCaching(builder.Configuration, healthChecksBuilder, out var useRedis);
+        builder.Services.AddIdentity(builder.Configuration);
 
         useRedis.Should().BeFalse();
 
@@ -428,10 +428,10 @@ public class DependencyInjectionTests
         builder.Services.AddScoped(_ => fleetMigrator);
 
         await using var app = builder.Build();
-        app.UseExamPrismCors();
-        app.UseExamPrismLocalization();
-        await app.InitializeExamPrismIdentityAsync();
-        await app.InitializeExamPrismMultiTenancyAsync();
+        app.UseAppCors();
+        app.UseAppLocalization();
+        await app.InitializeIdentityAsync();
+        await app.InitializeMultiTenancyAsync();
 
         await fleetMigrator.Received(1).MigrateAllActiveTenantsAsync(Arg.Any<CancellationToken>());
     }

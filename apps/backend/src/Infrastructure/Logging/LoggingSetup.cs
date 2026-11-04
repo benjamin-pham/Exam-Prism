@@ -5,7 +5,7 @@ using Serilog;
 
 public static class LoggingSetup
 {
-    public static IHostBuilder UseExamPrismLogging(this IHostBuilder hostBuilder)
+    public static IHostBuilder UseLogging(this IHostBuilder hostBuilder)
     {
         return hostBuilder.UseSerilog((context, services, configuration) =>
         {

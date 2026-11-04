@@ -15,7 +15,7 @@ builder.AddInfrastructure();
 
 var app = builder.Build();
 
-app.UseExamPrismLocalization();
+app.UseAppLocalization();
 app.UseExceptionHandler();
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
@@ -30,7 +30,7 @@ app.UseSerilogRequestLogging(options =>
     options.EnrichDiagnosticContext = LogEnrichmentMiddlewareExtensions.EnrichDiagnosticContext;
 });
 
-app.UseExamPrismCors();
+app.UseAppCors();
 
 app.UseMultiTenant();
 app.UseMiddleware<TenantAccessGuardMiddleware>();
@@ -42,7 +42,7 @@ app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapExamPrismOpenApi();
+    app.MapAppOpenApi();
 }
 
 app.MapEndpoints();

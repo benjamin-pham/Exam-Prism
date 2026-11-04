@@ -24,14 +24,14 @@ public static class DependencyInjection
 
     public static WebApplicationBuilder AddInfrastructure(this WebApplicationBuilder builder)
     {
-        builder.Services.AddExamPrismCors(builder.Environment);
+        builder.Services.AddAppCors(builder.Environment);
 
-        builder.Host.UseExamPrismLogging();
-        builder.Host.UseExamPrismWolverine();
-        builder.Host.UseExamPrismOrleans();
+        builder.Host.UseLogging();
+        builder.Host.UseWolverine();
+        builder.Host.UseOrleans();
 
-        builder.Services.AddExamPrismOpenApi();
-        builder.Services.AddExamPrismLocalization();
+        builder.Services.AddAppOpenApi();
+        builder.Services.AddAppLocalization();
         builder.Services.AddInfrastructure(builder.Configuration);
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -48,12 +48,12 @@ public static class DependencyInjection
 
         var healthChecksBuilder = services.AddHealthChecks();
 
-        services.AddExamPrismPersistence(configuration, healthChecksBuilder);
-        services.AddExamPrismMultiTenancy(configuration);
-        services.AddExamPrismCaching(configuration, healthChecksBuilder, out var useRedis);
-        services.AddExamPrismRateLimiting(configuration, useRedis);
-        services.AddExamPrismOrleans(configuration, healthChecksBuilder);
-        services.AddExamPrismIdentity(configuration);
+        services.AddPersistence(configuration, healthChecksBuilder);
+        services.AddMultiTenancy(configuration);
+        services.AddCaching(configuration, healthChecksBuilder, out var useRedis);
+        services.AddRateLimiting(configuration, useRedis);
+        services.AddOrleans(configuration, healthChecksBuilder);
+        services.AddIdentity(configuration);
 
         return services;
     }

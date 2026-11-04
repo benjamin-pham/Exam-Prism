@@ -24,7 +24,7 @@ using StackExchange.Redis;
 
 public static class RateLimitingSetup
 {
-    public static IServiceCollection AddExamPrismRateLimiting(
+    public static IServiceCollection AddRateLimiting(
         this IServiceCollection services,
         IConfiguration configuration,
         bool useRedis)

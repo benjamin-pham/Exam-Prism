@@ -8,7 +8,7 @@ using Scalar.AspNetCore;
 
 public static class OpenApiSetup
 {
-    public static IServiceCollection AddExamPrismOpenApi(this IServiceCollection services)
+    public static IServiceCollection AddAppOpenApi(this IServiceCollection services)
     {
         services.AddOpenApi(options =>
         {
@@ -69,7 +69,7 @@ public static class OpenApiSetup
         return services;
     }
 
-    public static IEndpointRouteBuilder MapExamPrismOpenApi(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapAppOpenApi(this IEndpointRouteBuilder app)
     {
         app.MapOpenApi();
         app.MapScalarApiReference(options =>

@@ -73,7 +73,7 @@ public static class OrleansSetup
         return (siloPort, gatewayPort);
     }
 
-    public static IHostBuilder UseExamPrismOrleans(this IHostBuilder hostBuilder)
+    public static IHostBuilder UseOrleans(this IHostBuilder hostBuilder)
     {
         return hostBuilder.UseOrleans((context, siloBuilder) =>
         {
@@ -159,7 +159,7 @@ public static class OrleansSetup
         });
     }
 
-    public static IServiceCollection AddExamPrismOrleans(
+    public static IServiceCollection AddOrleans(
         this IServiceCollection services,
         IConfiguration configuration,
         IHealthChecksBuilder healthChecksBuilder)

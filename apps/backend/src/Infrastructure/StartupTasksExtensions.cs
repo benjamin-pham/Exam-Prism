@@ -8,7 +8,7 @@ public static class StartupTasksExtensions
 {
     public static async Task InitializeInfrastructureAsync(this WebApplication app, CancellationToken cancellationToken = default)
     {
-        await app.InitializeExamPrismIdentityAsync(cancellationToken);
-        await app.InitializeExamPrismMultiTenancyAsync(cancellationToken);
+        await app.InitializeIdentityAsync(cancellationToken);
+        await app.InitializeMultiTenancyAsync(cancellationToken);
     }
 }

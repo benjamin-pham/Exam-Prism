@@ -12,15 +12,15 @@ using StackExchange.Redis;
 
 public static class CachingSetup
 {
-    public static IServiceCollection AddExamPrismCaching(
+    public static IServiceCollection AddCaching(
         this IServiceCollection services,
         IConfiguration configuration,
         IHealthChecksBuilder healthChecksBuilder)
     {
-        return services.AddExamPrismCaching(configuration, healthChecksBuilder, out _);
+        return services.AddCaching(configuration, healthChecksBuilder, out _);
     }
 
-    public static IServiceCollection AddExamPrismCaching(
+    public static IServiceCollection AddCaching(
         this IServiceCollection services,
         IConfiguration configuration,
         IHealthChecksBuilder healthChecksBuilder,

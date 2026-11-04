@@ -17,7 +17,7 @@ using Wolverine.FluentValidation;
 
 public static class MultiTenancySetup
 {
-    public static IHostBuilder UseExamPrismWolverine(this IHostBuilder hostBuilder)
+    public static IHostBuilder UseWolverine(this IHostBuilder hostBuilder)
     {
         return hostBuilder.UseWolverine(opts =>
         {
@@ -27,7 +27,7 @@ public static class MultiTenancySetup
         });
     }
 
-    public static IServiceCollection AddExamPrismMultiTenancy(
+    public static IServiceCollection AddMultiTenancy(
         this IServiceCollection services,
         IConfiguration configuration)
     {
@@ -81,7 +81,7 @@ public static class MultiTenancySetup
         return services;
     }
 
-    public static async Task InitializeExamPrismMultiTenancyAsync(
+    public static async Task InitializeMultiTenancyAsync(
         this WebApplication app,
         CancellationToken cancellationToken = default)
     {
