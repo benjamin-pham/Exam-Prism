@@ -52,7 +52,7 @@
   - `ExamPrism.Infrastructure.Orleans.OrleansOptions` (`SectionName = "Orleans"`, `DefaultStateStoreName = "Default"`, `ClusterId`, `ServiceId`, `StateStoreName`, `SiloPort`, `GatewayPort`)
   - `ExamPrism.Infrastructure.Orleans.TenantGrainFactory(IGrainFactory grainFactory, ITenantContext tenantContext) : ITenantGrainFactory`
 
-- [ ] **Step 1: Add Orleans NuGet package versions and references**
+- [x] **Step 1: Add Orleans NuGet package versions and references**
 
 In `apps/backend/Directory.Packages.props` under `<!-- API Dependencies -->`, add:
 ```xml
@@ -63,7 +63,7 @@ In `apps/backend/Directory.Packages.props` under `<!-- API Dependencies -->`, ad
 ```
 In `apps/backend/src/ExamPrism.csproj`, add `<PackageReference>` entries for those four packages.
 
-- [ ] **Step 2: Write failing unit tests for `TenantGrainKey` and `TenantGrainFactory` in `apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansFoundationUnitTests.cs`**
+- [x] **Step 2: Write failing unit tests for `TenantGrainKey` and `TenantGrainFactory` in `apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansFoundationUnitTests.cs`**
 
 Create `OrleansFoundationUnitTests` (`namespace Tests.Infrastructure.Orleans`) with tests:
 - `TenantGrainKey_FormatAndParse_RoundTripsGuidAndCompositeEntityKeyWithColons`: formats `tenantId = Guid.Parse("11111111-2222-3333-4444-555555555555")` and `entityKey = "exam-10:attempt-20"`, asserts formatted string is `"11111111-2222-3333-4444-555555555555:exam-10:attempt-20"`, and `TenantGrainKey.Parse` / `TryParse` extracts both `TenantId` and `"exam-10:attempt-20"`.
@@ -72,24 +72,24 @@ Create `OrleansFoundationUnitTests` (`namespace Tests.Infrastructure.Orleans`) w
 - `TenantGrainFactory_GetGrain_WithoutActiveTenant_ThrowsInvalidOperationException`: mocks `ITenantContext` (`HasTenant = false`, `TenantId = null`), asserts `factory.GetGrain<IDummyTenantGrain>("attempt-1")` throws `InvalidOperationException` with message `"*active tenant context*"`.
 - `TenantGrainFactory_GetGrainForTenant_ResolvesWithExplicitTenantIdEvenWhenAmbientTenantAbsent`: mocks `ITenantContext` (`HasTenant = false`), calls `factory.GetGrainForTenant<IDummyTenantGrain>(tenantId, Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"))`, asserts compound key is `$"{tenantId:D}:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"`.
 
-- [ ] **Step 3: Run `OrleansFoundationUnitTests` to verify compilation failure**
+- [x] **Step 3: Run `OrleansFoundationUnitTests` to verify compilation failure**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~OrleansFoundationUnitTests"`
 Expected: FAIL (`OrleansTenantConstants`, `ITenantScopedGrain`, `TenantGrainKey`, `ITenantGrainFactory`, and `TenantGrainFactory` do not exist yet).
 
-- [ ] **Step 4: Implement `Common.Orleans` contracts, `OrleansOptions`, and `TenantGrainFactory`**
+- [x] **Step 4: Implement `Common.Orleans` contracts, `OrleansOptions`, and `TenantGrainFactory`**
 
 - Create `apps/backend/src/Common/Orleans/OrleansTenantConstants.cs`, `ITenantScopedGrain.cs`, `TenantGrainKey.cs`, and `ITenantGrainFactory.cs` per Spec §3.1–§3.4.
 - In `TenantGrainKey.TryParse(string? compoundKey, out TenantGrainKey result)`: find first `':'` via `compoundKey.IndexOf(':')`; validate `colonIndex == 36`, `Guid.TryParseExact(compoundKey.AsSpan(0, 36), "D", out var tenantId)` with `tenantId != Guid.Empty`, and `var entityKey = compoundKey[(colonIndex + 1)..].Trim()` is non-empty.
 - Create `apps/backend/src/Infrastructure/Orleans/OrleansOptions.cs` per Spec §2.3 (`ClusterId = "examprism-cluster"`, `ServiceId = "examprism-service"`, `StateStoreName = "Default"`, `SiloPort = 11111`, `GatewayPort = 30000`).
 - Create `apps/backend/src/Infrastructure/Orleans/TenantGrainFactory.cs` per Spec §4.1.
 
-- [ ] **Step 5: Run `OrleansFoundationUnitTests` to verify all tests pass**
+- [x] **Step 5: Run `OrleansFoundationUnitTests` to verify all tests pass**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~OrleansFoundationUnitTests"`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/backend/Directory.Packages.props apps/backend/src/ExamPrism.csproj apps/backend/src/Common/Orleans apps/backend/src/Infrastructure/Orleans/OrleansOptions.cs apps/backend/src/Infrastructure/Orleans/TenantGrainFactory.cs apps/backend/tests/ExamPrism.Tests/Infrastructure/Orleans/OrleansFoundationUnitTests.cs
