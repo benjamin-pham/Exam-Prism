@@ -39,6 +39,7 @@ public sealed class TenantAccessGuardMiddleware
                 return;
 
             case HostResolutionKind.InvalidTenantHost:
+                await RecordStrikeIfReputationServiceAvailableAsync(context);
                 await TenantProblemResults.WriteTenantNotFoundAsync(context);
                 return;
 
@@ -47,6 +48,7 @@ public sealed class TenantAccessGuardMiddleware
                 if (tenantInfo is null)
                 {
                     ClearTenantContext(context);
+                    await RecordStrikeIfReputationServiceAvailableAsync(context);
                     await TenantProblemResults.WriteTenantNotFoundAsync(context);
                     return;
                 }
@@ -96,6 +98,16 @@ public sealed class TenantAccessGuardMiddleware
         }
 
         context.Items[typeof(IMultiTenantContext)] = emptyContext;
+    }
+
+    private static async ValueTask RecordStrikeIfReputationServiceAvailableAsync(HttpContext context)
+    {
+        var reputationService = context.RequestServices.GetService<Common.Security.IIpReputationService>();
+        if (reputationService is not null)
+        {
+            var clientIp = Http.ReverseProxySetup.ResolveClientIp(context);
+            await reputationService.RecordStrikeAsync(clientIp, Common.Security.IpStrikeReason.UnknownTenantProbe, cancellationToken: context.RequestAborted);
+        }
     }
 }
 

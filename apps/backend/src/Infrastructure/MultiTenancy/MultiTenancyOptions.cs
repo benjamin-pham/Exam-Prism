@@ -11,6 +11,8 @@ public sealed class MultiTenancyOptions
     public int CatalogCacheExpirationMinutes { get; set; } = 30;
     public int CatalogLocalCacheExpirationMinutes { get; set; } = 5;
     public int NotFoundCacheExpirationSeconds { get; set; } = 30;
+    public int MaxNegativeCacheEntries { get; set; } = 2000;
+    public int MaxCatalogDbMissesPerSecond { get; set; } = 50;
     public int ProvisioningRetryAfterSeconds { get; set; } = 5;
     public TenantDatabasePoolOptions DatabasePool { get; set; } = new();
     public TenantProvisioningOptions Provisioning { get; set; } = new();

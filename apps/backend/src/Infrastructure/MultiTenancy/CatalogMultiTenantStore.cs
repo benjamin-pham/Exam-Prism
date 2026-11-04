@@ -1,7 +1,14 @@
 namespace ExamPrism.Infrastructure.MultiTenancy;
 
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Common.Caching;
 using Common.MultiTenancy;
+using Common.Telemetry;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -27,19 +34,26 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
     private readonly ICacheBackplane _backplane;
     private readonly IConnectionStringProtector _protector;
     private readonly MultiTenancyOptions _options;
+    private readonly TimeProvider _timeProvider;
+
+    private readonly ConcurrentDictionary<string, long> _negativeCache = new(StringComparer.OrdinalIgnoreCase);
+    private long _missWindowSecond;
+    private int _missCountInSecond;
 
     public CatalogMultiTenantStore(
         CatalogDbContext db,
         HybridCache hybridCache,
         IConnectionStringProtector protector,
         IOptions<MultiTenancyOptions> options,
-        ICacheBackplane? backplane = null)
+        ICacheBackplane? backplane = null,
+        TimeProvider? timeProvider = null)
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
         _hybridCache = hybridCache ?? throw new ArgumentNullException(nameof(hybridCache));
         _protector = protector ?? throw new ArgumentNullException(nameof(protector));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _backplane = backplane ?? new NoOpCacheBackplane();
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     private static SemaphoreSlim GetStripe(string key)
@@ -60,6 +74,59 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         return TimeSpan.FromMinutes(minutes * jitterFactor);
     }
 
+    private bool IsNegativelyCached(string key)
+    {
+        if (_negativeCache.TryGetValue(key, out var expiresAt))
+        {
+            var nowMs = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
+            if (nowMs < expiresAt)
+            {
+                return true;
+            }
+
+            _negativeCache.TryRemove(key, out _);
+        }
+
+        return false;
+    }
+
+    private void RecordNegativeCache(string key, TimeSpan ttl)
+    {
+        var nowMs = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
+        var expiresAt = nowMs + Math.Max(1000L, (long)ttl.TotalMilliseconds);
+        _negativeCache[key] = expiresAt;
+
+        if (_negativeCache.Count > _options.MaxNegativeCacheEntries)
+        {
+            foreach (var kvp in _negativeCache)
+            {
+                if (nowMs >= kvp.Value)
+                {
+                    _negativeCache.TryRemove(kvp.Key, out _);
+                }
+            }
+        }
+    }
+
+    private bool TryAcquireCatalogDbMissPermit()
+    {
+        if (_options.MaxCatalogDbMissesPerSecond <= 0)
+        {
+            return true;
+        }
+
+        var currentSecond = _timeProvider.GetUtcNow().ToUnixTimeSeconds();
+        var windowSec = Volatile.Read(ref _missWindowSecond);
+        if (windowSec != currentSecond)
+        {
+            Interlocked.Exchange(ref _missWindowSecond, currentSecond);
+            Interlocked.Exchange(ref _missCountInSecond, 0);
+        }
+
+        var count = Interlocked.Increment(ref _missCountInSecond);
+        return count <= _options.MaxCatalogDbMissesPerSecond;
+    }
+
     public async Task<ExamPrismTenantInfo?> GetByIdentifierAsync(string identifier)
     {
         if (string.IsNullOrWhiteSpace(identifier))
@@ -68,7 +135,19 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         }
 
         var slug = identifier.Trim().ToLowerInvariant();
+
+        // 1. Zero-allocation format pre-filter: invalid slugs skip cache and DB entirely
+        if (!TenantSlugValidator.IsValidFormat(slug))
+        {
+            return null;
+        }
+
         var key = $"catalog:tenant:slug:{slug}";
+
+        if (IsNegativelyCached(key))
+        {
+            return null;
+        }
 
         var cached = await GetCacheEntryOrDefaultAsync(key);
         if (cached is not null)
@@ -80,10 +159,21 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         await stripe.WaitAsync();
         try
         {
+            if (IsNegativelyCached(key))
+            {
+                return null;
+            }
+
             cached = await GetCacheEntryOrDefaultAsync(key);
             if (cached is not null)
             {
                 return MapToTenantInfo(cached);
+            }
+
+            if (!TryAcquireCatalogDbMissPermit())
+            {
+                ExamPrismDiagnostics.RecordTenantCatalogShieldRejection();
+                return null;
             }
 
             var row = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug);
@@ -100,8 +190,11 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
                 var notFoundOptions = new HybridCacheEntryOptions
                 {
                     Expiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds),
-                    LocalCacheExpiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds)
+                    LocalCacheExpiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds),
+                    Flags = HybridCacheEntryFlags.DisableDistributedCacheWrite // Never pollute Redis L2 on negative misses
                 };
+
+                RecordNegativeCache(key, TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds));
 
                 await _hybridCache.SetAsync(
                     key,
@@ -147,6 +240,11 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
 
         var key = $"catalog:tenant:id:{guid:D}";
 
+        if (IsNegativelyCached(key))
+        {
+            return null;
+        }
+
         var cached = await GetCacheEntryOrDefaultAsync(key);
         if (cached is not null)
         {
@@ -157,10 +255,21 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         await stripe.WaitAsync();
         try
         {
+            if (IsNegativelyCached(key))
+            {
+                return null;
+            }
+
             cached = await GetCacheEntryOrDefaultAsync(key);
             if (cached is not null)
             {
                 return MapToTenantInfo(cached);
+            }
+
+            if (!TryAcquireCatalogDbMissPermit())
+            {
+                ExamPrismDiagnostics.RecordTenantCatalogShieldRejection();
+                return null;
             }
 
             var row = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == guid);
@@ -177,8 +286,11 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
                 var notFoundOptions = new HybridCacheEntryOptions
                 {
                     Expiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds),
-                    LocalCacheExpiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds)
+                    LocalCacheExpiration = TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds),
+                    Flags = HybridCacheEntryFlags.DisableDistributedCacheWrite
                 };
+
+                RecordNegativeCache(key, TimeSpan.FromSeconds(_options.NotFoundCacheExpirationSeconds));
 
                 await _hybridCache.SetAsync(
                     key,
@@ -353,6 +465,7 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
 
         foreach (var key in keys)
         {
+            _negativeCache.TryRemove(key, out _);
             await _hybridCache.RemoveAsync(key, ct);
             await _backplane.PublishKeyInvalidationAsync(key, ct);
         }

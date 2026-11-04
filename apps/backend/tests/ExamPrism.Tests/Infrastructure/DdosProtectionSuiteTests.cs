@@ -1,24 +1,36 @@
 namespace ExamPrism.Tests.Infrastructure;
 
+using System.Collections.Concurrent;
+using System.Data;
+using System.Data.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.IO;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
+using Common.MultiTenancy;
 using Common.Security;
 using Common.Telemetry;
 using ExamPrism.Infrastructure.Http;
 using ExamPrism.Infrastructure.Identity;
+using ExamPrism.Infrastructure.MultiTenancy;
+using ExamPrism.Infrastructure.Persistence.Catalog;
 using ExamPrism.Infrastructure.Security;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.Tokens;
+using NSubstitute;
 using Xunit;
 
 public class DdosProtectionSuiteTests
@@ -222,6 +234,155 @@ public class DdosProtectionSuiteTests
         var isBanned = await reputationService.GetBanRemainingAsync(attackerIp);
         isBanned.Should().NotBeNull();
         isBanned!.Value.TotalSeconds.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task CatalogMultiTenantStore_RejectsInvalidSlugWithoutCacheOrDb_KeepsNegativeCacheOutOfDistributedCache_AndEnforcesDbMissBudget()
+    {
+        ExamPrismDiagnostics.ResetForTesting();
+
+        var recordingCache = new RecordingDistributedCache();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IDistributedCache>(recordingCache);
+        services.AddHybridCache();
+        var sp = services.BuildServiceProvider();
+        var hybridCache = sp.GetRequiredService<HybridCache>();
+
+        var protector = Substitute.For<IConnectionStringProtector>();
+        var interceptor = new EmptyQueryCountingInterceptor();
+        var connInterceptor = new SuppressConnectionInterceptor();
+
+        var dbOptions = new DbContextOptionsBuilder<CatalogDbContext>()
+            .UseNpgsql("Host=localhost;Database=dummy_test;Username=dummy;Password=dummy")
+            .AddInterceptors(connInterceptor, interceptor)
+            .Options;
+
+        await using var db = new CatalogDbContext(dbOptions);
+
+        var mtOptions = Options.Create(new MultiTenancyOptions
+        {
+            CatalogCacheExpirationMinutes = 30,
+            CatalogLocalCacheExpirationMinutes = 5,
+            NotFoundCacheExpirationSeconds = 30,
+            MaxNegativeCacheEntries = 100,
+            MaxCatalogDbMissesPerSecond = 5
+        });
+
+        var store = new CatalogMultiTenantStore(db, hybridCache, protector, mtOptions);
+
+        // 1. Invalid slug format rejects immediately with 0 DB queries and 0 cache writes
+        var resInvalid1 = await store.GetByIdentifierAsync("INVALID_SLUG_$$$");
+        var resInvalid2 = await store.GetByIdentifierAsync("-bad-slug-");
+        resInvalid1.Should().BeNull();
+        resInvalid2.Should().BeNull();
+        interceptor.ExecutedSelectCount.Should().Be(0);
+        recordingCache.Entries.Should().BeEmpty();
+
+        // 2. Cold miss on valid slug queries DB once, caches in L1, and keeps negative cache out of Redis L2
+        var resMissing1 = await store.GetByIdentifierAsync("missing-tenant-1");
+        resMissing1.Should().BeNull();
+        interceptor.ExecutedSelectCount.Should().Be(1);
+
+        var resMissing2 = await store.GetByIdentifierAsync("missing-tenant-1");
+        resMissing2.Should().BeNull();
+        interceptor.ExecutedSelectCount.Should().Be(1); // Cached in L1, no second DB query
+
+        recordingCache.Entries.Should().BeEmpty("negative cache must not pollute distributed cache (L2)");
+
+        // 3. Flood of 20 distinct cold misses in the same second is throttled by MaxCatalogDbMissesPerSecond (5)
+        for (var i = 0; i < 20; i++)
+        {
+            await store.GetByIdentifierAsync($"random-slug-{i}");
+        }
+
+        // Initial 1 query from missing-tenant-1 + at most 5 permitted misses = at most 6 queries total
+        interceptor.ExecutedSelectCount.Should().BeInRange(1, 6);
+        ExamPrismDiagnostics.TenantCatalogShieldRejectedCount.Should().BeGreaterThanOrEqualTo(14);
+    }
+
+    private sealed class EmptyQueryCountingInterceptor : DbCommandInterceptor
+    {
+        private int _executedSelectCount;
+        public int ExecutedSelectCount => _executedSelectCount;
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("SELECT", StringComparison.OrdinalIgnoreCase))
+            {
+                Interlocked.Increment(ref _executedSelectCount);
+            }
+
+            var table = new DataTable();
+            table.Columns.Add("Id", typeof(Guid));
+            table.Columns.Add("CreatedAt", typeof(DateTimeOffset));
+            table.Columns.Add("EncryptedConnectionString", typeof(string));
+            table.Columns.Add("EncryptedOwnerPassword", typeof(string));
+            table.Columns.Add("FailureReason", typeof(string));
+            table.Columns.Add("Name", typeof(string));
+            table.Columns.Add("OwnerEmail", typeof(string));
+            table.Columns.Add("ProvisionedAt", typeof(DateTimeOffset));
+            table.Columns.Add("Slug", typeof(string));
+            table.Columns.Add("Status", typeof(string));
+            table.Columns.Add("UpdatedAt", typeof(DateTimeOffset));
+
+            return new ValueTask<InterceptionResult<DbDataReader>>(
+                InterceptionResult<DbDataReader>.SuppressWithResult(table.CreateDataReader()));
+        }
+    }
+
+    private sealed class SuppressConnectionInterceptor : DbConnectionInterceptor
+    {
+        public override ValueTask<InterceptionResult> ConnectionOpeningAsync(
+            DbConnection connection,
+            ConnectionEventData eventData,
+            InterceptionResult result,
+            CancellationToken cancellationToken = default)
+        {
+            return new ValueTask<InterceptionResult>(InterceptionResult.Suppress());
+        }
+    }
+
+    private sealed class RecordingDistributedCache : IDistributedCache
+    {
+        private readonly MemoryDistributedCache _inner = new(Options.Create(new MemoryDistributedCacheOptions()));
+        public ConcurrentDictionary<string, byte[]> Entries { get; } = new();
+
+        public byte[]? Get(string key) => _inner.Get(key);
+
+        public Task<byte[]?> GetAsync(string key, CancellationToken token = default) => _inner.GetAsync(key, token);
+
+        public void Set(string key, byte[] value, DistributedCacheEntryOptions options)
+        {
+            Entries[key] = value;
+            _inner.Set(key, value, options);
+        }
+
+        public Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
+        {
+            Entries[key] = value;
+            return _inner.SetAsync(key, value, options, token);
+        }
+
+        public void Refresh(string key) => _inner.Refresh(key);
+
+        public Task RefreshAsync(string key, CancellationToken token = default) => _inner.RefreshAsync(key, token);
+
+        public void Remove(string key)
+        {
+            Entries.TryRemove(key, out _);
+            _inner.Remove(key);
+        }
+
+        public Task RemoveAsync(string key, CancellationToken token = default)
+        {
+            Entries.TryRemove(key, out _);
+            return _inner.RemoveAsync(key, token);
+        }
     }
 }
 

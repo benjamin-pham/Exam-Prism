@@ -18,4 +18,6 @@ public static partial class TenantSlugValidator
 
         return SlugRegex().IsMatch(slug);
     }
+
+    public static bool IsValidFormat(string? slug) => IsValid(slug);
 }
