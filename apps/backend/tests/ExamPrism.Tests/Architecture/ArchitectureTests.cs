@@ -467,7 +467,6 @@ public class ArchitectureTests
 
         var commonTypes = AppAssembly.GetTypes()
             .Where(t => t.Namespace != null && (t.Namespace == "Common" || t.Namespace.StartsWith("Common.") || t.Namespace == "ExamPrism.Common" || t.Namespace.StartsWith("ExamPrism.Common.")))
-            .Where(t => !IsDbContextOrNested(t))
             .ToList();
 
         commonTypes.Should().NotBeEmpty();
@@ -669,7 +668,6 @@ public class ArchitectureTests
     {
         var commonTypes = AppTypes
             .Where(t => t.Namespace != null && (t.Namespace == "Common" || t.Namespace.StartsWith("Common.", StringComparison.Ordinal)))
-            .Where(t => !IsDbContextOrNested(t))
             .ToList();
 
         commonTypes.Should().NotBeEmpty();
@@ -794,23 +792,10 @@ public class ArchitectureTests
     }
 
     [Fact]
-    public void AppDbContext_And_CatalogDbContext_MustBeInCommonPersistence()
+    public void AppDbContext_And_CatalogDbContext_MustBeInInfrastructurePersistence()
     {
-        typeof(AppDbContext).Namespace.Should().Be("Common.Persistence");
-        typeof(CatalogDbContext).Namespace.Should().Be("Common.Persistence");
-    }
-
-    private static bool IsDbContextOrNested(Type? toCheck)
-    {
-        while (toCheck != null)
-        {
-            if (toCheck == typeof(AppDbContext) || toCheck == typeof(CatalogDbContext))
-            {
-                return true;
-            }
-            toCheck = toCheck.DeclaringType;
-        }
-        return false;
+        typeof(AppDbContext).Namespace.Should().Be("ExamPrism.Infrastructure.Persistence");
+        typeof(CatalogDbContext).Namespace.Should().Be("ExamPrism.Infrastructure.Persistence.Catalog");
     }
 
     private static bool IsSubclassOfRawGeneric(Type generic, Type? toCheck)

@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Common.Domain.Specifications;
 using Common.Persistence;
-using Dapper;
 using Microsoft.EntityFrameworkCore;
 
 public static class DbContextQueryExtensions

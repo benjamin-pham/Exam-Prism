@@ -1,4 +1,4 @@
-namespace Common.Persistence;
+namespace ExamPrism.Infrastructure.Persistence;
 
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence.App.Configurations;
@@ -18,3 +18,4 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.ApplyConfiguration(new RefreshTokenEntityTypeConfiguration());
     }
 }
+

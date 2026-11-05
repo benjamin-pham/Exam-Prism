@@ -1,4 +1,4 @@
-namespace Common.Persistence;
+namespace ExamPrism.Infrastructure.Persistence.Catalog;
 
 using ExamPrism.Domain.Tenants;
 using ExamPrism.Infrastructure.Identity;
@@ -9,6 +9,11 @@ using Microsoft.EntityFrameworkCore;
 public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
     : IdentityDbContext<PlatformUser, PlatformRole, Guid>(options)
 {
+    static CatalogDbContext()
+    {
+        DapperTypeHandlers.EnsureRegistered();
+    }
+
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<PlatformRefreshToken> PlatformRefreshTokens => Set<PlatformRefreshToken>();
 
@@ -20,3 +25,4 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
         builder.ApplyConfiguration(new PlatformRefreshTokenEntityTypeConfiguration());
     }
 }
+
