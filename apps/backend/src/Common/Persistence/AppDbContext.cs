@@ -1,6 +1,7 @@
 namespace Common.Persistence;
 
 using ExamPrism.Infrastructure.Identity;
+using ExamPrism.Infrastructure.Persistence.App.Configurations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -14,18 +15,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     {
         base.OnModelCreating(builder);
 
-        builder.Entity<RefreshToken>(b =>
-        {
-            b.HasKey(rt => rt.Id);
-            b.Property(rt => rt.TokenHash).IsRequired().HasMaxLength(128);
-            b.HasIndex(rt => rt.TokenHash).IsUnique();
-            b.HasIndex(rt => rt.UserId);
-
-            b.HasOne(rt => rt.User)
-                .WithMany(u => u.RefreshTokens)
-                .HasForeignKey(rt => rt.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
+        builder.ApplyConfiguration(new RefreshTokenEntityTypeConfiguration());
     }
 }
-
