@@ -46,7 +46,9 @@ public class AspireAppHostConfigurationTests
         content.Should().Contain("AddDatabase(\"CatalogConnection\", \"examprism_catalog_dev\")");
         content.Should().Contain("AddRedis(\"Redis\")");
         content.Should().Contain("WithRedisCommander");
-        content.Should().Contain("WithContainerRuntimeArgs");
+        content.Should().Contain("WithContainerRuntimeArgs(\"--cpus=2\", \"--memory=1024m\")");
+        content.Should().Contain("WithContainerRuntimeArgs(\"--cpus=1\", \"--memory=512m\")");
+        content.Should().Contain("WithContainerRuntimeArgs(\"--cpus=0.5\", \"--memory=256m\")");
         content.Should().Contain("AddProject(\"examprism-api\", \"../apps/backend/src/ExamPrism.csproj\")");
 
         string[] requiredEnvPrefixes =
