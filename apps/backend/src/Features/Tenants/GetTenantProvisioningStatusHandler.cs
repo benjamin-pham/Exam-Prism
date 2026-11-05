@@ -3,8 +3,10 @@ namespace ExamPrism.Features.Tenants;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
+using ExamPrism.Domain.Tenants;
+using ExamPrism.Domain.Tenants.Specifications;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
-using Microsoft.EntityFrameworkCore;
 
 public record GetTenantProvisioningStatusQuery(string Slug);
 
@@ -21,10 +23,10 @@ public sealed class GetTenantProvisioningStatusHandler(CatalogDbContext db)
     {
         var slug = (query.Slug ?? string.Empty).Trim().ToLowerInvariant();
 
-        var tenant = await db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == slug, ct);
+        var tenant = await db.QueryFirstOrDefaultAsync(new TenantBySlugSpec(slug), ct);
         if (tenant is null)
         {
-            return Error.NotFound("TENANT_NOT_FOUND", "The requested organization was not found.");
+            return TenantErrors.TenantNotFound();
         }
 
         return new GetTenantProvisioningStatusResult(

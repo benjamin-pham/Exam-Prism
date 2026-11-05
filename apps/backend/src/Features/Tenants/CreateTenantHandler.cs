@@ -5,6 +5,7 @@ using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
 using ExamPrism.Infrastructure.MultiTenancy;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -88,7 +89,7 @@ public sealed class CreateTenantHandler(
         }
 
         if (options.Value.ReservedSubdomains.Contains(slug, StringComparer.OrdinalIgnoreCase) ||
-            await db.Tenants.AsNoTracking().AnyAsync(t => t.Slug == slug, ct))
+            await db.QueryAnyAsync(new ExamPrism.Domain.Tenants.Specifications.TenantBySlugSpec(slug), ct))
         {
             return Error.Conflict("SLUG_ALREADY_TAKEN", "This organization subdomain is already taken or reserved.");
         }
@@ -97,18 +98,13 @@ public sealed class CreateTenantHandler(
         var ownerEmail = (command.OwnerEmail ?? string.Empty).Trim();
         var now = timeProvider.GetUtcNow();
 
-        var tenant = new Tenant
+        var tenantResult = Tenant.Create(slug, name, ownerEmail, protector.Protect(command.OwnerPassword), now);
+        if (tenantResult.IsFailure)
         {
-            Id = Guid.NewGuid(),
-            Slug = slug,
-            Name = name,
-            Status = TenantStatus.Provisioning,
-            OwnerEmail = ownerEmail,
-            EncryptedOwnerPassword = protector.Protect(command.OwnerPassword),
-            CreatedAt = now,
-            UpdatedAt = now
-        };
+            return tenantResult.Error;
+        }
 
+        var tenant = tenantResult.Value;
         db.Tenants.Add(tenant);
 
         try

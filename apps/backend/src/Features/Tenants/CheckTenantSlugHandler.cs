@@ -3,9 +3,10 @@ namespace ExamPrism.Features.Tenants;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
+using ExamPrism.Domain.Tenants.Specifications;
 using ExamPrism.Infrastructure.MultiTenancy;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 public record CheckTenantSlugQuery(string Slug);
@@ -30,7 +31,7 @@ public sealed class CheckTenantSlugHandler(
             return new CheckTenantSlugResult(slug, false, "RESERVED_SLUG");
         }
 
-        var isTaken = await db.Tenants.AsNoTracking().AnyAsync(t => t.Slug == slug, ct);
+        var isTaken = await db.QueryAnyAsync(new TenantBySlugSpec(slug), ct);
         if (isTaken)
         {
             return new CheckTenantSlugResult(slug, false, "SLUG_ALREADY_TAKEN");

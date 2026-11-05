@@ -3,8 +3,10 @@ namespace ExamPrism.Features.Platform.Tenants;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
+using ExamPrism.Domain.Tenants;
+using ExamPrism.Domain.Tenants.Specifications;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
-using Microsoft.EntityFrameworkCore;
 
 public record ReactivateTenantCommand(Guid Id);
 
@@ -15,19 +17,17 @@ public sealed class ReactivateTenantHandler(
 {
     public async Task<Result<TenantDetailResult>> Handle(ReactivateTenantCommand command, CancellationToken ct = default)
     {
-        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == command.Id, ct);
+        var tenant = await db.QueryFirstOrDefaultAsync(new TenantByIdSpec(command.Id, track: true), ct);
         if (tenant is null)
         {
-            return Error.NotFound("TENANT_NOT_FOUND", "The requested organization was not found.");
+            return TenantErrors.TenantNotFound();
         }
 
-        if (tenant.Status != TenantStatus.Suspended || string.IsNullOrWhiteSpace(tenant.EncryptedConnectionString))
+        var reactivateResult = tenant.Reactivate(timeProvider.GetUtcNow());
+        if (reactivateResult.IsFailure)
         {
-            return Error.Conflict("INVALID_TENANT_STATUS_TRANSITION", "Only a suspended organization workspace with a valid database connection can be reactivated.");
+            return reactivateResult.Error;
         }
-
-        tenant.Status = TenantStatus.Active;
-        tenant.UpdatedAt = timeProvider.GetUtcNow();
 
         await db.SaveChangesAsync(ct);
         await cacheInvalidator.InvalidateTenantAsync(tenant.Id, tenant.Slug, ct);

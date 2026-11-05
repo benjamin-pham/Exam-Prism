@@ -3,7 +3,7 @@ namespace Common.Domain;
 public abstract class Entity<TId> : IEquatable<Entity<TId>>
     where TId : notnull
 {
-    public TId Id { get; protected set; } = default!;
+    public TId Id { get; set; } = default!;
 
     protected Entity()
     {

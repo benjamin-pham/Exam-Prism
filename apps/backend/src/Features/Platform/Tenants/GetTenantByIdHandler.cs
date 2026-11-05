@@ -2,8 +2,10 @@ namespace ExamPrism.Features.Platform.Tenants;
 
 using Common.Handlers;
 using Common.Results;
+using ExamPrism.Domain.Tenants;
+using ExamPrism.Domain.Tenants.Specifications;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
-using Microsoft.EntityFrameworkCore;
 
 public record GetTenantByIdQuery(Guid Id);
 
@@ -11,13 +13,11 @@ public sealed class GetTenantByIdHandler(CatalogDbContext db) : IHandler<GetTena
 {
     public async Task<Result<TenantDetailResult>> Handle(GetTenantByIdQuery query, CancellationToken ct = default)
     {
-        var tenant = await db.Tenants
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Id == query.Id, ct);
+        var tenant = await db.QueryFirstOrDefaultAsync(new TenantByIdSpec(query.Id), ct);
 
         if (tenant is null)
         {
-            return Error.NotFound("TENANT_NOT_FOUND", "The requested organization was not found.");
+            return TenantErrors.TenantNotFound();
         }
 
         return new TenantDetailResult(

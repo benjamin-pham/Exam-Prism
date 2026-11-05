@@ -3,6 +3,7 @@ namespace ExamPrism.Infrastructure.MultiTenancy;
 using System.Security.Cryptography;
 using Common.MultiTenancy;
 using Common.Security;
+using ExamPrism.Domain.Tenants.Specifications;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
@@ -32,7 +33,7 @@ public sealed class TenantProvisioner(
         Tenant? tenant = null;
         try
         {
-            tenant = await catalogDb.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, ct);
+            tenant = await catalogDb.QueryFirstOrDefaultAsync(new TenantByIdSpec(tenantId, track: true), ct);
             if (tenant is null || tenant.Status is TenantStatus.Active or TenantStatus.Suspended)
             {
                 return;
@@ -91,7 +92,7 @@ public sealed class TenantProvisioner(
                         Password = rolePassword
                     };
                     rawTenantConnStr = tenantConnBuilder.ConnectionString;
-                    tenant.EncryptedConnectionString = protector.Protect(rawTenantConnStr);
+                    tenant.SetEncryptedConnectionString(protector.Protect(rawTenantConnStr), timeProvider.GetUtcNow());
                     await catalogDb.SaveChangesAsync(ct);
                 }
             }
@@ -221,12 +222,7 @@ public sealed class TenantProvisioner(
             }
 
             var now = timeProvider.GetUtcNow();
-            tenant.EncryptedConnectionString = protector.Protect(rawTenantConnStr);
-            tenant.Status = TenantStatus.Active;
-            tenant.FailureReason = null;
-            tenant.EncryptedOwnerPassword = null;
-            tenant.ProvisionedAt = now;
-            tenant.UpdatedAt = now;
+            tenant.MarkProvisioned(protector.Protect(rawTenantConnStr), now);
 
             await catalogDb.SaveChangesAsync(ct);
             await cacheInvalidator.InvalidateTenantAsync(tenant.Id, tenant.Slug, ct);
@@ -238,9 +234,7 @@ public sealed class TenantProvisioner(
             if (tenant != null)
             {
                 var now = timeProvider.GetUtcNow();
-                tenant.Status = TenantStatus.Failed;
-                tenant.FailureReason = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
-                tenant.UpdatedAt = now;
+                tenant.MarkProvisioningFailed(ex.Message, now);
 
                 try
                 {

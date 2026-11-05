@@ -3,9 +3,11 @@ namespace ExamPrism.Features.Platform.Tenants;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
+using ExamPrism.Domain.Tenants;
+using ExamPrism.Domain.Tenants.Specifications;
 using ExamPrism.Features.Tenants;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
-using Microsoft.EntityFrameworkCore;
 using Wolverine;
 
 public record RetryTenantProvisioningCommand(Guid Id);
@@ -18,20 +20,17 @@ public sealed class RetryTenantProvisioningHandler(
 {
     public async Task<Result<TenantDetailResult>> Handle(RetryTenantProvisioningCommand command, CancellationToken ct = default)
     {
-        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == command.Id, ct);
+        var tenant = await db.QueryFirstOrDefaultAsync(new TenantByIdSpec(command.Id, track: true), ct);
         if (tenant is null)
         {
-            return Error.NotFound("TENANT_NOT_FOUND", "The requested organization was not found.");
+            return TenantErrors.TenantNotFound();
         }
 
-        if (tenant.Status is TenantStatus.Active or TenantStatus.Suspended)
+        var retryResult = tenant.RetryProvisioning(timeProvider.GetUtcNow());
+        if (retryResult.IsFailure)
         {
-            return Error.Conflict("INVALID_TENANT_STATUS_TRANSITION", "Only a failed or provisioning organization workspace can retry provisioning.");
+            return retryResult.Error;
         }
-
-        tenant.Status = TenantStatus.Provisioning;
-        tenant.FailureReason = null;
-        tenant.UpdatedAt = timeProvider.GetUtcNow();
 
         await db.SaveChangesAsync(ct);
         await cacheInvalidator.InvalidateTenantAsync(tenant.Id, tenant.Slug, ct);

@@ -3,8 +3,10 @@ namespace ExamPrism.Features.Platform.Tenants;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
+using ExamPrism.Domain.Tenants;
+using ExamPrism.Domain.Tenants.Specifications;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
-using Microsoft.EntityFrameworkCore;
 
 public record SuspendTenantCommand(Guid Id);
 
@@ -15,19 +17,17 @@ public sealed class SuspendTenantHandler(
 {
     public async Task<Result<TenantDetailResult>> Handle(SuspendTenantCommand command, CancellationToken ct = default)
     {
-        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == command.Id, ct);
+        var tenant = await db.QueryFirstOrDefaultAsync(new TenantByIdSpec(command.Id, track: true), ct);
         if (tenant is null)
         {
-            return Error.NotFound("TENANT_NOT_FOUND", "The requested organization was not found.");
+            return TenantErrors.TenantNotFound();
         }
 
-        if (tenant.Status != TenantStatus.Active)
+        var suspendResult = tenant.Suspend(timeProvider.GetUtcNow());
+        if (suspendResult.IsFailure)
         {
-            return Error.Conflict("INVALID_TENANT_STATUS_TRANSITION", "Only an active organization workspace can be suspended.");
+            return suspendResult.Error;
         }
-
-        tenant.Status = TenantStatus.Suspended;
-        tenant.UpdatedAt = timeProvider.GetUtcNow();
 
         await db.SaveChangesAsync(ct);
         await cacheInvalidator.InvalidateTenantAsync(tenant.Id, tenant.Slug, ct);

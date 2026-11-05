@@ -3,9 +3,11 @@ namespace ExamPrism.Features.Platform.Tenants;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
+using ExamPrism.Domain.Tenants;
+using ExamPrism.Domain.Tenants.Specifications;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 public record UpdateTenantCommand(Guid Id, string Name);
 
@@ -29,14 +31,17 @@ public sealed class UpdateTenantHandler(
 {
     public async Task<Result<TenantDetailResult>> Handle(UpdateTenantCommand command, CancellationToken ct = default)
     {
-        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == command.Id, ct);
+        var tenant = await db.QueryFirstOrDefaultAsync(new TenantByIdSpec(command.Id, track: true), ct);
         if (tenant is null)
         {
-            return Error.NotFound("TENANT_NOT_FOUND", "The requested organization was not found.");
+            return TenantErrors.TenantNotFound();
         }
 
-        tenant.Name = command.Name.Trim();
-        tenant.UpdatedAt = timeProvider.GetUtcNow();
+        var renameResult = tenant.Rename(command.Name, timeProvider.GetUtcNow());
+        if (renameResult.IsFailure)
+        {
+            return renameResult.Error;
+        }
 
         await db.SaveChangesAsync(ct);
         await cacheInvalidator.InvalidateTenantAsync(tenant.Id, tenant.Slug, ct);

@@ -2,7 +2,9 @@ namespace ExamPrism.Features.Platform.Tenants;
 
 using Common.Handlers;
 using Common.MultiTenancy;
+using Common.Persistence;
 using Common.Results;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -35,9 +37,9 @@ public record ListTenantsResult(
     int Page,
     int PageSize);
 
-public sealed class ListTenantsHandler(CatalogDbContext db) : IHandler<ListTenantsQuery, ListTenantsResult>
+public sealed class ListTenantsDbQuery(ListTenantsQuery query) : IDbQuery<CatalogDbContext, ListTenantsResult>
 {
-    public async Task<Result<ListTenantsResult>> Handle(ListTenantsQuery query, CancellationToken ct = default)
+    public async Task<ListTenantsResult> ExecuteAsync(CatalogDbContext db, CancellationToken ct = default)
     {
         var queryable = db.Tenants.AsNoTracking();
 
@@ -76,5 +78,13 @@ public sealed class ListTenantsHandler(CatalogDbContext db) : IHandler<ListTenan
             .ToListAsync(ct);
 
         return new ListTenantsResult(items.AsReadOnly(), totalCount, page, pageSize);
+    }
+}
+
+public sealed class ListTenantsHandler(CatalogDbContext db) : IHandler<ListTenantsQuery, ListTenantsResult>
+{
+    public async Task<Result<ListTenantsResult>> Handle(ListTenantsQuery query, CancellationToken ct = default)
+    {
+        return await db.QueryAsync(new ListTenantsDbQuery(query), ct);
     }
 }
