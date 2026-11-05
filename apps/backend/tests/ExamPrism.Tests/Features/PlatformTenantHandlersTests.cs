@@ -4,6 +4,7 @@ using Common.MultiTenancy;
 using Common.Results;
 using ExamPrism.Features.Platform.Tenants;
 using ExamPrism.Infrastructure.MultiTenancy;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -76,7 +77,17 @@ public class PlatformTenantHandlersTests : IClassFixture<CatalogDbFixture>
         db.Tenants.AddRange(t1, t2, t3, t4);
         await db.SaveChangesAsync();
 
-        var handler = new ListTenantsHandler(db);
+        await using var readOnlyDb = new ReadOnlyCatalogDbContext(db);
+        var handler = new ListTenantsHandler(readOnlyDb);
+
+        typeof(ListTenantsHandler).Assembly
+            .GetType("ExamPrism.Features.Platform.Tenants.ListTenantsDbQuery")
+            .Should().BeNull();
+
+        // 0. Nullable parameters (Status: null, Search: null)
+        var unfilteredRes = await handler.Handle(new ListTenantsQuery());
+        unfilteredRes.IsSuccess.Should().BeTrue();
+        unfilteredRes.Value.TotalCount.Should().BeGreaterOrEqualTo(4);
 
         // 1. Filter by Status = Active
         var activeRes = await handler.Handle(new ListTenantsQuery(Status: TenantStatus.Active, Search: prefix));
@@ -128,7 +139,8 @@ public class PlatformTenantHandlersTests : IClassFixture<CatalogDbFixture>
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
 
-        var handler = new GetTenantByIdHandler(db);
+        await using var readOnlyDb = new ReadOnlyCatalogDbContext(db);
+        var handler = new GetTenantByIdHandler(readOnlyDb);
 
         // Found
         var foundResult = await handler.Handle(new GetTenantByIdQuery(tenant.Id));

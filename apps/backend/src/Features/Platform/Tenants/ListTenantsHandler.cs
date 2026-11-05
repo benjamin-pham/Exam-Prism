@@ -2,12 +2,10 @@ namespace ExamPrism.Features.Platform.Tenants;
 
 using Common.Handlers;
 using Common.MultiTenancy;
-using Common.Persistence;
 using Common.Results;
+using Dapper;
 using ExamPrism.Infrastructure.Persistence;
-using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore;
 
 public record ListTenantsQuery(
     int Page = 1,
@@ -37,54 +35,47 @@ public record ListTenantsResult(
     int Page,
     int PageSize);
 
-public sealed class ListTenantsDbQuery(ListTenantsQuery query) : IDbQuery<CatalogDbContext, ListTenantsResult>
+public sealed class ListTenantsHandler(ReadOnlyCatalogDbContext db) : IHandler<ListTenantsQuery, ListTenantsResult>
 {
-    public async Task<ListTenantsResult> ExecuteAsync(CatalogDbContext db, CancellationToken ct = default)
-    {
-        var queryable = db.Tenants.AsNoTracking();
+    private const string ListTenantsSql = """
+        SELECT COUNT(*)
+        FROM "Tenants"
+        WHERE (CAST(@Status AS varchar(32)) IS NULL OR "Status" = @Status)
+          AND (CAST(@Pattern AS text) IS NULL OR "Slug" ILIKE @Pattern OR "Name" ILIKE @Pattern);
 
-        if (query.Status.HasValue)
-        {
-            queryable = queryable.Where(t => t.Status == query.Status.Value);
-        }
+        SELECT "Id", "Slug", "Name", "Status", "CreatedAt", "ProvisionedAt", "UpdatedAt"
+        FROM "Tenants"
+        WHERE (CAST(@Status AS varchar(32)) IS NULL OR "Status" = @Status)
+          AND (CAST(@Pattern AS text) IS NULL OR "Slug" ILIKE @Pattern OR "Name" ILIKE @Pattern)
+        ORDER BY "CreatedAt" DESC, "Slug" ASC
+        LIMIT @Take OFFSET @Skip;
+        """;
 
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            var search = query.Search.Trim();
-            var pattern = $"%{search}%";
-            queryable = queryable.Where(t =>
-                EF.Functions.ILike(t.Slug, pattern) ||
-                EF.Functions.ILike(t.Name, pattern));
-        }
-
-        var totalCount = await queryable.CountAsync(ct);
-
-        var page = query.Page < 1 ? 1 : query.Page;
-        var pageSize = query.PageSize < 1 ? 20 : query.PageSize;
-
-        var items = await queryable
-            .OrderByDescending(t => t.CreatedAt)
-            .ThenBy(t => t.Slug)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(t => new TenantSummaryItem(
-                t.Id,
-                t.Slug,
-                t.Name,
-                t.Status,
-                t.CreatedAt,
-                t.ProvisionedAt,
-                t.UpdatedAt))
-            .ToListAsync(ct);
-
-        return new ListTenantsResult(items.AsReadOnly(), totalCount, page, pageSize);
-    }
-}
-
-public sealed class ListTenantsHandler(CatalogDbContext db) : IHandler<ListTenantsQuery, ListTenantsResult>
-{
     public async Task<Result<ListTenantsResult>> Handle(ListTenantsQuery query, CancellationToken ct = default)
     {
-        return await db.QueryAsync(new ListTenantsDbQuery(query), ct);
+        var page = query.Page < 1 ? 1 : query.Page;
+        var pageSize = query.PageSize < 1 ? 20 : query.PageSize;
+        var skip = (page - 1) * pageSize;
+        var status = query.Status?.ToString();
+        var pattern = string.IsNullOrWhiteSpace(query.Search) ? null : $"%{query.Search.Trim()}%";
+
+        var (totalCount, items) = await db.QueryMultipleAsync(
+            ListTenantsSql,
+            async grid =>
+            {
+                var count = await grid.ReadSingleAsync<int>();
+                var rows = (await grid.ReadAsync<TenantSummaryItem>()).AsList().AsReadOnly();
+                return (count, rows);
+            },
+            new
+            {
+                Status = status,
+                Pattern = pattern,
+                Take = pageSize,
+                Skip = skip
+            },
+            ct);
+
+        return new ListTenantsResult(items, totalCount, page, pageSize);
     }
 }

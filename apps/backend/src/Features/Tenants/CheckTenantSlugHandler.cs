@@ -3,10 +3,8 @@ namespace ExamPrism.Features.Tenants;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
-using ExamPrism.Domain.Tenants.Specifications;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence;
-using ExamPrism.Infrastructure.Persistence.Catalog;
 using Microsoft.Extensions.Options;
 
 public record CheckTenantSlugQuery(string Slug);
@@ -14,9 +12,17 @@ public record CheckTenantSlugQuery(string Slug);
 public record CheckTenantSlugResult(string Slug, bool IsAvailable, string? ReasonCode);
 
 public sealed class CheckTenantSlugHandler(
-    CatalogDbContext db,
+    ReadOnlyCatalogDbContext db,
     IOptions<MultiTenancyOptions> options) : IHandler<CheckTenantSlugQuery, CheckTenantSlugResult>
 {
+    private const string CheckSlugSql = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM "Tenants"
+            WHERE "Slug" = @Slug
+        );
+        """;
+
     public async Task<Result<CheckTenantSlugResult>> Handle(CheckTenantSlugQuery query, CancellationToken ct = default)
     {
         var slug = (query.Slug ?? string.Empty).Trim().ToLowerInvariant();
@@ -31,7 +37,7 @@ public sealed class CheckTenantSlugHandler(
             return new CheckTenantSlugResult(slug, false, "RESERVED_SLUG");
         }
 
-        var isTaken = await db.QueryAnyAsync(new TenantBySlugSpec(slug), ct);
+        var isTaken = await db.ExecuteScalarAsync<bool>(CheckSlugSql, new { Slug = slug }, ct);
         if (isTaken)
         {
             return new CheckTenantSlugResult(slug, false, "SLUG_ALREADY_TAKEN");

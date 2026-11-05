@@ -5,6 +5,7 @@ using Common.Results;
 using ExamPrism.Features.Platform.Tenants;
 using ExamPrism.Features.Tenants;
 using ExamPrism.Infrastructure.MultiTenancy;
+using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -55,7 +56,8 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
             ReservedSubdomains = ["admin", "api", "www"]
         });
 
-        var handler = new CheckTenantSlugHandler(db, options);
+        await using var readOnlyDb = new ReadOnlyCatalogDbContext(db);
+        var handler = new CheckTenantSlugHandler(readOnlyDb, options);
 
         // 1. Valid available slug
         var validRes = await handler.Handle(new CheckTenantSlugQuery("sunrise-academy"));
@@ -252,7 +254,8 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
         });
         await db.SaveChangesAsync();
 
-        var handler = new GetTenantProvisioningStatusHandler(db);
+        await using var readOnlyDb = new ReadOnlyCatalogDbContext(db);
+        var handler = new GetTenantProvisioningStatusHandler(readOnlyDb);
 
         // 1. Existing tenant returns public status
         var existingRes = await handler.Handle(new GetTenantProvisioningStatusQuery(slug));

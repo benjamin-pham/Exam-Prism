@@ -37,3 +37,4 @@ public static class DapperTypeHandlers
         SqlMapper.AddTypeHandler(new StringEnumTypeHandler<TenantStatus>());
     }
 }
+

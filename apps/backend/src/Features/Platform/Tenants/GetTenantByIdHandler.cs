@@ -3,31 +3,31 @@ namespace ExamPrism.Features.Platform.Tenants;
 using Common.Handlers;
 using Common.Results;
 using ExamPrism.Domain.Tenants;
-using ExamPrism.Domain.Tenants.Specifications;
 using ExamPrism.Infrastructure.Persistence;
-using ExamPrism.Infrastructure.Persistence.Catalog;
 
 public record GetTenantByIdQuery(Guid Id);
 
-public sealed class GetTenantByIdHandler(CatalogDbContext db) : IHandler<GetTenantByIdQuery, TenantDetailResult>
+public sealed class GetTenantByIdHandler(ReadOnlyCatalogDbContext db) : IHandler<GetTenantByIdQuery, TenantDetailResult>
 {
+    private const string GetTenantByIdSql = """
+        SELECT "Id", "Slug", "Name", "Status", "FailureReason", "CreatedAt", "ProvisionedAt", "UpdatedAt"
+        FROM "Tenants"
+        WHERE "Id" = @Id
+        LIMIT 1;
+        """;
+
     public async Task<Result<TenantDetailResult>> Handle(GetTenantByIdQuery query, CancellationToken ct = default)
     {
-        var tenant = await db.QueryFirstOrDefaultAsync(new TenantByIdSpec(query.Id), ct);
+        var tenant = await db.QueryFirstOrDefaultAsync<TenantDetailResult>(
+            GetTenantByIdSql,
+            new { query.Id },
+            ct);
 
         if (tenant is null)
         {
             return TenantErrors.TenantNotFound();
         }
 
-        return new TenantDetailResult(
-            tenant.Id,
-            tenant.Slug,
-            tenant.Name,
-            tenant.Status,
-            tenant.FailureReason,
-            tenant.CreatedAt,
-            tenant.ProvisionedAt,
-            tenant.UpdatedAt);
+        return tenant;
     }
 }
