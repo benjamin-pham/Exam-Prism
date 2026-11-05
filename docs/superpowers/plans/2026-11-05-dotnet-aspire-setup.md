@@ -243,3 +243,4 @@ Expected: `ExamPrism.AppHost` builds with 0 errors and all tests in `ExamPrism.T
 git add apps/backend/src/appsettings.json apps/backend/src/appsettings.Development.json apps/backend/src/Infrastructure/Telemetry/TelemetrySetup.cs apps/backend/tests/ExamPrism.Tests/
 git commit -m "refactor(config): keep only Serilog in appsettings and support Aspire OTLP fallback"
 ```
+

@@ -312,3 +312,4 @@ Because `IdentitySetup.AddIdentity` requires `Jwt:SecretKey` (at least 32 bytes)
 1. Run `dotnet build aspire-app/ExamPrism.AppHost.csproj` and verify clean compilation with zero `<ProjectReference>` to `ExamPrism.csproj`.
 2. Verify `apps/backend/src/appsettings.json` and `apps/backend/src/appsettings.Development.json` contain only `Serilog`.
 3. Run `dotnet test apps/backend/ExamPrism.slnx` to verify all unit, architecture, and integration tests pass.
+
