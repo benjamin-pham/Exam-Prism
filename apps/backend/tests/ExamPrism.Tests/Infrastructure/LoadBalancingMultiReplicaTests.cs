@@ -162,5 +162,31 @@ public class LoadBalancingMultiReplicaTests
         banOnB.Should().NotBeNull();
         banOnB!.Value.TotalSeconds.Should().BeGreaterThan(200);
     }
+
+    [Fact]
+    public async Task CatalogMultiTenantStore_ScopedInstances_ShareSingletonShieldState_AndEvictNegativeCacheViaBackplane()
+    {
+        var mtOpts = Options.Create(new ExamPrism.Infrastructure.MultiTenancy.MultiTenancyOptions
+        {
+            MaxCatalogDbMissesPerSecond = 2,
+            NotFoundCacheExpirationSeconds = 60,
+            MaxNegativeCacheEntries = 100
+        });
+
+        var backplane = Substitute.For<ICacheBackplane>();
+        var shieldState = new ExamPrism.Infrastructure.MultiTenancy.TenantCatalogShieldState(mtOpts, backplane, TimeProvider.System);
+
+        shieldState.RecordNegativeCache("catalog:tenant:slug:new-school", TimeSpan.FromSeconds(60));
+        shieldState.IsNegativelyCached("catalog:tenant:slug:new-school").Should().BeTrue();
+
+        // Simulate peer replica publishing key invalidation when "new-school" is provisioned
+        backplane.KeyInvalidated += Raise.Event<Action<string>>("catalog:tenant:slug:new-school");
+        shieldState.IsNegativelyCached("catalog:tenant:slug:new-school").Should().BeFalse();
+
+        // Token bucket is shared across calls on the singleton state
+        shieldState.TryAcquireCatalogDbMissPermit().Should().BeTrue();
+        shieldState.TryAcquireCatalogDbMissPermit().Should().BeTrue();
+        shieldState.TryAcquireCatalogDbMissPermit().Should().BeFalse();
+    }
 }
 

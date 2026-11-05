@@ -35,10 +35,7 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
     private readonly IConnectionStringProtector _protector;
     private readonly MultiTenancyOptions _options;
     private readonly TimeProvider _timeProvider;
-
-    private readonly ConcurrentDictionary<string, long> _negativeCache = new(StringComparer.OrdinalIgnoreCase);
-    private long _missWindowSecond;
-    private int _missCountInSecond;
+    private readonly TenantCatalogShieldState _shieldState;
 
     public CatalogMultiTenantStore(
         CatalogDbContext db,
@@ -46,7 +43,8 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         IConnectionStringProtector protector,
         IOptions<MultiTenancyOptions> options,
         ICacheBackplane? backplane = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        TenantCatalogShieldState? shieldState = null)
     {
         _db = db ?? throw new ArgumentNullException(nameof(db));
         _hybridCache = hybridCache ?? throw new ArgumentNullException(nameof(hybridCache));
@@ -54,6 +52,7 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _backplane = backplane ?? new NoOpCacheBackplane();
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _shieldState = shieldState ?? new TenantCatalogShieldState(options, _backplane, _timeProvider);
     }
 
     private static SemaphoreSlim GetStripe(string key)
@@ -74,58 +73,11 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
         return TimeSpan.FromMinutes(minutes * jitterFactor);
     }
 
-    private bool IsNegativelyCached(string key)
-    {
-        if (_negativeCache.TryGetValue(key, out var expiresAt))
-        {
-            var nowMs = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
-            if (nowMs < expiresAt)
-            {
-                return true;
-            }
+    private bool IsNegativelyCached(string key) => _shieldState.IsNegativelyCached(key);
 
-            _negativeCache.TryRemove(key, out _);
-        }
+    private void RecordNegativeCache(string key, TimeSpan ttl) => _shieldState.RecordNegativeCache(key, ttl);
 
-        return false;
-    }
-
-    private void RecordNegativeCache(string key, TimeSpan ttl)
-    {
-        var nowMs = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
-        var expiresAt = nowMs + Math.Max(1000L, (long)ttl.TotalMilliseconds);
-        _negativeCache[key] = expiresAt;
-
-        if (_negativeCache.Count > _options.MaxNegativeCacheEntries)
-        {
-            foreach (var kvp in _negativeCache)
-            {
-                if (nowMs >= kvp.Value)
-                {
-                    _negativeCache.TryRemove(kvp.Key, out _);
-                }
-            }
-        }
-    }
-
-    private bool TryAcquireCatalogDbMissPermit()
-    {
-        if (_options.MaxCatalogDbMissesPerSecond <= 0)
-        {
-            return true;
-        }
-
-        var currentSecond = _timeProvider.GetUtcNow().ToUnixTimeSeconds();
-        var windowSec = Volatile.Read(ref _missWindowSecond);
-        if (windowSec != currentSecond)
-        {
-            Interlocked.Exchange(ref _missWindowSecond, currentSecond);
-            Interlocked.Exchange(ref _missCountInSecond, 0);
-        }
-
-        var count = Interlocked.Increment(ref _missCountInSecond);
-        return count <= _options.MaxCatalogDbMissesPerSecond;
-    }
+    private bool TryAcquireCatalogDbMissPermit() => _shieldState.TryAcquireCatalogDbMissPermit();
 
     public async Task<ExamPrismTenantInfo?> GetByIdentifierAsync(string identifier)
     {
@@ -465,7 +417,7 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
 
         foreach (var key in keys)
         {
-            _negativeCache.TryRemove(key, out _);
+            _shieldState.RemoveNegativeCache(key);
             await _hybridCache.RemoveAsync(key, ct);
             await _backplane.PublishKeyInvalidationAsync(key, ct);
         }

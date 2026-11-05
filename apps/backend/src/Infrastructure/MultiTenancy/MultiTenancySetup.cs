@@ -86,6 +86,7 @@ public static class MultiTenancySetup
 
         services.AddSingleton<IConnectionStringProtector, DataProtectionConnectionStringProtector>();
         services.AddSingleton<ITenantConnectionStringNormalizer, TenantConnectionStringNormalizer>();
+        services.AddSingleton<TenantCatalogShieldState>();
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<CatalogMultiTenantStore>();
         services.AddScoped<ITenantCacheInvalidator>(sp => sp.GetRequiredService<CatalogMultiTenantStore>());
