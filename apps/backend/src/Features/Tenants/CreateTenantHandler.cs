@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
+using ExamPrism.Domain.Tenants.Specifications;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
@@ -89,7 +90,7 @@ public sealed class CreateTenantHandler(
         }
 
         if (options.Value.ReservedSubdomains.Contains(slug, StringComparer.OrdinalIgnoreCase) ||
-            await db.QueryAnyAsync(new ExamPrism.Domain.Tenants.Specifications.TenantBySlugSpec(slug), ct))
+            await db.QueryAnyAsync(new TenantBySlugSpec(slug), ct))
         {
             return Error.Conflict("SLUG_ALREADY_TAKEN", "This organization subdomain is already taken or reserved.");
         }

@@ -156,7 +156,7 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
     public void MarkProvisioningFailed(string failureReason, DateTimeOffset now)
     {
         Status = TenantStatus.Failed;
-        FailureReason = failureReason.Length > 1000 ? failureReason[..1000] : failureReason;
+        FailureReason = failureReason is { Length: > 1000 } ? failureReason[..1000] : (failureReason ?? string.Empty);
         UpdatedAt = now;
 
         RaiseDomainEvent(new TenantProvisioningFailedDomainEvent(Id, Slug, FailureReason, now));

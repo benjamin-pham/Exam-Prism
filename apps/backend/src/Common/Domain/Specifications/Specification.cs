@@ -171,6 +171,11 @@ public class Specification<TEntity> : ISpecification<TEntity>
             {
                 Criteria = ExpressionCombiner.Not(source.Criteria);
             }
+            else
+            {
+                var parameter = Expression.Parameter(typeof(T), "x");
+                Criteria = Expression.Lambda<Func<T, bool>>(Expression.Constant(false), parameter);
+            }
 
             foreach (var inc in source.Includes) AddInclude(inc);
             foreach (var incStr in source.IncludeStrings) AddInclude(incStr);

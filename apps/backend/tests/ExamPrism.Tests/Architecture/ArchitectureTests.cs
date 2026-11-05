@@ -728,6 +728,9 @@ public class ArchitectureTests
             evt.IsSealed.Should().BeTrue($"{evt.FullName} must be sealed");
             evt.Name.Should().EndWith("DomainEvent", $"{evt.FullName} must end with 'DomainEvent'");
             evt.Namespace.Should().StartWith("ExamPrism.Domain", $"{evt.FullName} must be in ExamPrism.Domain");
+
+            var isRecord = evt.GetProperty("EqualityContract", BindingFlags.NonPublic | BindingFlags.Instance) is not null;
+            isRecord.Should().BeTrue($"{evt.FullName} must be a C# record");
         }
     }
 

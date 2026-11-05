@@ -221,6 +221,10 @@ public class DddPrimitivesTests
         orMatchAll.Criteria.Should().BeNull();
         orMatchAll.IsSatisfiedBy(item4).Should().BeTrue();
 
+        var matchNoneSpec = matchAllSpec.Not();
+        matchNoneSpec.IsSatisfiedBy(item1).Should().BeFalse();
+        matchNoneSpec.IsSatisfiedBy(item4).Should().BeFalse();
+
         var dtoSpec = new ProductDtoSpec();
         dtoSpec.Skip.Should().Be(10);
         dtoSpec.Take.Should().Be(5);
