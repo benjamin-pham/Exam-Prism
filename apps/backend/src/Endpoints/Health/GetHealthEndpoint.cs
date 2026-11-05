@@ -34,6 +34,13 @@ public sealed class GetHealthEndpoint : IEndpoint
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
 
+            if (!drainState.IsStartupComplete)
+            {
+                return Results.Json(
+                    new GetHealthResult("Starting", DateTime.UtcNow, false),
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
             var result = await bus.InvokeAsync<Result<GetHealthResult>>(new GetHealthQuery(), ct);
             if (result.IsFailure)
             {

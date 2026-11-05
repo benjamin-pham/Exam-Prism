@@ -188,5 +188,70 @@ public class LoadBalancingMultiReplicaTests
         shieldState.TryAcquireCatalogDbMissPermit().Should().BeTrue();
         shieldState.TryAcquireCatalogDbMissPermit().Should().BeFalse();
     }
+
+    [Fact]
+    public async Task HostDrainState_And_GracefulShutdown_TrackStartupReadiness_AndAwaitDrainAsynchronously()
+    {
+        var drainState = new ExamPrism.Infrastructure.Health.HostDrainState();
+        drainState.IsStartupComplete.Should().BeTrue();
+        drainState.IsReady.Should().BeTrue();
+
+        drainState.MarkStartupIncomplete();
+        drainState.IsStartupComplete.Should().BeFalse();
+        drainState.IsReady.Should().BeFalse();
+
+        drainState.MarkStartupComplete();
+        drainState.IsReady.Should().BeTrue();
+
+        using var lifetimeCts = new CancellationTokenSource();
+        var lifetime = Substitute.For<Microsoft.Extensions.Hosting.IHostApplicationLifetime>();
+        lifetime.ApplicationStopping.Returns(lifetimeCts.Token);
+
+        var opts = Options.Create(new ExamPrism.Infrastructure.Health.GracefulShutdownOptions
+        {
+            DrainDelaySeconds = 1,
+            StartupWaitTimeoutSeconds = 2,
+            StartupPollIntervalMs = 50
+        });
+
+        var svc = new ExamPrism.Infrastructure.Health.GracefulShutdownHostedService(
+            drainState,
+            lifetime,
+            opts,
+            NullLogger<ExamPrism.Infrastructure.Health.GracefulShutdownHostedService>.Instance);
+
+        await svc.StartAsync(CancellationToken.None);
+        lifetimeCts.Cancel();
+        drainState.IsDraining.Should().BeTrue();
+        drainState.IsReady.Should().BeFalse();
+
+        using var stopCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+        await svc.Invoking(s => s.StopAsync(stopCts.Token)).Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task StartupTasks_WaitForLeaderAsync_PollsUntilLeaderReleasesLock_OrTimesOutGracefully()
+    {
+        var attempts = 0;
+        var distributedLock = Substitute.For<Common.Locking.IDistributedLock>();
+        var handle = Substitute.For<Common.Locking.IDistributedLockHandle>();
+        distributedLock.TryAcquireAsync("startup:infrastructure-init", Arg.Any<TimeSpan?>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                var cur = Interlocked.Increment(ref attempts);
+                return ValueTask.FromResult<Common.Locking.IDistributedLockHandle?>(cur >= 3 ? handle : null);
+            });
+
+        var released = await ExamPrism.Infrastructure.StartupTasksExtensions.WaitForLeaderStartupAsync(
+            distributedLock,
+            timeout: TimeSpan.FromSeconds(2),
+            pollInterval: TimeSpan.FromMilliseconds(20),
+            NullLogger.Instance,
+            CancellationToken.None);
+
+        released.Should().BeTrue();
+        attempts.Should().BeGreaterThanOrEqualTo(3);
+        await handle.Received(1).DisposeAsync();
+    }
 }
 

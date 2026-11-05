@@ -30,22 +30,29 @@ public sealed class GracefulShutdownHostedService : IHostedService
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         _stoppingRegistration.Dispose();
-        return Task.CompletedTask;
-    }
-
-    private void OnStopping()
-    {
-        _logger.LogInformation("Host is stopping. Marking HostDrainState.IsDraining = true");
         _drainState.MarkDraining();
 
         var delaySeconds = _options.Value.DrainDelaySeconds;
         if (delaySeconds > 0)
         {
             _logger.LogInformation("Waiting {DelaySeconds}s for reverse proxy/load balancer drain...", delaySeconds);
-            Thread.Sleep(TimeSpan.FromSeconds(delaySeconds));
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Graceful shutdown drain delay was cancelled before completion.");
+            }
         }
+    }
+
+    private void OnStopping()
+    {
+        _logger.LogInformation("Host is stopping. Marking HostDrainState.IsDraining = true");
+        _drainState.MarkDraining();
     }
 }
