@@ -1,10 +1,12 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 var postgres = builder.AddPostgres("postgres")
-    .WithPgAdmin();
+    .WithContainerRuntimeArgs("--cpus=2", "--memory=1024m")
+    .WithPgAdmin(c => c.WithContainerRuntimeArgs("--cpus=0.5", "--memory=256m"));
 var catalogDb = postgres.AddDatabase("CatalogConnection", "examprism_catalog_dev");
 var redis = builder.AddRedis("Redis")
-    .WithRedisCommander();
+    .WithContainerRuntimeArgs("--cpus=1", "--memory=512m")
+    .WithRedisCommander(c => c.WithContainerRuntimeArgs("--cpus=0.5", "--memory=256m"));
 
 builder.AddProject("examprism-api", "../apps/backend/src/ExamPrism.csproj")
     .WaitFor(catalogDb)
