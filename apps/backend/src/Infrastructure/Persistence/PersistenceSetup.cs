@@ -4,6 +4,7 @@ using System;
 using Common.MultiTenancy;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence.Catalog;
+using ExamPrism.Infrastructure.Persistence.Interceptors;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -20,6 +21,8 @@ public static class PersistenceSetup
     {
         services.Configure<PersistenceOptions>(configuration.GetSection(PersistenceOptions.SectionName));
         services.AddSingleton<SlowQueryTelemetryInterceptor>();
+        services.AddSingleton<AuditableEntityInterceptor>();
+        services.AddScoped<DomainEventDispatchInterceptor>();
         services.AddSingleton<TenantDataSourceRegistry>();
         services.AddHostedService(sp => sp.GetRequiredService<TenantDataSourceRegistry>());
 
@@ -30,8 +33,10 @@ public static class PersistenceSetup
         {
             var persistenceOptions = sp.GetRequiredService<IOptions<PersistenceOptions>>().Value;
             var interceptor = sp.GetRequiredService<SlowQueryTelemetryInterceptor>();
+            var auditableInterceptor = sp.GetRequiredService<AuditableEntityInterceptor>();
+            var dispatchInterceptor = sp.GetRequiredService<DomainEventDispatchInterceptor>();
 
-            options.AddInterceptors(interceptor);
+            options.AddInterceptors(interceptor, auditableInterceptor, dispatchInterceptor);
             options.UseNpgsql(catalogConnection, npgsqlOptions =>
                 ConfigureNpgsql(npgsqlOptions, persistenceOptions));
         });
@@ -51,11 +56,13 @@ public static class PersistenceSetup
             var registry = sp.GetRequiredService<TenantDataSourceRegistry>();
             var persistenceOptions = sp.GetRequiredService<IOptions<PersistenceOptions>>().Value;
             var interceptor = sp.GetRequiredService<SlowQueryTelemetryInterceptor>();
+            var auditableInterceptor = sp.GetRequiredService<AuditableEntityInterceptor>();
+            var dispatchInterceptor = sp.GetRequiredService<DomainEventDispatchInterceptor>();
 
             var normalized = normalizer.Normalize(tenantInfo.ConnectionString);
             var dataSource = registry.GetOrCreate(normalized);
 
-            options.AddInterceptors(interceptor);
+            options.AddInterceptors(interceptor, auditableInterceptor, dispatchInterceptor);
             options.UseNpgsql(dataSource, npgsqlOptions =>
                 ConfigureNpgsql(npgsqlOptions, persistenceOptions));
         });
