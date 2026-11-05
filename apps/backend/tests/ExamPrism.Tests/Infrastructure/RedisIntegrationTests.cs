@@ -47,6 +47,12 @@ public class RedisWebApplicationFactory : WebApplicationFactory<Program>, IAsync
         builder.UseSetting("RateLimiting:Global:WindowSeconds", "60");
         builder.UseSetting("Orleans:SiloPort", "0");
         builder.UseSetting("Orleans:GatewayPort", "0");
+        builder.UseSetting("Jwt:Issuer", "ExamPrism");
+        builder.UseSetting("Jwt:Audience", "ExamPrism");
+        builder.UseSetting("Jwt:SecretKey", "SuperSecretKeyForDevJwtTokensMin256BitsLongExamPrismDevOnly!");
+        builder.UseSetting("PlatformAdmin:SeedOnStartup", "false");
+        builder.UseSetting("MultiTenancy:Provisioning:RecoverStuckProvisioningOnStartup", "false");
+        builder.UseSetting("MultiTenancy:FleetMigration:MigrateOnStartup", "false");
     }
 
     public async Task InitializeAsync()

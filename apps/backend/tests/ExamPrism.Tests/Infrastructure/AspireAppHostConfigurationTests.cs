@@ -37,10 +37,10 @@ public class AspireAppHostConfigurationTests
     [Fact]
     public void AppHostProgram_RegistersExamPrismByRelativePath_WithPostgresRedisAndAllEnvironmentVariables()
     {
-        var programPath = Path.Combine(GetRepoRoot(), "aspire-app", "Program.cs");
-        File.Exists(programPath).Should().BeTrue("aspire-app/Program.cs must exist");
+        var appHostPath = Path.Combine(GetRepoRoot(), "aspire-app", "AppHost.cs");
+        File.Exists(appHostPath).Should().BeTrue("aspire-app/AppHost.cs must exist");
 
-        var content = File.ReadAllText(programPath);
+        var content = File.ReadAllText(appHostPath);
         content.Should().Contain("AddPostgres(\"postgres\")");
         content.Should().Contain("AddDatabase(\"CatalogConnection\", \"examprism_catalog_dev\")");
         content.Should().Contain("AddRedis(\"Redis\")");

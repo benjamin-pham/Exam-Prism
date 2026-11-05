@@ -20,6 +20,13 @@ public static class TelemetrySetup
         var telemetryOptions = configuration.GetSection(TelemetryOptions.SectionName).Get<TelemetryOptions>()
             ?? new TelemetryOptions();
 
+        var rawOtlpEndpoint = !string.IsNullOrWhiteSpace(telemetryOptions.OtlpEndpoint)
+            ? telemetryOptions.OtlpEndpoint
+            : configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+        Uri? otlpEndpointUri = null;
+        var hasOtlpEndpoint = !string.IsNullOrWhiteSpace(rawOtlpEndpoint) &&
+            Uri.TryCreate(rawOtlpEndpoint, UriKind.Absolute, out otlpEndpointUri);
+
         var otelBuilder = services.AddOpenTelemetry();
 
         otelBuilder.WithTracing(tracing =>
@@ -40,10 +47,9 @@ public static class TelemetrySetup
                 })
                 .AddHttpClientInstrumentation();
 
-            if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpEndpoint) &&
-                Uri.TryCreate(telemetryOptions.OtlpEndpoint, UriKind.Absolute, out var endpointUri))
+            if (hasOtlpEndpoint && otlpEndpointUri is not null)
             {
-                tracing.AddOtlpExporter(otlp => otlp.Endpoint = endpointUri);
+                tracing.AddOtlpExporter(otlp => otlp.Endpoint = otlpEndpointUri);
             }
         });
 
@@ -59,10 +65,9 @@ public static class TelemetrySetup
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation();
 
-            if (!string.IsNullOrWhiteSpace(telemetryOptions.OtlpEndpoint) &&
-                Uri.TryCreate(telemetryOptions.OtlpEndpoint, UriKind.Absolute, out var endpointUri))
+            if (hasOtlpEndpoint && otlpEndpointUri is not null)
             {
-                metrics.AddOtlpExporter(otlp => otlp.Endpoint = endpointUri);
+                metrics.AddOtlpExporter(otlp => otlp.Endpoint = otlpEndpointUri);
             }
         });
 

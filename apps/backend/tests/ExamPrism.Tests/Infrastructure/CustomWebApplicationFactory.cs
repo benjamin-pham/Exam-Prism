@@ -38,6 +38,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         builder.UseSetting("Orleans:SiloPort", "0");
         builder.UseSetting("Orleans:GatewayPort", "0");
         builder.UseSetting("Persistence:MaxRetryCount", "0");
+        builder.UseSetting("Jwt:Issuer", "ExamPrism");
+        builder.UseSetting("Jwt:Audience", "ExamPrism");
+        builder.UseSetting("Jwt:SecretKey", "SuperSecretKeyForDevJwtTokensMin256BitsLongExamPrismDevOnly!");
+        builder.UseSetting("Jwt:AccessTokenExpirationMinutes", "15");
+        builder.UseSetting("Jwt:RefreshTokenExpirationDays", "7");
     }
 
     public async Task InitializeAsync()

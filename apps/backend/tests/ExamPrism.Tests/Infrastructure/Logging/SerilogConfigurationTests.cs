@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ExamPrism.Infrastructure.Telemetry;
 using Serilog;
 using Xunit;
 
@@ -160,6 +161,36 @@ public class SerilogConfigurationTests
 
         logger.Should().NotBeNull();
         var act = () => logger.Information("Test log message from Serilog LoggerConfiguration with dev appsettings");
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void AppsettingsJson_And_AppsettingsDevelopmentJson_ContainOnlySerilogSection()
+    {
+        foreach (var fileName in new[] { "appsettings.json", "appsettings.Development.json" })
+        {
+            var jsonPath = GetSrcPath(fileName);
+            using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(jsonPath));
+            var keys = doc.RootElement.EnumerateObject().Select(p => p.Name).ToList();
+            keys.Should().Equal(["Serilog"], $"{fileName} should only retain the Serilog section");
+        }
+    }
+
+    [Theory]
+    [InlineData("http://localhost:19100")]
+    [InlineData("not-a-valid-uri")]
+    public void AddAppTelemetry_WhenTelemetryOtlpEndpointEmpty_FallsBackToOtelExporterOtlpEndpointEnvKey(string envEndpoint)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Telemetry:OtlpEndpoint"] = "",
+                ["OTEL_EXPORTER_OTLP_ENDPOINT"] = envEndpoint
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        var act = () => services.AddAppTelemetry(configuration);
         act.Should().NotThrow();
     }
 }

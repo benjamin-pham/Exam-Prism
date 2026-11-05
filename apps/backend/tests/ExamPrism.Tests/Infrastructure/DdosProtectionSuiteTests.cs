@@ -313,6 +313,9 @@ public class DdosProtectionSuiteTests
         {
             builder.UseSetting("ConnectionStrings:CatalogConnection", "Host=127.0.0.1;Port=5432;Database=examprism_dummy;Username=postgres;Password=postgres");
             builder.UseSetting("ConnectionStrings:Redis", "");
+            builder.UseSetting("Jwt:Issuer", "ExamPrism");
+            builder.UseSetting("Jwt:Audience", "ExamPrism");
+            builder.UseSetting("Jwt:SecretKey", "SuperSecretKeyForDevJwtTokensMin256BitsLongExamPrismDevOnly!");
             builder.UseSetting("PlatformAdmin:SeedOnStartup", "false");
             builder.UseSetting("MultiTenancy:Provisioning:RecoverStuckProvisioningOnStartup", "false");
             builder.UseSetting("MultiTenancy:FleetMigration:MigrateOnStartup", "false");
