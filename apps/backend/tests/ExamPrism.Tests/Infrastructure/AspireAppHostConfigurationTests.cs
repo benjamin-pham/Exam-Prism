@@ -48,6 +48,8 @@ public class AspireAppHostConfigurationTests
 
         string[] requiredEnvPrefixes =
         [
+            "\"ConnectionStrings__CatalogConnection\"",
+            "\"ConnectionStrings__Redis\"",
             "\"AllowedHosts\"",
             "\"Persistence__CommandTimeoutSeconds\"",
             "\"MultiTenancy__BaseDomains__0\"",

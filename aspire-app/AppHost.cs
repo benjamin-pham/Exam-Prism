@@ -5,10 +5,10 @@ var catalogDb = postgres.AddDatabase("CatalogConnection", "examprism_catalog_dev
 var redis = builder.AddRedis("Redis");
 
 builder.AddProject("examprism-api", "../apps/backend/src/ExamPrism.csproj")
-    .WithReference(catalogDb)
-    .WithReference(redis)
     .WaitFor(catalogDb)
     .WaitFor(redis)
+    .WithEnvironment("ConnectionStrings__CatalogConnection", catalogDb.Resource.ConnectionStringExpression)
+    .WithEnvironment("ConnectionStrings__Redis", redis.Resource.ConnectionStringExpression)
     .WithEnvironment("AllowedHosts", "*")
     // Persistence
     .WithEnvironment("Persistence__CommandTimeoutSeconds", "30")
@@ -38,7 +38,7 @@ builder.AddProject("examprism-api", "../apps/backend/src/ExamPrism.csproj")
     .WithEnvironment("MultiTenancy__DatabasePool__ConnectionPruningIntervalSeconds", "10")
     .WithEnvironment("MultiTenancy__DatabasePool__NoResetOnClose", "true")
     .WithEnvironment("MultiTenancy__DatabasePool__KeepAliveSeconds", "30")
-    .WithEnvironment("MultiTenancy__Provisioning__ServerConnectionString", "")
+    .WithEnvironment("MultiTenancy__Provisioning__ServerConnectionString", postgres.Resource.ConnectionStringExpression)
     .WithEnvironment("MultiTenancy__Provisioning__DatabaseNamePrefix", "examprism_tenant_")
     .WithEnvironment("MultiTenancy__Provisioning__DedicatedUserPrefix", "examprism_u_")
     .WithEnvironment("MultiTenancy__Provisioning__CreateDedicatedPostgresUser", "false")
