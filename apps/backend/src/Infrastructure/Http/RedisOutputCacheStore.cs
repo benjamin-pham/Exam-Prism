@@ -1,12 +1,17 @@
 namespace ExamPrism.Infrastructure.Http;
 
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
+using Common.Caching;
 using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
-public sealed class RedisOutputCacheStore : IOutputCacheStore
+public sealed class RedisOutputCacheStore : IOutputCacheStore, IDisposable
 {
     private const string EvictByTagLuaScript = @"
 local tagKey = KEYS[1]
@@ -20,16 +25,33 @@ return #members";
     private readonly IConnectionMultiplexer? _connectionMultiplexer;
     private readonly IOutputCacheStore _fallbackStore;
     private readonly ILogger<RedisOutputCacheStore>? _logger;
+    private readonly ICacheBackplane? _backplane;
+    private readonly string _keyPrefix;
 
     public RedisOutputCacheStore(
         IConnectionMultiplexer? connectionMultiplexer = null,
         IOutputCacheStore? fallbackStore = null,
-        ILogger<RedisOutputCacheStore>? logger = null)
+        ILogger<RedisOutputCacheStore>? logger = null,
+        ICacheBackplane? backplane = null,
+        string? keyPrefix = null)
     {
         _connectionMultiplexer = connectionMultiplexer;
         _fallbackStore = fallbackStore ?? new MemoryOutputCacheFallbackStore();
         _logger = logger;
+        _backplane = backplane;
+        _keyPrefix = keyPrefix ?? string.Empty;
+
+        if (_backplane is not null)
+        {
+            _backplane.TagInvalidated += OnBackplaneTagInvalidated;
+        }
     }
+
+    private string FormatKey(string key) => string.IsNullOrEmpty(_keyPrefix) ? key : $"{_keyPrefix}{key}";
+
+    private string FormatTagKey(string tag) => string.IsNullOrEmpty(_keyPrefix)
+        ? $"outputcache:tag:{tag}"
+        : $"{_keyPrefix}outputcache:tag:{tag}";
 
     public async ValueTask<byte[]?> GetAsync(string key, CancellationToken cancellationToken)
     {
@@ -43,7 +65,8 @@ return #members";
         try
         {
             var db = _connectionMultiplexer.GetDatabase();
-            var value = await db.StringGetAsync(key);
+            var redisKey = FormatKey(key);
+            var value = await db.StringGetAsync(redisKey);
             if (!value.HasValue)
             {
                 return null;
@@ -77,7 +100,8 @@ return #members";
         try
         {
             var db = _connectionMultiplexer.GetDatabase();
-            await db.StringSetAsync(key, value, validFor);
+            var redisKey = FormatKey(key);
+            await db.StringSetAsync(redisKey, value, validFor);
 
             if (tags is { Length: > 0 })
             {
@@ -86,8 +110,8 @@ return #members";
                 {
                     if (!string.IsNullOrWhiteSpace(tag))
                     {
-                        var tagKey = $"outputcache:tag:{tag}";
-                        tagTasks.Add(AddTagKeyAsync(db, tagKey, key, validFor));
+                        var tagKey = FormatTagKey(tag);
+                        tagTasks.Add(AddTagKeyAsync(db, tagKey, redisKey, validFor));
                     }
                 }
 
@@ -114,7 +138,7 @@ return #members";
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tag);
 
-        var tagKey = $"outputcache:tag:{tag}";
+        var tagKey = FormatTagKey(tag);
 
         if (_connectionMultiplexer is not null && _connectionMultiplexer.IsConnected)
         {
@@ -132,6 +156,47 @@ return #members";
         }
 
         await _fallbackStore.EvictByTagAsync(tag, cancellationToken);
+
+        if (_backplane is not null)
+        {
+            try
+            {
+                await _backplane.PublishTagInvalidationAsync($"outputcache:tag:{tag}", cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to publish output cache tag invalidation for {Tag}", tag);
+            }
+        }
+    }
+
+    private void OnBackplaneTagInvalidated(string tag)
+    {
+        const string prefix = "outputcache:tag:";
+        var actualTag = tag.StartsWith(prefix, StringComparison.Ordinal)
+            ? tag[prefix.Length..]
+            : tag;
+
+        try
+        {
+            var vt = _fallbackStore.EvictByTagAsync(actualTag, CancellationToken.None);
+            if (!vt.IsCompleted)
+            {
+                vt.AsTask().GetAwaiter().GetResult();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Error evicting fallback store for backplane tag {Tag}", actualTag);
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_backplane is not null)
+        {
+            _backplane.TagInvalidated -= OnBackplaneTagInvalidated;
+        }
     }
 
     internal sealed class MemoryOutputCacheFallbackStore : IOutputCacheStore

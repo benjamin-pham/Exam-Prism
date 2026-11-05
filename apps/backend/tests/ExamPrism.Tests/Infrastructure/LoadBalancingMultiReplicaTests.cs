@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Common.Caching;
 using ExamPrism.Infrastructure.Caching;
 using FluentAssertions;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -252,6 +253,55 @@ public class LoadBalancingMultiReplicaTests
         released.Should().BeTrue();
         attempts.Should().BeGreaterThanOrEqualTo(3);
         await handle.Received(1).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task OrleansIpResolution_OutputCacheBackplane_And_UpstreamHeader_WorkAcrossReplicas()
+    {
+        // 1. Orleans IP resolution ignores loopback/invalid strings and resolves explicit or host non-loopback IPv4
+        var explicitIp = ExamPrism.Infrastructure.Orleans.OrleansSetup.ResolveAdvertisedIpAddress("10.244.1.15", null);
+        explicitIp.Should().Be(System.Net.IPAddress.Parse("10.244.1.15"));
+
+        var loopbackFallback = ExamPrism.Infrastructure.Orleans.OrleansSetup.ResolveAdvertisedIpAddress("127.0.0.1", "invalid-ip");
+        if (loopbackFallback is not null)
+        {
+            System.Net.IPAddress.IsLoopback(loopbackFallback).Should().BeFalse();
+        }
+
+        // 2. RedisOutputCacheStore prefixes keys and evicts peer fallback store via backplane
+        var backplaneA = Substitute.For<ICacheBackplane>();
+        var backplaneB = Substitute.For<ICacheBackplane>();
+        backplaneA.When(b => b.PublishTagInvalidationAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()))
+            .Do(ci => backplaneB.TagInvalidated += Raise.Event<Action<string>>(ci.ArgAt<string>(0)));
+
+        var storeA = new ExamPrism.Infrastructure.Http.RedisOutputCacheStore(
+            connectionMultiplexer: null, fallbackStore: null, logger: null, backplane: backplaneA, keyPrefix: "examprism:");
+        var storeB = new ExamPrism.Infrastructure.Http.RedisOutputCacheStore(
+            connectionMultiplexer: null, fallbackStore: null, logger: null, backplane: backplaneB, keyPrefix: "examprism:");
+
+        await storeB.SetAsync("page1", [1, 2, 3], ["tenant-1"], TimeSpan.FromMinutes(5), CancellationToken.None);
+        (await storeB.GetAsync("page1", CancellationToken.None)).Should().NotBeNull();
+
+        await storeA.EvictByTagAsync("tenant-1", CancellationToken.None);
+        (await storeB.GetAsync("page1", CancellationToken.None)).Should().BeNull();
+
+        // 3. UseAppReverseProxy emits X-Upstream-Instance header
+        var ctx = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.Configure<ExamPrism.Infrastructure.Http.ReverseProxyOptions>(o =>
+        {
+            o.EmitUpstreamInstanceHeader = true;
+            o.InstanceId = "replica-node-2";
+        });
+        ctx.RequestServices = services.BuildServiceProvider();
+        var appBuilder = new Microsoft.AspNetCore.Builder.ApplicationBuilder(ctx.RequestServices);
+        ExamPrism.Infrastructure.Http.ReverseProxySetup.UseAppReverseProxy(appBuilder);
+        appBuilder.Run(_ => Task.CompletedTask);
+        var pipeline = appBuilder.Build();
+
+        await pipeline(ctx);
+        ctx.Response.Headers["X-Upstream-Instance"].ToString().Should().Be("replica-node-2");
     }
 }
 

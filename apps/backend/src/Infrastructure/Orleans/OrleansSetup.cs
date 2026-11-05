@@ -1,6 +1,7 @@
 namespace ExamPrism.Infrastructure.Orleans;
 
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Common.Orleans;
 using global::Orleans;
@@ -73,6 +74,50 @@ public static class OrleansSetup
         return (siloPort, gatewayPort);
     }
 
+    public static IPAddress? ResolveAdvertisedIpAddress(string? configuredIp, string? podIpEnv)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredIp) &&
+            IPAddress.TryParse(configuredIp, out var parsedConfig) &&
+            !IPAddress.IsLoopback(parsedConfig))
+        {
+            return parsedConfig;
+        }
+
+        if (!string.IsNullOrWhiteSpace(podIpEnv) &&
+            IPAddress.TryParse(podIpEnv, out var parsedPod) &&
+            !IPAddress.IsLoopback(parsedPod))
+        {
+            return parsedPod;
+        }
+
+        try
+        {
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up ||
+                    ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                {
+                    continue;
+                }
+
+                var ipProps = ni.GetIPProperties();
+                foreach (var addr in ipProps.UnicastAddresses)
+                {
+                    if (addr.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(addr.Address))
+                    {
+                        return addr.Address;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Ignore network interface enumeration failures
+        }
+
+        return null;
+    }
+
     public static IHostBuilder UseOrleans(this IHostBuilder hostBuilder)
     {
         return hostBuilder.UseOrleans((context, siloBuilder) =>
@@ -108,15 +153,10 @@ public static class OrleansSetup
                 msgOpts.ResponseTimeout = TimeSpan.FromSeconds(options.ResponseTimeoutSeconds);
             });
 
-            var advertisedIp = options.AdvertisedIpAddress;
-            if (string.IsNullOrWhiteSpace(advertisedIp))
+            var resolvedIp = ResolveAdvertisedIpAddress(options.AdvertisedIpAddress, Environment.GetEnvironmentVariable("POD_IP"));
+            if (resolvedIp is not null)
             {
-                advertisedIp = Environment.GetEnvironmentVariable("POD_IP");
-            }
-
-            if (!string.IsNullOrWhiteSpace(advertisedIp) && IPAddress.TryParse(advertisedIp, out var ip))
-            {
-                siloBuilder.Configure<EndpointOptions>(endpointOpts => endpointOpts.AdvertisedIPAddress = ip);
+                siloBuilder.Configure<EndpointOptions>(endpointOpts => endpointOpts.AdvertisedIPAddress = resolvedIp);
             }
 
             siloBuilder.AddIncomingGrainCallFilter<TenantIncomingGrainCallFilter>();

@@ -1,6 +1,7 @@
 namespace ExamPrism.Infrastructure.Http;
 
 using System.IO.Compression;
+using Common.Caching;
 using Common.Http;
 using ExamPrism.Infrastructure.Caching;
 using Microsoft.AspNetCore.Builder;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
 public static class HttpPerformanceSetup
@@ -71,7 +73,9 @@ public static class HttpPerformanceSetup
         {
             var multiplexer = sp.GetService<IConnectionMultiplexer>();
             var logger = sp.GetService<ILogger<RedisOutputCacheStore>>();
-            return new RedisOutputCacheStore(multiplexer, fallbackStore: null, logger);
+            var backplane = sp.GetService<ICacheBackplane>();
+            var keyPrefix = sp.GetService<IOptions<CacheOptions>>()?.Value?.KeyPrefix;
+            return new RedisOutputCacheStore(multiplexer, fallbackStore: null, logger, backplane, keyPrefix);
         });
 
         services.Configure<LoadSheddingOptions>(configuration.GetSection(LoadSheddingOptions.SectionName));

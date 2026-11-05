@@ -79,6 +79,15 @@ public static class ReverseProxySetup
                 context.Items[OriginalRemoteIpItemKey] = context.Connection.RemoteIpAddress;
             }
 
+            var proxyOpts = context.RequestServices?.GetService<IOptions<ReverseProxyOptions>>()?.Value;
+            if (proxyOpts?.EmitUpstreamInstanceHeader ?? true)
+            {
+                var instanceId = !string.IsNullOrWhiteSpace(proxyOpts?.InstanceId)
+                    ? proxyOpts!.InstanceId
+                    : Environment.MachineName;
+                context.Response.Headers["X-Upstream-Instance"] = instanceId;
+            }
+
             await next();
         });
 
