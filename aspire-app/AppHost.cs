@@ -1,8 +1,10 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var postgres = builder.AddPostgres("postgres");
+var postgres = builder.AddPostgres("postgres")
+    .WithPgAdmin();
 var catalogDb = postgres.AddDatabase("CatalogConnection", "examprism_catalog_dev");
-var redis = builder.AddRedis("Redis");
+var redis = builder.AddRedis("Redis")
+    .WithRedisCommander();
 
 builder.AddProject("examprism-api", "../apps/backend/src/ExamPrism.csproj")
     .WaitFor(catalogDb)

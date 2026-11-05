@@ -42,8 +42,10 @@ public class AspireAppHostConfigurationTests
 
         var content = File.ReadAllText(appHostPath);
         content.Should().Contain("AddPostgres(\"postgres\")");
+        content.Should().Contain("WithPgAdmin()");
         content.Should().Contain("AddDatabase(\"CatalogConnection\", \"examprism_catalog_dev\")");
         content.Should().Contain("AddRedis(\"Redis\")");
+        content.Should().Contain("WithRedisCommander()");
         content.Should().Contain("AddProject(\"examprism-api\", \"../apps/backend/src/ExamPrism.csproj\")");
 
         string[] requiredEnvPrefixes =
