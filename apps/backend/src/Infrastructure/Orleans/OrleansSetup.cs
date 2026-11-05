@@ -206,9 +206,10 @@ public static class OrleansSetup
             if (isRedisReachable && redisOptions is not null)
             {
                 siloBuilder.ConfigureEndpoints(
+                    advertisedIP: resolvedIp ?? IPAddress.Loopback,
                     siloPort: siloPort,
                     gatewayPort: gatewayPort,
-                    listenOnAnyHostAddress: true);
+                    listenOnAnyHostAddress: options.ListenOnAnyHostAddress);
 
                 siloBuilder.UseRedisClustering(opt => opt.ConfigurationOptions = redisOptions);
                 siloBuilder.AddRedisGrainStorage(options.StateStoreName, opt => opt.ConfigurationOptions = redisOptions);

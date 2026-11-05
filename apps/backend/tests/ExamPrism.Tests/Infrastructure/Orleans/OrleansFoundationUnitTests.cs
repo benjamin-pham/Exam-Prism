@@ -10,6 +10,7 @@ using Finbuckle.MultiTenant.Extensions;
 using FluentAssertions;
 using global::Orleans;
 using global::Orleans.Runtime;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using NSubstitute;
@@ -428,5 +429,28 @@ public class OrleansFoundationUnitTests
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("boom-scope");
 
         accessor.MultiTenantContext.Should().BeSameAs(priorContext);
+    }
+
+    [Fact]
+    public void OrleansOptions_ListenOnAnyHostAddress_DefaultsToFalse()
+    {
+        var options = new OrleansOptions();
+        options.ListenOnAnyHostAddress.Should().BeFalse();
+    }
+
+    [Fact]
+    public void OrleansOptions_BindsFromConfigurationCorrectly()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Orleans:ListenOnAnyHostAddress"] = "true"
+            })
+            .Build();
+
+        var options = new OrleansOptions();
+        config.GetSection("Orleans").Bind(options);
+
+        options.ListenOnAnyHostAddress.Should().BeTrue();
     }
 }

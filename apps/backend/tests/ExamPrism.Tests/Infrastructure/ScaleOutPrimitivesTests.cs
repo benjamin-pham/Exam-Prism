@@ -125,6 +125,27 @@ public class ScaleOutPrimitivesTests
     }
 
     [Fact]
+    public async Task RedisDistributedLock_WhenRedisThrowsException_ReturnsNull_FailsClosed()
+    {
+        var multiplexer = Substitute.For<IConnectionMultiplexer>();
+        var database = Substitute.For<IDatabase>();
+        multiplexer.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(database);
+
+        database.StringSetAsync(
+            Arg.Any<RedisKey>(),
+            Arg.Any<RedisValue>(),
+            Arg.Any<TimeSpan?>(),
+            Arg.Any<When>())
+            .ThrowsAsync(new RedisTimeoutException("Redis command timed out", CommandStatus.Unknown));
+
+        var lockOptions = Options.Create(new LockingOptions { KeyPrefix = "lock:", DefaultExpirySeconds = 30 });
+        var redisLock = new RedisDistributedLock(multiplexer, lockOptions, NullLogger<RedisDistributedLock>.Instance);
+
+        var handle = await redisLock.TryAcquireAsync("res-timeout-fail-closed");
+        handle.Should().BeNull();
+    }
+
+    [Fact]
     public void RedisXmlRepository_StoresAndReadsDataProtectionXmlElements_AndFailsOpenOnRedisException()
     {
         var multiplexer = Substitute.For<IConnectionMultiplexer>();

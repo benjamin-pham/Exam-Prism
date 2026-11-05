@@ -10,6 +10,7 @@ public sealed class OrleansOptions
     public string StateStoreName { get; set; } = DefaultStateStoreName;
     public int SiloPort { get; set; } = 11111;
     public int GatewayPort { get; set; } = 30000;
+    public bool ListenOnAnyHostAddress { get; set; } = false;
     public string? AdvertisedIpAddress { get; set; }
     public bool LoadSheddingEnabled { get; set; } = true;
     public int LoadSheddingLimitPercent { get; set; } = 95;

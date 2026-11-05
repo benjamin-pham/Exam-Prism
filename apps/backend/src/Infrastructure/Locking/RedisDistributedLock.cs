@@ -13,7 +13,6 @@ public sealed class RedisDistributedLock : IDistributedLock
     private readonly IConnectionMultiplexer _multiplexer;
     private readonly LockingOptions _options;
     private readonly ILogger<RedisDistributedLock> _logger;
-    private readonly InMemoryDistributedLock _inMemoryFallback = new();
 
     public RedisDistributedLock(
         IConnectionMultiplexer multiplexer,
@@ -49,8 +48,8 @@ public sealed class RedisDistributedLock : IDistributedLock
         }
         catch (Exception ex) when (ex is RedisException or TimeoutException)
         {
-            _logger.LogWarning(ex, "Failed to acquire distributed lock for resource {Resource} via Redis, falling back to in-memory lock", resource);
-            return await _inMemoryFallback.TryAcquireAsync(resource, expiry, cancellationToken);
+            _logger.LogWarning(ex, "Failed to acquire distributed lock for resource {Resource} via Redis; failing closed to prevent multi-node split-brain.", resource);
+            return null;
         }
     }
 
