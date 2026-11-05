@@ -22,6 +22,10 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
 
     public string InstanceId { get; } = Guid.NewGuid().ToString("N");
 
+    public event Action<string>? KeyInvalidated;
+
+    public event Action<string>? TagInvalidated;
+
     public RedisCacheBackplane(
         IConnectionMultiplexer multiplexer,
         HybridCache hybridCache,
@@ -132,6 +136,7 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
                     vt.AsTask().GetAwaiter().GetResult();
                 }
                 ExamPrismDiagnostics.RecordCacheBackplaneEviction();
+                NotifyListeners(KeyInvalidated, target, kind);
             }
             else if (string.Equals(kind, "T", StringComparison.Ordinal))
             {
@@ -141,11 +146,35 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
                     vt.AsTask().GetAwaiter().GetResult();
                 }
                 ExamPrismDiagnostics.RecordCacheBackplaneEviction();
+                NotifyListeners(TagInvalidated, target, kind);
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to evict L1 cache entry {Target} ({Kind}) from backplane message", target, kind);
+        }
+    }
+
+    private void NotifyListeners(Action<string>? handlers, string target, string kind)
+    {
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (var invocation in handlers.GetInvocationList())
+        {
+            if (invocation is Action<string> action)
+            {
+                try
+                {
+                    action(target);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Subscriber threw exception during cache backplane notification for {Target} ({Kind})", target, kind);
+                }
+            }
         }
     }
 

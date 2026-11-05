@@ -94,6 +94,8 @@ public sealed class HybridCacheService : ICacheService
             options,
             scopedTags,
             cancellationToken);
+
+        await _backplane.PublishKeyInvalidationAsync(scopedKey, cancellationToken);
     }
 
     public async ValueTask RemoveAsync(
