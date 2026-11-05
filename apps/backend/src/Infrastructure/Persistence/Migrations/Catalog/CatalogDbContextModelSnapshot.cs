@@ -78,7 +78,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
                     b.ToTable("Tenants", (string)null);
                 });
 
-            modelBuilder.Entity("ExamPrism.Infrastructure.Identity.PlatformRefreshToken", b =>
+            modelBuilder.Entity("ExamPrism.Domain.Identity.PlatformRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -116,7 +116,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
                     b.ToTable("PlatformRefreshTokens", (string)null);
                 });
 
-            modelBuilder.Entity("ExamPrism.Infrastructure.Identity.PlatformRole", b =>
+            modelBuilder.Entity("ExamPrism.Domain.Identity.PlatformRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -143,7 +143,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
                     b.ToTable("AspNetRoles", (string)null);
                 });
 
-            modelBuilder.Entity("ExamPrism.Infrastructure.Identity.PlatformUser", b =>
+            modelBuilder.Entity("ExamPrism.Domain.Identity.PlatformUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -311,9 +311,9 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("ExamPrism.Infrastructure.Identity.PlatformRefreshToken", b =>
+            modelBuilder.Entity("ExamPrism.Domain.Identity.PlatformRefreshToken", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.PlatformUser", "User")
+                    b.HasOne("ExamPrism.Domain.Identity.PlatformUser", "User")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -324,7 +324,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.PlatformRole", null)
+                    b.HasOne("ExamPrism.Domain.Identity.PlatformRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -333,7 +333,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.PlatformUser", null)
+                    b.HasOne("ExamPrism.Domain.Identity.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -342,7 +342,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.PlatformUser", null)
+                    b.HasOne("ExamPrism.Domain.Identity.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -351,13 +351,13 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.PlatformRole", null)
+                    b.HasOne("ExamPrism.Domain.Identity.PlatformRole", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("ExamPrism.Infrastructure.Identity.PlatformUser", null)
+                    b.HasOne("ExamPrism.Domain.Identity.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -366,14 +366,14 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.PlatformUser", null)
+                    b.HasOne("ExamPrism.Domain.Identity.PlatformUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ExamPrism.Infrastructure.Identity.PlatformUser", b =>
+            modelBuilder.Entity("ExamPrism.Domain.Identity.PlatformUser", b =>
                 {
                     b.Navigation("RefreshTokens");
                 });

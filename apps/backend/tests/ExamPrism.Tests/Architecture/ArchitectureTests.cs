@@ -13,6 +13,7 @@ using ExamPrism.Infrastructure.Orleans;
 using ExamPrism.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -626,14 +627,19 @@ public class ArchitectureTests
 
         foreach (var type in domainTypes)
         {
+            var isIdentityDomain = type.Namespace == "ExamPrism.Domain.Identity";
+            var typeForbiddenPrefixes = isIdentityDomain
+                ? forbiddenPrefixes.Where(p => p != "Microsoft.AspNetCore").Concat(["Microsoft.AspNetCore.Http", "Microsoft.AspNetCore.Mvc", "Microsoft.AspNetCore.Routing"]).ToArray()
+                : forbiddenPrefixes;
+
             if (type.BaseType is not null)
             {
-                AssertNotForbiddenNamespace(type.BaseType, type, "BaseType", forbiddenPrefixes);
+                AssertNotForbiddenNamespace(type.BaseType, type, "BaseType", typeForbiddenPrefixes);
             }
 
             foreach (var iface in type.GetInterfaces())
             {
-                AssertNotForbiddenNamespace(iface, type, "Interface", forbiddenPrefixes);
+                AssertNotForbiddenNamespace(iface, type, "Interface", typeForbiddenPrefixes);
             }
 
             var members = type.GetMembers(
@@ -644,19 +650,19 @@ public class ArchitectureTests
                 switch (member)
                 {
                     case FieldInfo f:
-                        AssertNotForbiddenNamespace(f.FieldType, type, f.Name, forbiddenPrefixes);
+                        AssertNotForbiddenNamespace(f.FieldType, type, f.Name, typeForbiddenPrefixes);
                         break;
                     case PropertyInfo p:
-                        AssertNotForbiddenNamespace(p.PropertyType, type, p.Name, forbiddenPrefixes);
+                        AssertNotForbiddenNamespace(p.PropertyType, type, p.Name, typeForbiddenPrefixes);
                         break;
                     case MethodBase m:
                         if (m is MethodInfo mi)
                         {
-                            AssertNotForbiddenNamespace(mi.ReturnType, type, m.Name, forbiddenPrefixes);
+                            AssertNotForbiddenNamespace(mi.ReturnType, type, m.Name, typeForbiddenPrefixes);
                         }
                         foreach (var param in m.GetParameters())
                         {
-                            AssertNotForbiddenNamespace(param.ParameterType, type, $"{m.Name}({param.Name})", forbiddenPrefixes);
+                            AssertNotForbiddenNamespace(param.ParameterType, type, $"{m.Name}({param.Name})", typeForbiddenPrefixes);
                         }
                         break;
                 }
@@ -669,7 +675,7 @@ public class ArchitectureTests
     {
         var commonTypes = AppTypes
             .Where(t => t.Namespace != null && (t.Namespace == "Common" || t.Namespace.StartsWith("Common.", StringComparison.Ordinal)))
-            .Where(t => t != typeof(ICatalogDbContext))
+            .Where(t => t != typeof(IAppDbContext) && t != typeof(ICatalogDbContext))
             .ToList();
 
         commonTypes.Should().NotBeEmpty();
@@ -757,9 +763,10 @@ public class ArchitectureTests
         {
             var isEntity = IsSubclassOfRawGeneric(typeof(Entity<>), type);
             var isAggregate = IsSubclassOfRawGeneric(typeof(AggregateRoot<>), type);
+            var isIdentityType = typeof(IdentityUser<Guid>).IsAssignableFrom(type) || typeof(IdentityRole<Guid>).IsAssignableFrom(type);
 
-            (isEntity || isAggregate).Should().BeTrue(
-                $"{type.FullName} in ExamPrism.Domain must inherit from Entity<TId>, AggregateRoot<TId>, ValueObject, IDomainEvent, or Specification<T>");
+            (isEntity || isAggregate || isIdentityType).Should().BeTrue(
+                $"{type.FullName} in ExamPrism.Domain must inherit from Entity<TId>, AggregateRoot<TId>, ValueObject, IDomainEvent, Specification<T>, or IdentityUser/Role");
         }
     }
 
@@ -805,6 +812,16 @@ public class ArchitectureTests
     {
         typeof(IAppDbContext).Namespace.Should().Be("Common.Persistence");
         typeof(ICatalogDbContext).Namespace.Should().Be("Common.Persistence");
+    }
+
+    [Fact]
+    public void IdentityEntities_MustBeInDomainIdentity()
+    {
+        typeof(ApplicationUser).Namespace.Should().Be("ExamPrism.Domain.Identity");
+        typeof(PlatformUser).Namespace.Should().Be("ExamPrism.Domain.Identity");
+        typeof(PlatformRole).Namespace.Should().Be("ExamPrism.Domain.Identity");
+        typeof(RefreshToken).Namespace.Should().Be("ExamPrism.Domain.Identity");
+        typeof(PlatformRefreshToken).Namespace.Should().Be("ExamPrism.Domain.Identity");
     }
 
     private static bool IsSubclassOfRawGeneric(Type generic, Type? toCheck)

@@ -1,8 +1,9 @@
-namespace ExamPrism.Infrastructure.Identity;
+namespace ExamPrism.Domain.Identity;
 
-public class PlatformRefreshToken
+using Common.Domain;
+
+public class PlatformRefreshToken : Entity<Guid>
 {
-    public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public PlatformUser User { get; set; } = null!;
     public string TokenHash { get; set; } = string.Empty;
@@ -11,7 +12,12 @@ public class PlatformRefreshToken
     public DateTime? RevokedAt { get; set; }
     public string? ReplacedByTokenHash { get; set; }
 
+    public PlatformRefreshToken() { }
+
+    public PlatformRefreshToken(Guid id) : base(id) { }
+
     public bool IsExpired(TimeProvider timeProvider) => timeProvider.GetUtcNow().UtcDateTime >= ExpiresAt;
     public bool IsRevoked => RevokedAt != null;
     public bool IsActive(TimeProvider timeProvider) => !IsRevoked && !IsExpired(timeProvider);
 }
+

@@ -2,8 +2,8 @@ namespace Common.Persistence;
 
 using System.Threading;
 using System.Threading.Tasks;
+using ExamPrism.Domain.Identity;
 using ExamPrism.Domain.Tenants;
-using ExamPrism.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 

@@ -22,7 +22,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("ExamPrism.Infrastructure.Identity.ApplicationUser", b =>
+            modelBuilder.Entity("ExamPrism.Domain.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -87,7 +87,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("ExamPrism.Infrastructure.Identity.RefreshToken", b =>
+            modelBuilder.Entity("ExamPrism.Domain.Identity.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -253,9 +253,9 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("ExamPrism.Infrastructure.Identity.RefreshToken", b =>
+            modelBuilder.Entity("ExamPrism.Domain.Identity.RefreshToken", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.ApplicationUser", "User")
+                    b.HasOne("ExamPrism.Domain.Identity.ApplicationUser", "User")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -275,7 +275,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.ApplicationUser", null)
+                    b.HasOne("ExamPrism.Domain.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -284,7 +284,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.ApplicationUser", null)
+                    b.HasOne("ExamPrism.Domain.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -299,7 +299,7 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("ExamPrism.Infrastructure.Identity.ApplicationUser", null)
+                    b.HasOne("ExamPrism.Domain.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -308,14 +308,14 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
                 {
-                    b.HasOne("ExamPrism.Infrastructure.Identity.ApplicationUser", null)
+                    b.HasOne("ExamPrism.Domain.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ExamPrism.Infrastructure.Identity.ApplicationUser", b =>
+            modelBuilder.Entity("ExamPrism.Domain.Identity.ApplicationUser", b =>
                 {
                     b.Navigation("RefreshTokens");
                 });
