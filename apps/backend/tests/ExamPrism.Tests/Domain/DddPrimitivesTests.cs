@@ -216,6 +216,11 @@ public class DddPrimitivesTests
         notActive.IsSatisfiedBy(item1).Should().BeFalse();
         notActive.IsSatisfiedBy(item4).Should().BeTrue();
 
+        var matchAllSpec = new MatchAllProductSpec();
+        var orMatchAll = activeSpec.Or(matchAllSpec);
+        orMatchAll.Criteria.Should().BeNull();
+        orMatchAll.IsSatisfiedBy(item4).Should().BeTrue();
+
         var dtoSpec = new ProductDtoSpec();
         dtoSpec.Skip.Should().Be(10);
         dtoSpec.Take.Should().Be(5);
@@ -223,6 +228,10 @@ public class DddPrimitivesTests
         dtoSpec.IgnoreQueryFilters.Should().BeTrue();
         dtoSpec.OrderExpressions.Should().ContainSingle(o => !o.Descending);
         dtoSpec.Selector.Should().NotBeNull();
+    }
+
+    private sealed class MatchAllProductSpec : Specification<ProductItem>
+    {
     }
 }
 

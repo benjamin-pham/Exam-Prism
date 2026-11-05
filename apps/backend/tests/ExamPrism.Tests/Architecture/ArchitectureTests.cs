@@ -602,7 +602,10 @@ public class ArchitectureTests
     public void TypesInDomain_MustNotReferenceInfrastructureFeaturesEndpointsOrExternalFrameworks()
     {
         var domainTypes = AppTypes
-            .Where(t => t.Namespace != null && t.Namespace.StartsWith("ExamPrism.Domain", StringComparison.Ordinal))
+            .Where(t => t.Namespace != null &&
+                (t.Namespace.StartsWith("ExamPrism.Domain", StringComparison.Ordinal) ||
+                 t.Namespace == "Common.Domain" ||
+                 t.Namespace.StartsWith("Common.Domain.", StringComparison.Ordinal)))
             .ToList();
 
         domainTypes.Should().NotBeEmpty();
@@ -621,6 +624,16 @@ public class ArchitectureTests
 
         foreach (var type in domainTypes)
         {
+            if (type.BaseType is not null)
+            {
+                AssertNotForbiddenNamespace(type.BaseType, type, "BaseType", forbiddenPrefixes);
+            }
+
+            foreach (var iface in type.GetInterfaces())
+            {
+                AssertNotForbiddenNamespace(iface, type, "Interface", forbiddenPrefixes);
+            }
+
             var members = type.GetMembers(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
 
@@ -662,6 +675,16 @@ public class ArchitectureTests
 
         foreach (var type in commonTypes)
         {
+            if (type.BaseType is not null)
+            {
+                AssertNotForbiddenNamespace(type.BaseType, type, "BaseType", forbiddenPrefixes);
+            }
+
+            foreach (var iface in type.GetInterfaces())
+            {
+                AssertNotForbiddenNamespace(iface, type, "Interface", forbiddenPrefixes);
+            }
+
             var members = type.GetMembers(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
 

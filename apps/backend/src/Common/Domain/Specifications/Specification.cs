@@ -121,13 +121,15 @@ public class Specification<TEntity> : ISpecification<TEntity>
                     ? ExpressionCombiner.AndAlso(left.Criteria, right.Criteria)
                     : ExpressionCombiner.OrElse(left.Criteria, right.Criteria);
             }
-            else if (left.Criteria is not null)
+            else if (type == CombinationType.And)
             {
-                Criteria = left.Criteria;
+                Criteria = left.Criteria ?? right.Criteria;
             }
             else
             {
-                Criteria = right.Criteria;
+                // In OR combination, if either side is unconditional match-all (null Criteria),
+                // (True OR Criteria) is True, which is also an unconditional match-all (null Criteria).
+                Criteria = null;
             }
 
             foreach (var inc in left.Includes.Concat(right.Includes))
