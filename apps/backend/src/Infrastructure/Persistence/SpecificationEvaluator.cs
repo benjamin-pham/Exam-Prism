@@ -86,17 +86,5 @@ public static class SpecificationEvaluator
 
         return query;
     }
-
-    public static IQueryable<TResult> GetQuery<TEntity, TResult>(
-        IQueryable<TEntity> inputQuery,
-        ISpecification<TEntity, TResult> specification)
-        where TEntity : class
-    {
-        ArgumentNullException.ThrowIfNull(specification);
-        ArgumentNullException.ThrowIfNull(specification.Selector);
-
-        var entityQuery = GetQuery(inputQuery, specification, evaluateCriteriaOnly: false);
-        return entityQuery.Select(specification.Selector);
-    }
 }
 

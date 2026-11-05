@@ -19,6 +19,7 @@ public static class PersistenceSetup
         IConfiguration configuration,
         IHealthChecksBuilder healthChecksBuilder)
     {
+        DapperTypeHandlers.EnsureRegistered();
         services.Configure<PersistenceOptions>(configuration.GetSection(PersistenceOptions.SectionName));
         services.AddSingleton<SlowQueryTelemetryInterceptor>();
         services.AddSingleton<AuditableEntityInterceptor>();
@@ -92,7 +93,7 @@ public static class PersistenceSetup
                 ConfigureNpgsql(npgsqlOptions, persistenceOptions));
 
             var inner = new CatalogDbContext(builder.Options);
-            return new ReadOnlyCatalogDbContext(inner);
+            return new ReadOnlyCatalogDbContext(inner, interceptor);
         });
 
         services.AddScoped<ReadOnlyAppDbContext>(sp =>
@@ -121,7 +122,7 @@ public static class PersistenceSetup
                 ConfigureNpgsql(npgsqlOptions, persistenceOptions));
 
             var inner = new AppDbContext(builder.Options);
-            return new ReadOnlyAppDbContext(inner);
+            return new ReadOnlyAppDbContext(inner, interceptor);
         });
 
         healthChecksBuilder.AddDbContextCheck<CatalogDbContext>(name: "catalog_db");

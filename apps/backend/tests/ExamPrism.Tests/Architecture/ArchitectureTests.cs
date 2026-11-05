@@ -619,7 +619,8 @@ public class ArchitectureTests
             "Microsoft.AspNetCore",
             "Wolverine",
             "Orleans",
-            "StackExchange.Redis"
+            "StackExchange.Redis",
+            "Dapper"
         };
 
         foreach (var type in domainTypes)
@@ -774,6 +775,38 @@ public class ArchitectureTests
             vo.IsPublic.Should().BeTrue($"{vo.FullName} must be public");
             vo.IsSealed.Should().BeTrue($"{vo.FullName} must be sealed");
             vo.Namespace.Should().StartWith("ExamPrism.Domain", $"{vo.FullName} must be in ExamPrism.Domain");
+        }
+    }
+
+    [Fact]
+    public void ReadOnlyDbContexts_MustNotExposeIQueryableOrAcceptSpecifications()
+    {
+        var readOnlyTypes = new[] { typeof(ReadOnlyCatalogDbContext), typeof(ReadOnlyAppDbContext) };
+
+        foreach (var type in readOnlyTypes)
+        {
+            var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
+            foreach (var prop in properties)
+            {
+                typeof(IQueryable).IsAssignableFrom(prop.PropertyType).Should().BeFalse(
+                    $"{type.Name}.{prop.Name} must not expose IQueryable; read side uses Dapper raw SQL");
+            }
+
+            var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
+            foreach (var method in methods)
+            {
+                typeof(IQueryable).IsAssignableFrom(method.ReturnType).Should().BeFalse(
+                    $"{type.Name}.{method.Name} must not return IQueryable");
+
+                foreach (var param in method.GetParameters())
+                {
+                    var paramType = param.ParameterType.IsGenericType
+                        ? param.ParameterType.GetGenericTypeDefinition()
+                        : param.ParameterType;
+                    (paramType == typeof(ISpecification<>)).Should().BeFalse(
+                        $"{type.Name}.{method.Name} must not accept ISpecification; specifications are write-side only");
+                }
+            }
         }
     }
 

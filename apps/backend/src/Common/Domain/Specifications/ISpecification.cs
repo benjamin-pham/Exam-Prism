@@ -16,8 +16,3 @@ public interface ISpecification<TEntity>
     bool IsSatisfiedBy(TEntity entity);
 }
 
-public interface ISpecification<TEntity, TResult> : ISpecification<TEntity>
-{
-    Expression<Func<TEntity, TResult>> Selector { get; }
-}
-

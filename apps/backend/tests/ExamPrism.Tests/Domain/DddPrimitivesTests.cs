@@ -98,16 +98,15 @@ public class DddPrimitivesTests
         }
     }
 
-    private sealed class ProductDtoSpec : Specification<ProductItem, string>
+    private sealed class PagedProductSpec : Specification<ProductItem>
     {
-        public ProductDtoSpec()
+        public PagedProductSpec()
         {
             Where(x => x.IsActive);
             ApplyOrderBy(x => x.Price);
             ApplyPaging(skip: 10, take: 5);
             WithSplitQuery();
             WithIgnoreQueryFilters();
-            Select(x => x.Name);
         }
     }
 
@@ -225,13 +224,17 @@ public class DddPrimitivesTests
         matchNoneSpec.IsSatisfiedBy(item1).Should().BeFalse();
         matchNoneSpec.IsSatisfiedBy(item4).Should().BeFalse();
 
-        var dtoSpec = new ProductDtoSpec();
-        dtoSpec.Skip.Should().Be(10);
-        dtoSpec.Take.Should().Be(5);
-        dtoSpec.AsSplitQuery.Should().BeTrue();
-        dtoSpec.IgnoreQueryFilters.Should().BeTrue();
-        dtoSpec.OrderExpressions.Should().ContainSingle(o => !o.Descending);
-        dtoSpec.Selector.Should().NotBeNull();
+        var pagedSpec = new PagedProductSpec();
+        pagedSpec.Skip.Should().Be(10);
+        pagedSpec.Take.Should().Be(5);
+        pagedSpec.AsSplitQuery.Should().BeTrue();
+        pagedSpec.IgnoreQueryFilters.Should().BeTrue();
+        pagedSpec.OrderExpressions.Should().ContainSingle(o => !o.Descending);
+
+        typeof(ISpecification<>).Assembly.GetType("Common.Domain.Specifications.ISpecification`2")
+            .Should().BeNull();
+        typeof(Specification<>).Assembly.GetType("Common.Domain.Specifications.Specification`2")
+            .Should().BeNull();
     }
 
     private sealed class MatchAllProductSpec : Specification<ProductItem>

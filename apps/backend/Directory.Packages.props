@@ -5,6 +5,7 @@
 
   <ItemGroup>
     <!-- API Dependencies -->
+    <PackageVersion Include="Dapper" Version="2.1.66" />
     <PackageVersion Include="Finbuckle.MultiTenant" Version="10.1.5" />
     <PackageVersion Include="Finbuckle.MultiTenant.AspNetCore" Version="10.1.5" />
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.2.0" />

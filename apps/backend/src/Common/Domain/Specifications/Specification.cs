@@ -193,13 +193,3 @@ public class Specification<TEntity> : ISpecification<TEntity>
     }
 }
 
-public class Specification<TEntity, TResult> : Specification<TEntity>, ISpecification<TEntity, TResult>
-{
-    public Expression<Func<TEntity, TResult>> Selector { get; private set; } = null!;
-
-    protected void Select(Expression<Func<TEntity, TResult>> selector)
-    {
-        Selector = selector ?? throw new ArgumentNullException(nameof(selector));
-    }
-}
-

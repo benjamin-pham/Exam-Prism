@@ -164,15 +164,12 @@ public class PersistenceHighLoadTests
 
         // 1. Resolve ReadOnlyCatalogDbContext
         var readOnlyCatalog = scope.ServiceProvider.GetRequiredService<ReadOnlyCatalogDbContext>();
+        readOnlyCatalog.DatabaseContext.Should().NotBeNull();
         readOnlyCatalog.DatabaseContext.ChangeTracker.QueryTrackingBehavior.Should().Be(QueryTrackingBehavior.NoTracking);
-        readOnlyCatalog.Tenants.Should().NotBeNull();
-        readOnlyCatalog.Users.Should().NotBeNull();
-        readOnlyCatalog.PlatformRefreshTokens.Should().NotBeNull();
 
         // 2. Resolve ReadOnlyAppDbContext
         var readOnlyApp = scope.ServiceProvider.GetRequiredService<ReadOnlyAppDbContext>();
+        readOnlyApp.DatabaseContext.Should().NotBeNull();
         readOnlyApp.DatabaseContext.ChangeTracker.QueryTrackingBehavior.Should().Be(QueryTrackingBehavior.NoTracking);
-        readOnlyApp.Users.Should().NotBeNull();
-        readOnlyApp.RefreshTokens.Should().NotBeNull();
     }
 }

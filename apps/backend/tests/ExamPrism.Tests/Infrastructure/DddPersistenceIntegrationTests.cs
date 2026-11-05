@@ -3,13 +3,17 @@ namespace Tests.Infrastructure;
 using System.Linq.Expressions;
 using Common.Domain;
 using Common.Domain.Specifications;
+using Common.MultiTenancy;
 using Common.Persistence;
+using Dapper;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using ExamPrism.Infrastructure.Persistence.Interceptors;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Wolverine;
@@ -40,13 +44,7 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         }
     }
 
-    private sealed class CustomReadOnlyCatalogTenantCountQuery(string prefix) : IDbQuery<ReadOnlyCatalogDbContext, int>
-    {
-        public Task<int> ExecuteAsync(ReadOnlyCatalogDbContext db, CancellationToken ct = default)
-        {
-            return db.Tenants.CountAsync(t => t.Slug.StartsWith(prefix), ct);
-        }
-    }
+    public record TenantSummaryDto(Guid Id, string Slug, string Name, TenantStatus Status);
 
     private sealed class TenantByPrefixSpec : Specification<Tenant>
     {
@@ -67,21 +65,11 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         }
     }
 
-    private sealed class TenantNameProjectionSpec : Specification<Tenant, string>
-    {
-        public TenantNameProjectionSpec(string prefix)
-        {
-            Where(t => t.Slug.StartsWith(prefix));
-            ApplyOrderBy(t => t.Slug);
-            Select(t => t.Name);
-        }
-    }
-
     [Fact]
-    public async Task DbContextQueryExtensions_ExecutesIDbQuery_AndSpecificationMethods_OnWriteAndReadOnlyContexts()
+    public async Task WriteSideDbContext_ExecutesIDbQuery_AndEntitySpecifications()
     {
         await using var db = CreateCatalogDbContext();
-        var prefix = "query-test-" + Guid.NewGuid().ToString("N")[..6];
+        var prefix = "write-query-" + Guid.NewGuid().ToString("N")[..6];
 
         var t1 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-1", Name = "Tenant One", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
         var t2 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-2", Name = "Tenant Two", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
@@ -90,40 +78,17 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         db.Tenants.AddRange(t1, t2, t3);
         await db.SaveChangesAsync();
 
-        using var readOnlyDb = new ReadOnlyCatalogDbContext(CreateCatalogDbContext());
+        var count = await db.QueryAsync(new CustomCatalogTenantCountQuery(prefix));
+        count.Should().Be(3);
 
-        // 1. IDbQuery
-        var countWrite = await db.QueryAsync(new CustomCatalogTenantCountQuery(prefix));
-        countWrite.Should().Be(3);
-
-        var countRead = await readOnlyDb.QueryAsync(new CustomReadOnlyCatalogTenantCountQuery(prefix));
-        countRead.Should().Be(3);
-
-        // 2. QueryFirstOrDefaultAsync (Entity & Projection)
         var firstSpec = new TenantByPrefixSpec(prefix);
         var firstEntity = await db.QueryFirstOrDefaultAsync(firstSpec);
         firstEntity.Should().NotBeNull();
         firstEntity!.Slug.Should().Be($"{prefix}-1");
 
-        var firstReadEntity = await readOnlyDb.QueryFirstOrDefaultAsync(firstSpec);
-        firstReadEntity.Should().NotBeNull();
-        firstReadEntity!.Slug.Should().Be($"{prefix}-1");
-
-        var projSpec = new TenantNameProjectionSpec(prefix);
-        var firstName = await db.QueryFirstOrDefaultAsync(projSpec);
-        firstName.Should().Be("Tenant One");
-
-        var firstReadName = await readOnlyDb.QueryFirstOrDefaultAsync(projSpec);
-        firstReadName.Should().Be("Tenant One");
-
-        // 3. QueryListAsync (Entity & Projection)
         var listEntities = await db.QueryListAsync(firstSpec);
         listEntities.Should().HaveCount(3);
 
-        var listNames = await readOnlyDb.QueryListAsync(projSpec);
-        listNames.Should().Equal("Tenant One", "Tenant Two", "Tenant Three");
-
-        // 4. QueryAnyAsync & QueryCountAsync (Review Focus #3: Paged specification ignores Skip/Take for Count)
         var pagedSpec = new PagedTenantSpec(prefix, skip: 0, take: 1);
         var pagedList = await db.QueryListAsync(pagedSpec);
         pagedList.Should().HaveCount(1);
@@ -133,9 +98,93 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
 
         var totalCount = await db.QueryCountAsync(pagedSpec);
         totalCount.Should().Be(3);
+    }
 
-        var readTotalCount = await readOnlyDb.QueryCountAsync(pagedSpec);
-        readTotalCount.Should().Be(3);
+    [Fact]
+    public async Task ReadOnlyCatalogDbContext_And_DbContext_ExecuteDapperRawSql_MapStringEnums_ReuseConnection_AndRecordSlowQueries()
+    {
+        await using var db = CreateCatalogDbContext();
+        var prefix = "dapper-test-" + Guid.NewGuid().ToString("N")[..6];
+
+        var t1 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-active", Name = "Active Org", Status = TenantStatus.Active, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+        var t2 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-suspended", Name = "Suspended Org", Status = TenantStatus.Suspended, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+
+        db.Tenants.AddRange(t1, t2);
+        await db.SaveChangesAsync();
+
+        var logger = Substitute.For<ILogger<SlowQueryTelemetryInterceptor>>();
+        var interceptor = new SlowQueryTelemetryInterceptor(
+            Options.Create(new PersistenceOptions { SlowQueryThresholdMs = 0 }),
+            logger);
+
+        await using var readOnlyDb = new ReadOnlyCatalogDbContext(CreateCatalogDbContext(), interceptor);
+
+        // 1. QueryAsync
+        var list = await readOnlyDb.QueryAsync<TenantSummaryDto>(
+            "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" LIKE @Pattern ORDER BY \"Slug\"",
+            new { Pattern = $"{prefix}%" });
+        list.Should().HaveCount(2);
+        list[0].Status.Should().Be(TenantStatus.Active);
+        list[1].Status.Should().Be(TenantStatus.Suspended);
+
+        // 2. QueryFirstOrDefaultAsync
+        var found = await readOnlyDb.QueryFirstOrDefaultAsync<TenantSummaryDto>(
+            "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
+            new { Slug = $"{prefix}-active" });
+        found.Should().NotBeNull();
+        found!.Name.Should().Be("Active Org");
+        found.Status.Should().Be(TenantStatus.Active);
+
+        // 3. QuerySingleOrDefaultAsync
+        var single = await readOnlyDb.QuerySingleOrDefaultAsync<TenantSummaryDto>(
+            "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
+            new { Slug = $"{prefix}-suspended" });
+        single.Should().NotBeNull();
+        single!.Status.Should().Be(TenantStatus.Suspended);
+
+        // 4. QuerySingleAsync
+        var count = await readOnlyDb.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM \"Tenants\" WHERE \"Slug\" LIKE @Pattern",
+            new { Pattern = $"{prefix}%" });
+        count.Should().Be(2);
+
+        // 5. ExecuteScalarAsync
+        var exists = await readOnlyDb.ExecuteScalarAsync<bool>(
+            "SELECT EXISTS (SELECT 1 FROM \"Tenants\" WHERE \"Slug\" = @Slug)",
+            new { Slug = $"{prefix}-active" });
+        exists.Should().BeTrue();
+
+        // 6. QueryMultipleAsync
+        var multiResult = await readOnlyDb.QueryMultipleAsync(
+            $"""
+            SELECT COUNT(*) FROM "Tenants" WHERE "Slug" LIKE @Pattern;
+            SELECT "Id", "Slug", "Name", "Status" FROM "Tenants" WHERE "Slug" LIKE @Pattern ORDER BY "Slug";
+            """,
+            async grid =>
+            {
+                var total = await grid.ReadSingleAsync<int>();
+                var items = (await grid.ReadAsync<TenantSummaryDto>()).AsList();
+                return (Total: total, Items: items);
+            },
+            new { Pattern = $"{prefix}%" });
+
+        multiResult.Total.Should().Be(2);
+        multiResult.Items.Should().HaveCount(2);
+
+        // Verify slow query telemetry recorded
+        logger.Received().Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Is<object>(o => o.ToString()!.Contains("Slow query detected")),
+            Arg.Any<Exception>(),
+            Arg.Any<Func<object, Exception?, string>>());
+
+        // Also verify extensions work on DbContext directly
+        var directList = await db.QueryAsync<TenantSummaryDto>(
+            "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
+            new { Slug = $"{prefix}-active" });
+        directList.Should().ContainSingle();
+        directList[0].Status.Should().Be(TenantStatus.Active);
     }
 
     public sealed record SampleAuditedEvent(string Message) : DomainEventBase;
