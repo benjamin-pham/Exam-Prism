@@ -303,5 +303,96 @@ public class LoadBalancingMultiReplicaTests
         await pipeline(ctx);
         ctx.Response.Headers["X-Upstream-Instance"].ToString().Should().Be("replica-node-2");
     }
+
+    [Fact]
+    public async Task HybridCacheService_And_RedisCacheBackplane_InvalidatesL1Only_PreservingSharedRedisL2Entry()
+    {
+        // Shared L2 storage representing cluster Redis
+        var sharedL2Storage = new System.Collections.Concurrent.ConcurrentDictionary<string, byte[]>();
+        var sharedDistCache = Substitute.For<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
+        sharedDistCache.GetAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci => Task.FromResult<byte[]?>(sharedL2Storage.TryGetValue(ci.ArgAt<string>(0), out var b) ? b : null));
+        sharedDistCache.SetAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Arg.Any<Microsoft.Extensions.Caching.Distributed.DistributedCacheEntryOptions>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                sharedL2Storage[ci.ArgAt<string>(0)] = ci.ArgAt<byte[]>(1);
+                return Task.CompletedTask;
+            });
+        sharedDistCache.RemoveAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                sharedL2Storage.TryRemove(ci.ArgAt<string>(0), out _);
+                return Task.CompletedTask;
+            });
+
+        // Pub/sub backplane routing between Replica A and Replica B
+        Action<RedisChannel, RedisValue>? subscriberB = null;
+        var subB = Substitute.For<ISubscriber>();
+        subB.SubscribeAsync(Arg.Any<RedisChannel>(), Arg.Any<Action<RedisChannel, RedisValue>>(), Arg.Any<CommandFlags>())
+            .Returns(ci =>
+            {
+                subscriberB = ci.ArgAt<Action<RedisChannel, RedisValue>>(1);
+                return Task.CompletedTask;
+            });
+        var subA = Substitute.For<ISubscriber>();
+        subA.PublishAsync(Arg.Any<RedisChannel>(), Arg.Any<RedisValue>(), Arg.Any<CommandFlags>())
+            .Returns(ci =>
+            {
+                subscriberB?.Invoke(ci.ArgAt<RedisChannel>(0), ci.ArgAt<RedisValue>(1));
+                return Task.FromResult(1L);
+            });
+
+        var muxA = Substitute.For<IConnectionMultiplexer>();
+        muxA.GetSubscriber(Arg.Any<object>()).Returns(subA);
+        var muxB = Substitute.For<IConnectionMultiplexer>();
+        muxB.GetSubscriber(Arg.Any<object>()).Returns(subB);
+
+        // Replica A setup
+        var servicesA = new ServiceCollection();
+        servicesA.AddSingleton(sharedDistCache);
+        servicesA.AddHybridCache();
+        using var spA = servicesA.BuildServiceProvider();
+        var hybridCacheA = spA.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>();
+        var cacheOpts = Options.Create(new CacheOptions { KeyPrefix = "examprism:", EnableBackplane = true });
+        var backplaneA = new RedisCacheBackplane(muxA, hybridCacheA, cacheOpts, NullLogger<RedisCacheBackplane>.Instance);
+        var cacheServiceA = new HybridCacheService(hybridCacheA, cacheOpts, backplaneA);
+
+        // Replica B setup
+        var servicesB = new ServiceCollection();
+        servicesB.AddSingleton(sharedDistCache);
+        servicesB.AddHybridCache();
+        using var spB = servicesB.BuildServiceProvider();
+        var hybridCacheB = spB.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>();
+        var backplaneB = new RedisCacheBackplane(muxB, hybridCacheB, cacheOpts, NullLogger<RedisCacheBackplane>.Instance);
+        var cacheServiceB = new HybridCacheService(hybridCacheB, cacheOpts, backplaneB);
+
+        await backplaneB.StartAsync(CancellationToken.None);
+
+        // 1. Replica B warms up its L1 for "user:42" with initial data
+        var factoryCallCount = 0;
+        var val1 = await cacheServiceB.GetOrCreateAsync<string>("user:42", _ =>
+        {
+            Interlocked.Increment(ref factoryCallCount);
+            return ValueTask.FromResult("version-1");
+        });
+        val1.Should().Be("version-1");
+        factoryCallCount.Should().Be(1);
+
+        // 2. Replica A updates "user:42" with new data via SetAsync and publishes backplane invalidation
+        await cacheServiceA.SetAsync("user:42", "version-2");
+
+        // 3. Verify Redis L2 storage still retains the updated entry (was NOT deleted by peer backplane eviction)
+        sharedL2Storage.Should().NotBeEmpty();
+
+        // 4. Replica B reads "user:42". Its L1 was evicted by backplane, so it reads "version-2" from L2 Redis
+        // without calling the underlying database factory again!
+        var val2 = await cacheServiceB.GetOrCreateAsync<string>("user:42", _ =>
+        {
+            Interlocked.Increment(ref factoryCallCount);
+            return ValueTask.FromResult("stale-factory-should-not-run");
+        });
+        val2.Should().Be("version-2");
+        factoryCallCount.Should().Be(1); // Factory was NOT called again
+    }
 }
 

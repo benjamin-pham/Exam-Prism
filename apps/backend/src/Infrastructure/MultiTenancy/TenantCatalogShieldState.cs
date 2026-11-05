@@ -94,9 +94,8 @@ public sealed class TenantCatalogShieldState
 
         var currentSecond = _timeProvider.GetUtcNow().ToUnixTimeSeconds();
         var windowSec = Volatile.Read(ref _missWindowSecond);
-        if (windowSec != currentSecond)
+        if (windowSec != currentSecond && Interlocked.CompareExchange(ref _missWindowSecond, currentSecond, windowSec) == windowSec)
         {
-            Interlocked.Exchange(ref _missWindowSecond, currentSecond);
             Interlocked.Exchange(ref _missCountInSecond, 0);
         }
 

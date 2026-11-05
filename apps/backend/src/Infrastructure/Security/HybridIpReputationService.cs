@@ -17,7 +17,7 @@ public sealed class HybridIpReputationService : IIpReputationService
 
     private const string AtomicStrikeLuaScript = @"
 local current = redis.call('INCRBY', KEYS[1], tonumber(ARGV[1]))
-if current == tonumber(ARGV[1]) then
+if redis.call('PTTL', KEYS[1]) < 0 then
     redis.call('PEXPIRE', KEYS[1], tonumber(ARGV[2]))
 end
 return current";
@@ -260,8 +260,7 @@ return current";
             }
             catch { }
         }
-
-        if (_cache is not null)
+        else if (_cache is not null)
         {
             await _cache.SetAsync($"ddos:ban:ip:{ipAddress}", expiresAt, duration, duration, tags: null, cancellationToken);
         }
@@ -293,8 +292,7 @@ return current";
             }
             catch { }
         }
-
-        if (_cache is not null)
+        else if (_cache is not null)
         {
             await _cache.RemoveAsync($"ddos:ban:ip:{ipAddress}", cancellationToken);
         }

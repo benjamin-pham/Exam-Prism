@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Common.Caching;
 using Common.Telemetry;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,6 +16,7 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
 {
     private readonly IConnectionMultiplexer _multiplexer;
     private readonly HybridCache _hybridCache;
+    private readonly IMemoryCache? _memoryCache;
     private readonly CacheOptions _options;
     private readonly ILogger<RedisCacheBackplane> _logger;
     private readonly RedisChannel _channel;
@@ -30,13 +32,28 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
         IConnectionMultiplexer multiplexer,
         HybridCache hybridCache,
         IOptions<CacheOptions> options,
-        ILogger<RedisCacheBackplane> logger)
+        ILogger<RedisCacheBackplane> logger,
+        IMemoryCache? memoryCache = null)
     {
         _multiplexer = multiplexer ?? throw new ArgumentNullException(nameof(multiplexer));
         _hybridCache = hybridCache ?? throw new ArgumentNullException(nameof(hybridCache));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _memoryCache = memoryCache ?? TryExtractMemoryCache(hybridCache);
         _channel = RedisChannel.Literal($"{_options.KeyPrefix}{_options.BackplaneChannelName}");
+    }
+
+    private static IMemoryCache? TryExtractMemoryCache(HybridCache hybridCache)
+    {
+        try
+        {
+            var field = hybridCache.GetType().GetField("_localCache", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            return field?.GetValue(hybridCache) as IMemoryCache;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -59,6 +76,7 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
         {
             var subscriber = _multiplexer.GetSubscriber();
             await subscriber.UnsubscribeAsync(_channel, OnMessageReceived);
+            _logger.LogInformation("RedisCacheBackplane unsubscribed from channel {Channel}", (string)_channel!);
         }
         catch (Exception ex) when (ex is RedisException or TimeoutException)
         {
@@ -66,35 +84,32 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
         }
     }
 
-    public async ValueTask PublishKeyInvalidationAsync(string scopedKey, CancellationToken cancellationToken = default)
+    public async ValueTask PublishKeyInvalidationAsync(string key, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(scopedKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
-        try
-        {
-            var subscriber = _multiplexer.GetSubscriber();
-            var payload = $"{InstanceId}|K|{scopedKey}";
-            await subscriber.PublishAsync(_channel, payload);
-        }
-        catch (Exception ex) when (ex is RedisException or TimeoutException)
-        {
-            _logger.LogWarning(ex, "Failed to publish key invalidation for {Key} to Redis backplane channel {Channel}", scopedKey, (string)_channel!);
-        }
+        var payload = $"{InstanceId}|K|{key}";
+        await PublishPayloadAsync(payload);
     }
 
-    public async ValueTask PublishTagInvalidationAsync(string scopedTag, CancellationToken cancellationToken = default)
+    public async ValueTask PublishTagInvalidationAsync(string tag, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(scopedTag);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tag);
 
+        var payload = $"{InstanceId}|T|{tag}";
+        await PublishPayloadAsync(payload);
+    }
+
+    private async Task PublishPayloadAsync(string payload)
+    {
         try
         {
             var subscriber = _multiplexer.GetSubscriber();
-            var payload = $"{InstanceId}|T|{scopedTag}";
             await subscriber.PublishAsync(_channel, payload);
         }
         catch (Exception ex) when (ex is RedisException or TimeoutException)
         {
-            _logger.LogWarning(ex, "Failed to publish tag invalidation for {Tag} to Redis backplane channel {Channel}", scopedTag, (string)_channel!);
+            _logger.LogWarning(ex, "Failed to publish backplane invalidation payload to channel {Channel}; continuing without peer invalidation", (string)_channel!);
         }
     }
 
@@ -130,11 +145,19 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
         {
             if (string.Equals(kind, "K", StringComparison.Ordinal))
             {
-                var vt = _hybridCache.RemoveAsync(target);
-                if (!vt.IsCompleted)
+                if (_memoryCache is not null)
                 {
-                    vt.AsTask().GetAwaiter().GetResult();
+                    _memoryCache.Remove(target);
                 }
+                else
+                {
+                    var vt = _hybridCache.RemoveAsync(target);
+                    if (!vt.IsCompleted)
+                    {
+                        vt.AsTask().GetAwaiter().GetResult();
+                    }
+                }
+
                 ExamPrismDiagnostics.RecordCacheBackplaneEviction();
                 NotifyListeners(KeyInvalidated, target, kind);
             }
@@ -162,18 +185,15 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
             return;
         }
 
-        foreach (var invocation in handlers.GetInvocationList())
+        foreach (var handler in handlers.GetInvocationList())
         {
-            if (invocation is Action<string> action)
+            try
             {
-                try
-                {
-                    action(target);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Subscriber threw exception during cache backplane notification for {Target} ({Kind})", target, kind);
-                }
+                ((Action<string>)handler)(target);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Backplane listener callback failed for {Target} ({Kind})", target, kind);
             }
         }
     }
@@ -193,7 +213,7 @@ public sealed class RedisCacheBackplane : IHostedService, ICacheBackplane, IDisp
         }
         catch
         {
-            // Suppress errors during disposal
+            // Suppress cleanup exceptions during dispose
         }
     }
 }

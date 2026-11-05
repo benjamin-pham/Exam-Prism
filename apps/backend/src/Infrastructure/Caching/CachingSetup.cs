@@ -52,6 +52,8 @@ public static class CachingSetup
 
             healthChecksBuilder.AddCheck<RedisHealthCheck>("redis");
 
+            services.AddMemoryCache();
+
             if (initialCacheOpts.EnableBackplane)
             {
                 services.AddSingleton<RedisCacheBackplane>();

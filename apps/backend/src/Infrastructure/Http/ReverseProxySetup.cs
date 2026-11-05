@@ -72,6 +72,12 @@ public static class ReverseProxySetup
     {
         ArgumentNullException.ThrowIfNull(app);
 
+        var proxyOpts = app.ApplicationServices?.GetService<IOptions<ReverseProxyOptions>>()?.Value;
+        var emitHeader = proxyOpts?.EmitUpstreamInstanceHeader ?? true;
+        var instanceId = !string.IsNullOrWhiteSpace(proxyOpts?.InstanceId)
+            ? proxyOpts!.InstanceId
+            : Environment.MachineName;
+
         app.Use(async (context, next) =>
         {
             if (context.Connection.RemoteIpAddress is not null)
@@ -79,12 +85,8 @@ public static class ReverseProxySetup
                 context.Items[OriginalRemoteIpItemKey] = context.Connection.RemoteIpAddress;
             }
 
-            var proxyOpts = context.RequestServices?.GetService<IOptions<ReverseProxyOptions>>()?.Value;
-            if (proxyOpts?.EmitUpstreamInstanceHeader ?? true)
+            if (emitHeader)
             {
-                var instanceId = !string.IsNullOrWhiteSpace(proxyOpts?.InstanceId)
-                    ? proxyOpts!.InstanceId
-                    : Environment.MachineName;
                 context.Response.Headers["X-Upstream-Instance"] = instanceId;
             }
 
