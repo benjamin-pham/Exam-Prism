@@ -7,6 +7,7 @@ using Common.MultiTenancy;
 using Common.Telemetry;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence;
+using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using FluentAssertions;
@@ -128,7 +129,7 @@ public class PersistenceHighLoadTests
     }
 
     [Fact]
-    public void ReadOnlyCatalogDbContext_And_ReadOnlyAppDbContext_EnforceNoTracking_AndFallbackToPrimaryConnectionWhenReplicaNotConfigured()
+    public void CatalogDbContext_And_AppDbContext_ResolveCorrectly_AndFallbackToPrimaryConnectionWhenReplicaNotConfigured()
     {
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder()
@@ -139,6 +140,7 @@ public class PersistenceHighLoadTests
             .Build();
 
         services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton(TimeProvider.System);
         services.AddLogging();
         var healthChecksBuilder = services.AddHealthChecks();
 
@@ -162,14 +164,12 @@ public class PersistenceHighLoadTests
         using var serviceProvider = services.BuildServiceProvider();
         using var scope = serviceProvider.CreateScope();
 
-        // 1. Resolve ReadOnlyCatalogDbContext
-        var readOnlyCatalog = scope.ServiceProvider.GetRequiredService<ReadOnlyCatalogDbContext>();
-        readOnlyCatalog.DatabaseContext.Should().NotBeNull();
-        readOnlyCatalog.DatabaseContext.ChangeTracker.QueryTrackingBehavior.Should().Be(QueryTrackingBehavior.NoTracking);
+        // 1. Resolve CatalogDbContext
+        var catalogDb = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        catalogDb.Should().NotBeNull();
 
-        // 2. Resolve ReadOnlyAppDbContext
-        var readOnlyApp = scope.ServiceProvider.GetRequiredService<ReadOnlyAppDbContext>();
-        readOnlyApp.DatabaseContext.Should().NotBeNull();
-        readOnlyApp.DatabaseContext.ChangeTracker.QueryTrackingBehavior.Should().Be(QueryTrackingBehavior.NoTracking);
+        // 2. Resolve AppDbContext
+        var appDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        appDb.Should().NotBeNull();
     }
 }

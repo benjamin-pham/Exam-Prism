@@ -4,8 +4,9 @@ using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
 using Dapper;
-using ExamPrism.Infrastructure.Persistence;
+using ExamPrism.Infrastructure.Persistence.Catalog;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 public record ListTenantsQuery(
     int Page = 1,
@@ -35,7 +36,7 @@ public record ListTenantsResult(
     int Page,
     int PageSize);
 
-public sealed class ListTenantsHandler(ReadOnlyCatalogDbContext db) : IHandler<ListTenantsQuery, ListTenantsResult>
+public sealed class ListTenantsHandler(CatalogDbContext db) : IHandler<ListTenantsQuery, ListTenantsResult>
 {
     private const string ListTenantsSql = """
         SELECT COUNT(*)
@@ -59,22 +60,21 @@ public sealed class ListTenantsHandler(ReadOnlyCatalogDbContext db) : IHandler<L
         var status = query.Status?.ToString();
         var pattern = string.IsNullOrWhiteSpace(query.Search) ? null : $"%{query.Search.Trim()}%";
 
-        var (totalCount, items) = await db.QueryMultipleAsync(
-            ListTenantsSql,
-            async grid =>
-            {
-                var count = await grid.ReadSingleAsync<int>();
-                var rows = (await grid.ReadAsync<TenantSummaryItem>()).AsList().AsReadOnly();
-                return (count, rows);
-            },
-            new
-            {
-                Status = status,
-                Pattern = pattern,
-                Take = pageSize,
-                Skip = skip
-            },
-            ct);
+        var connection = db.Database.GetDbConnection();
+        await using var grid = await connection.QueryMultipleAsync(
+            new CommandDefinition(
+                ListTenantsSql,
+                new
+                {
+                    Status = status,
+                    Pattern = pattern,
+                    Take = pageSize,
+                    Skip = skip
+                },
+                cancellationToken: ct));
+
+        var totalCount = await grid.ReadSingleAsync<int>();
+        var items = (await grid.ReadAsync<TenantSummaryItem>()).AsList().AsReadOnly();
 
         return new ListTenantsResult(items, totalCount, page, pageSize);
     }

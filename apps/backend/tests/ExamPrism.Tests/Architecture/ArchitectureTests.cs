@@ -779,35 +779,16 @@ public class ArchitectureTests
     }
 
     [Fact]
-    public void ReadOnlyDbContexts_MustNotExposeIQueryableOrAcceptSpecifications()
+    public void ReadOnlyDbContextWrappers_MustNotExistInAssembly()
     {
-        var readOnlyTypes = new[] { typeof(ReadOnlyCatalogDbContext), typeof(ReadOnlyAppDbContext) };
+        AppAssembly.GetType("ExamPrism.Infrastructure.Persistence.ReadOnlyCatalogDbContext")
+            .Should().BeNull("ReadOnlyCatalogDbContext wrapper must be removed; queries use CatalogDbContext directly with Dapper");
 
-        foreach (var type in readOnlyTypes)
-        {
-            var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
-            foreach (var prop in properties)
-            {
-                typeof(IQueryable).IsAssignableFrom(prop.PropertyType).Should().BeFalse(
-                    $"{type.Name}.{prop.Name} must not expose IQueryable; read side uses Dapper raw SQL");
-            }
+        AppAssembly.GetType("ExamPrism.Infrastructure.Persistence.ReadOnlyAppDbContext")
+            .Should().BeNull("ReadOnlyAppDbContext wrapper must be removed; queries use AppDbContext directly with Dapper");
 
-            var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
-            foreach (var method in methods)
-            {
-                typeof(IQueryable).IsAssignableFrom(method.ReturnType).Should().BeFalse(
-                    $"{type.Name}.{method.Name} must not return IQueryable");
-
-                foreach (var param in method.GetParameters())
-                {
-                    var paramType = param.ParameterType.IsGenericType
-                        ? param.ParameterType.GetGenericTypeDefinition()
-                        : param.ParameterType;
-                    (paramType == typeof(ISpecification<>)).Should().BeFalse(
-                        $"{type.Name}.{method.Name} must not accept ISpecification; specifications are write-side only");
-                }
-            }
-        }
+        AppAssembly.GetType("ExamPrism.Infrastructure.Persistence.DapperCommandExecutor")
+            .Should().BeNull("DapperCommandExecutor must be removed; queries use native Dapper directly on DbConnection");
     }
 
     private static bool IsSubclassOfRawGeneric(Type generic, Type? toCheck)

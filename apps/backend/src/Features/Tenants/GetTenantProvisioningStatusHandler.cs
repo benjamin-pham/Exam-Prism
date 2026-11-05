@@ -3,8 +3,10 @@ namespace ExamPrism.Features.Tenants;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
+using Dapper;
 using ExamPrism.Domain.Tenants;
-using ExamPrism.Infrastructure.Persistence;
+using ExamPrism.Infrastructure.Persistence.Catalog;
+using Microsoft.EntityFrameworkCore;
 
 public record GetTenantProvisioningStatusQuery(string Slug);
 
@@ -14,7 +16,7 @@ public record GetTenantProvisioningStatusResult(
     TenantStatus Status,
     DateTime? ProvisionedAt);
 
-public sealed class GetTenantProvisioningStatusHandler(ReadOnlyCatalogDbContext db)
+public sealed class GetTenantProvisioningStatusHandler(CatalogDbContext db)
     : IHandler<GetTenantProvisioningStatusQuery, GetTenantProvisioningStatusResult>
 {
     private const string GetStatusSql = """
@@ -28,10 +30,12 @@ public sealed class GetTenantProvisioningStatusHandler(ReadOnlyCatalogDbContext 
     {
         var slug = (query.Slug ?? string.Empty).Trim().ToLowerInvariant();
 
-        var tenant = await db.QueryFirstOrDefaultAsync<GetTenantProvisioningStatusResult>(
-            GetStatusSql,
-            new { Slug = slug },
-            ct);
+        var connection = db.Database.GetDbConnection();
+        var tenant = await connection.QueryFirstOrDefaultAsync<GetTenantProvisioningStatusResult>(
+            new CommandDefinition(
+                GetStatusSql,
+                new { Slug = slug },
+                cancellationToken: ct));
 
         if (tenant is null)
         {

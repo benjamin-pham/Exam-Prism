@@ -49,7 +49,7 @@
     - `QueryFirstOrDefaultAsync<TEntity>`, `QueryListAsync<TEntity>`, `QueryAnyAsync<TEntity>`, `QueryCountAsync<TEntity>` on `DbContext`
   - Zero read-only wrapper classes or forwarder methods in `Infrastructure/Persistence/`
 
-- [ ] **Step 1: Write failing tests asserting removal of read-only wrappers and verifying native Dapper on `db.Database.GetDbConnection()`**
+- [x] **Step 1: Write failing tests asserting removal of read-only wrappers and verifying native Dapper on `db.Database.GetDbConnection()`**
 
 1. In `apps/backend/tests/ExamPrism.Tests/Architecture/ArchitectureTests.cs`:
    - Replace `ReadOnlyDbContexts_MustNotExposeIQueryableOrAcceptSpecifications` with an assertion that `ReadOnlyCatalogDbContext` and `ReadOnlyAppDbContext` types do not exist in the assembly.
@@ -63,12 +63,12 @@
          new CommandDefinition("SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" LIKE @Pattern ORDER BY \"Slug\"", new { Pattern = $"{prefix}%" }));
      ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~ArchitectureTests|FullyQualifiedName~PersistenceHighLoadTests|FullyQualifiedName~DddPersistenceIntegrationTests"`
 Expected: FAIL (compilation errors on obsolete read-only references).
 
-- [ ] **Step 3: Remove wrappers and clean up `PersistenceSetup` & `DbContextQueryExtensions`**
+- [x] **Step 3: Remove wrappers and clean up `PersistenceSetup` & `DbContextQueryExtensions`**
 
 1. Delete `ReadOnlyCatalogDbContext.cs`, `ReadOnlyAppDbContext.cs`, and `DapperCommandExecutor.cs`.
 2. In `apps/backend/src/Infrastructure/Persistence/PersistenceSetup.cs`:
@@ -77,7 +77,7 @@ Expected: FAIL (compilation errors on obsolete read-only references).
    - Remove all custom Dapper forwarder extension methods (`QueryAsync<T>`, `QueryFirstOrDefaultAsync<T>`, `ExecuteScalarAsync<T>`, `QueryMultipleAsync`).
    - Retain only `QueryAsync<TContext, TResult>` (`IDbQuery`) and the 4 `ISpecification<TEntity>` methods on `DbContext`.
 
-- [ ] **Step 4: Run tests to verify Task 1 passes**
+- [x] **Step 4: Run tests to verify Task 1 passes**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~ArchitectureTests|FullyQualifiedName~PersistenceHighLoadTests|FullyQualifiedName~DddPersistenceIntegrationTests"`
 Expected: PASS
@@ -105,19 +105,19 @@ Expected: PASS
   - `CheckTenantSlugHandler(CatalogDbContext db, IOptions<MultiTenancyOptions> options)`
   - `GetTenantProvisioningStatusHandler(CatalogDbContext db)`
 
-- [ ] **Step 1: Update handler tests to pass `CatalogDbContext` directly**
+- [x] **Step 1: Update handler tests to pass `CatalogDbContext` directly**
 
 1. In `PlatformTenantHandlersTests.cs`:
    - Pass `db` directly to `new ListTenantsHandler(db)` and `new GetTenantByIdHandler(db)`.
 2. In `TenantOnboardingHandlersTests.cs`:
    - Pass `db` directly to `new CheckTenantSlugHandler(db, options)` and `new GetTenantProvisioningStatusHandler(db)`.
 
-- [ ] **Step 2: Run handler tests to verify they fail**
+- [x] **Step 2: Run handler tests to verify they fail**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx --filter "FullyQualifiedName~PlatformTenantHandlersTests|FullyQualifiedName~TenantOnboardingHandlersTests"`
 Expected: FAIL (constructor parameter mismatch expecting `ReadOnlyCatalogDbContext`).
 
-- [ ] **Step 3: Refactor handlers to inject `CatalogDbContext` and use native Dapper on `db.Database.GetDbConnection()`**
+- [x] **Step 3: Refactor handlers to inject `CatalogDbContext` and use native Dapper on `db.Database.GetDbConnection()`**
 
 1. In `ListTenantsHandler.cs`:
    - Constructor `ListTenantsHandler(CatalogDbContext db)`.
@@ -136,7 +136,7 @@ Expected: FAIL (constructor parameter mismatch expecting `ReadOnlyCatalogDbConte
    - `var connection = db.Database.GetDbConnection();`
    - `var tenant = await connection.QueryFirstOrDefaultAsync<GetTenantProvisioningStatusResult>(new CommandDefinition(GetStatusSql, new { Slug = slug }, cancellationToken: ct));`
 
-- [ ] **Step 4: Run full test suite to verify everything passes**
+- [x] **Step 4: Run full test suite to verify everything passes**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx`
 Expected: PASS (all tests green, 0 failures).

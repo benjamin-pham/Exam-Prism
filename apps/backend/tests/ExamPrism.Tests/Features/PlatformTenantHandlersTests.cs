@@ -77,8 +77,7 @@ public class PlatformTenantHandlersTests : IClassFixture<CatalogDbFixture>
         db.Tenants.AddRange(t1, t2, t3, t4);
         await db.SaveChangesAsync();
 
-        await using var readOnlyDb = new ReadOnlyCatalogDbContext(db);
-        var handler = new ListTenantsHandler(readOnlyDb);
+        var handler = new ListTenantsHandler(db);
 
         typeof(ListTenantsHandler).Assembly
             .GetType("ExamPrism.Features.Platform.Tenants.ListTenantsDbQuery")
@@ -139,8 +138,7 @@ public class PlatformTenantHandlersTests : IClassFixture<CatalogDbFixture>
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
 
-        await using var readOnlyDb = new ReadOnlyCatalogDbContext(db);
-        var handler = new GetTenantByIdHandler(readOnlyDb);
+        var handler = new GetTenantByIdHandler(db);
 
         // Found
         var foundResult = await handler.Handle(new GetTenantByIdQuery(tenant.Id));

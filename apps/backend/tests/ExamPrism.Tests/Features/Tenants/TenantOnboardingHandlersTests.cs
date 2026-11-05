@@ -56,8 +56,7 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
             ReservedSubdomains = ["admin", "api", "www"]
         });
 
-        await using var readOnlyDb = new ReadOnlyCatalogDbContext(db);
-        var handler = new CheckTenantSlugHandler(readOnlyDb, options);
+        var handler = new CheckTenantSlugHandler(db, options);
 
         // 1. Valid available slug
         var validRes = await handler.Handle(new CheckTenantSlugQuery("sunrise-academy"));
@@ -254,8 +253,7 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
         });
         await db.SaveChangesAsync();
 
-        await using var readOnlyDb = new ReadOnlyCatalogDbContext(db);
-        var handler = new GetTenantProvisioningStatusHandler(readOnlyDb);
+        var handler = new GetTenantProvisioningStatusHandler(db);
 
         // 1. Existing tenant returns public status
         var existingRes = await handler.Handle(new GetTenantProvisioningStatusQuery(slug));

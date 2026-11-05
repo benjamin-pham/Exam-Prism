@@ -101,7 +101,7 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
     }
 
     [Fact]
-    public async Task ReadOnlyCatalogDbContext_And_DbContext_ExecuteDapperRawSql_MapStringEnums_ReuseConnection_AndRecordSlowQueries()
+    public async Task CatalogDbContext_ExecutesNativeDapper_OnDbConnection_MapStringEnums_AndSupportsMultipleQueries()
     {
         await using var db = CreateCatalogDbContext();
         var prefix = "dapper-test-" + Guid.NewGuid().ToString("N")[..6];
@@ -112,79 +112,62 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         db.Tenants.AddRange(t1, t2);
         await db.SaveChangesAsync();
 
-        var logger = Substitute.For<ILogger<SlowQueryTelemetryInterceptor>>();
-        var interceptor = new SlowQueryTelemetryInterceptor(
-            Options.Create(new PersistenceOptions { SlowQueryThresholdMs = 0 }),
-            logger);
-
-        await using var readOnlyDb = new ReadOnlyCatalogDbContext(CreateCatalogDbContext(), interceptor);
+        var connection = db.Database.GetDbConnection();
 
         // 1. QueryAsync
-        var list = await readOnlyDb.QueryAsync<TenantSummaryDto>(
-            "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" LIKE @Pattern ORDER BY \"Slug\"",
-            new { Pattern = $"{prefix}%" });
+        var list = (await connection.QueryAsync<TenantSummaryDto>(
+            new CommandDefinition(
+                "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" LIKE @Pattern ORDER BY \"Slug\"",
+                new { Pattern = $"{prefix}%" }))).AsList();
         list.Should().HaveCount(2);
         list[0].Status.Should().Be(TenantStatus.Active);
         list[1].Status.Should().Be(TenantStatus.Suspended);
 
         // 2. QueryFirstOrDefaultAsync
-        var found = await readOnlyDb.QueryFirstOrDefaultAsync<TenantSummaryDto>(
-            "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
-            new { Slug = $"{prefix}-active" });
+        var found = await connection.QueryFirstOrDefaultAsync<TenantSummaryDto>(
+            new CommandDefinition(
+                "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
+                new { Slug = $"{prefix}-active" }));
         found.Should().NotBeNull();
         found!.Name.Should().Be("Active Org");
         found.Status.Should().Be(TenantStatus.Active);
 
         // 3. QuerySingleOrDefaultAsync
-        var single = await readOnlyDb.QuerySingleOrDefaultAsync<TenantSummaryDto>(
-            "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
-            new { Slug = $"{prefix}-suspended" });
+        var single = await connection.QuerySingleOrDefaultAsync<TenantSummaryDto>(
+            new CommandDefinition(
+                "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
+                new { Slug = $"{prefix}-suspended" }));
         single.Should().NotBeNull();
         single!.Status.Should().Be(TenantStatus.Suspended);
 
         // 4. QuerySingleAsync
-        var count = await readOnlyDb.QuerySingleAsync<int>(
-            "SELECT COUNT(*) FROM \"Tenants\" WHERE \"Slug\" LIKE @Pattern",
-            new { Pattern = $"{prefix}%" });
+        var count = await connection.QuerySingleAsync<int>(
+            new CommandDefinition(
+                "SELECT COUNT(*) FROM \"Tenants\" WHERE \"Slug\" LIKE @Pattern",
+                new { Pattern = $"{prefix}%" }));
         count.Should().Be(2);
 
         // 5. ExecuteScalarAsync
-        var exists = await readOnlyDb.ExecuteScalarAsync<bool>(
-            "SELECT EXISTS (SELECT 1 FROM \"Tenants\" WHERE \"Slug\" = @Slug)",
-            new { Slug = $"{prefix}-active" });
+        var exists = await connection.ExecuteScalarAsync<bool>(
+            new CommandDefinition(
+                "SELECT EXISTS (SELECT 1 FROM \"Tenants\" WHERE \"Slug\" = @Slug)",
+                new { Slug = $"{prefix}-active" }));
         exists.Should().BeTrue();
 
         // 6. QueryMultipleAsync
-        var multiResult = await readOnlyDb.QueryMultipleAsync(
-            $"""
-            SELECT COUNT(*) FROM "Tenants" WHERE "Slug" LIKE @Pattern;
-            SELECT "Id", "Slug", "Name", "Status" FROM "Tenants" WHERE "Slug" LIKE @Pattern ORDER BY "Slug";
-            """,
-            async grid =>
-            {
-                var total = await grid.ReadSingleAsync<int>();
-                var items = (await grid.ReadAsync<TenantSummaryDto>()).AsList();
-                return (Total: total, Items: items);
-            },
-            new { Pattern = $"{prefix}%" });
+        await using var grid = await connection.QueryMultipleAsync(
+            new CommandDefinition(
+                $"""
+                SELECT COUNT(*) FROM "Tenants" WHERE "Slug" LIKE @Pattern;
+                SELECT "Id", "Slug", "Name", "Status" FROM "Tenants" WHERE "Slug" LIKE @Pattern ORDER BY "Slug";
+                """,
+                new { Pattern = $"{prefix}%" }));
 
-        multiResult.Total.Should().Be(2);
-        multiResult.Items.Should().HaveCount(2);
+        var total = await grid.ReadSingleAsync<int>();
+        var items = (await grid.ReadAsync<TenantSummaryDto>()).AsList();
 
-        // Verify slow query telemetry recorded
-        logger.Received().Log(
-            LogLevel.Warning,
-            Arg.Any<EventId>(),
-            Arg.Is<object>(o => o.ToString()!.Contains("Slow query detected")),
-            Arg.Any<Exception>(),
-            Arg.Any<Func<object, Exception?, string>>());
-
-        // Also verify extensions work on DbContext directly
-        var directList = await db.QueryAsync<TenantSummaryDto>(
-            "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
-            new { Slug = $"{prefix}-active" });
-        directList.Should().ContainSingle();
-        directList[0].Status.Should().Be(TenantStatus.Active);
+        total.Should().Be(2);
+        items.Should().HaveCount(2);
     }
 
     public sealed record SampleAuditedEvent(string Message) : DomainEventBase;
