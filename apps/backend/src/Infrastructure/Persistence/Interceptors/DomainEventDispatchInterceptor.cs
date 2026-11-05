@@ -44,7 +44,14 @@ public sealed class DomainEventDispatchInterceptor(IServiceProvider serviceProvi
                 {
                     foreach (var domainEvent in events)
                     {
-                        await bus.InvokeAsync(domainEvent, cancellationToken);
+                        try
+                        {
+                            await bus.InvokeAsync(domainEvent, cancellationToken);
+                        }
+                        catch (Wolverine.Runtime.Routing.IndeterminateRoutesException)
+                        {
+                            // No subscribers or handlers currently registered for this domain event; safe to ignore.
+                        }
                     }
                 }
             }
