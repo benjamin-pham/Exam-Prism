@@ -1,6 +1,8 @@
 namespace ExamPrism.Tests.Architecture;
 
 using System.Reflection;
+using Common.Domain;
+using Common.Domain.Specifications;
 using Common.Endpoints;
 using Common.Handlers;
 using Common.Orleans;
@@ -594,6 +596,173 @@ public class ArchitectureTests
                     $"{declaringType.FullName}.{memberName} must not reference raw Orleans type '{t.FullName}'. Use ITenantGrainFactory instead.");
             }
         }
+    }
+
+    [Fact]
+    public void TypesInDomain_MustNotReferenceInfrastructureFeaturesEndpointsOrExternalFrameworks()
+    {
+        var domainTypes = AppTypes
+            .Where(t => t.Namespace != null && t.Namespace.StartsWith("ExamPrism.Domain", StringComparison.Ordinal))
+            .ToList();
+
+        domainTypes.Should().NotBeEmpty();
+
+        var forbiddenPrefixes = new[]
+        {
+            "ExamPrism.Infrastructure",
+            "ExamPrism.Features",
+            "ExamPrism.Endpoints",
+            "Microsoft.EntityFrameworkCore",
+            "Microsoft.AspNetCore",
+            "Wolverine",
+            "Orleans",
+            "StackExchange.Redis"
+        };
+
+        foreach (var type in domainTypes)
+        {
+            var members = type.GetMembers(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
+
+            foreach (var member in members)
+            {
+                switch (member)
+                {
+                    case FieldInfo f:
+                        AssertNotForbiddenNamespace(f.FieldType, type, f.Name, forbiddenPrefixes);
+                        break;
+                    case PropertyInfo p:
+                        AssertNotForbiddenNamespace(p.PropertyType, type, p.Name, forbiddenPrefixes);
+                        break;
+                    case MethodBase m:
+                        if (m is MethodInfo mi)
+                        {
+                            AssertNotForbiddenNamespace(mi.ReturnType, type, m.Name, forbiddenPrefixes);
+                        }
+                        foreach (var param in m.GetParameters())
+                        {
+                            AssertNotForbiddenNamespace(param.ParameterType, type, $"{m.Name}({param.Name})", forbiddenPrefixes);
+                        }
+                        break;
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void TypesInCommon_MustNotReferenceExamPrismDomain()
+    {
+        var commonTypes = AppTypes
+            .Where(t => t.Namespace != null && (t.Namespace == "Common" || t.Namespace.StartsWith("Common.", StringComparison.Ordinal)))
+            .ToList();
+
+        commonTypes.Should().NotBeEmpty();
+
+        var forbiddenPrefixes = new[] { "ExamPrism.Domain" };
+
+        foreach (var type in commonTypes)
+        {
+            var members = type.GetMembers(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
+
+            foreach (var member in members)
+            {
+                switch (member)
+                {
+                    case FieldInfo f:
+                        AssertNotForbiddenNamespace(f.FieldType, type, f.Name, forbiddenPrefixes);
+                        break;
+                    case PropertyInfo p:
+                        AssertNotForbiddenNamespace(p.PropertyType, type, p.Name, forbiddenPrefixes);
+                        break;
+                    case MethodBase m:
+                        if (m is MethodInfo mi)
+                        {
+                            AssertNotForbiddenNamespace(mi.ReturnType, type, m.Name, forbiddenPrefixes);
+                        }
+                        foreach (var param in m.GetParameters())
+                        {
+                            AssertNotForbiddenNamespace(param.ParameterType, type, $"{m.Name}({param.Name})", forbiddenPrefixes);
+                        }
+                        break;
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void DomainEvents_MustBePublicSealedRecords_EndingWithDomainEvent()
+    {
+        var domainEventTypes = AppTypes
+            .Where(t => typeof(IDomainEvent).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
+            .ToList();
+
+        domainEventTypes.Should().NotBeEmpty();
+
+        foreach (var evt in domainEventTypes)
+        {
+            evt.IsPublic.Should().BeTrue($"{evt.FullName} must be public");
+            evt.IsSealed.Should().BeTrue($"{evt.FullName} must be sealed");
+            evt.Name.Should().EndWith("DomainEvent", $"{evt.FullName} must end with 'DomainEvent'");
+            evt.Namespace.Should().StartWith("ExamPrism.Domain", $"{evt.FullName} must be in ExamPrism.Domain");
+        }
+    }
+
+    [Fact]
+    public void DomainEntitiesAndAggregates_MustInheritFromEntityOrAggregateRoot()
+    {
+        var domainTypes = AppTypes
+            .Where(t => t.Namespace != null &&
+                        t.Namespace.StartsWith("ExamPrism.Domain", StringComparison.Ordinal) &&
+                        !t.IsInterface &&
+                        !t.IsAbstract &&
+                        !t.IsEnum &&
+                        !typeof(IDomainEvent).IsAssignableFrom(t) &&
+                        !typeof(ValueObject).IsAssignableFrom(t) &&
+                        !IsSubclassOfRawGeneric(typeof(Specification<>), t))
+            .ToList();
+
+        domainTypes.Should().NotBeEmpty();
+
+        foreach (var type in domainTypes)
+        {
+            var isEntity = IsSubclassOfRawGeneric(typeof(Entity<>), type);
+            var isAggregate = IsSubclassOfRawGeneric(typeof(AggregateRoot<>), type);
+
+            (isEntity || isAggregate).Should().BeTrue(
+                $"{type.FullName} in ExamPrism.Domain must inherit from Entity<TId>, AggregateRoot<TId>, ValueObject, IDomainEvent, or Specification<T>");
+        }
+    }
+
+    [Fact]
+    public void ValueObjects_WhenConcrete_MustBePublicSealed()
+    {
+        var voTypes = AppTypes
+            .Where(t => typeof(ValueObject).IsAssignableFrom(t) && !t.IsAbstract && !t.IsInterface)
+            .ToList();
+
+        voTypes.Should().NotBeEmpty();
+
+        foreach (var vo in voTypes)
+        {
+            vo.IsPublic.Should().BeTrue($"{vo.FullName} must be public");
+            vo.IsSealed.Should().BeTrue($"{vo.FullName} must be sealed");
+            vo.Namespace.Should().StartWith("ExamPrism.Domain", $"{vo.FullName} must be in ExamPrism.Domain");
+        }
+    }
+
+    private static bool IsSubclassOfRawGeneric(Type generic, Type? toCheck)
+    {
+        while (toCheck != null && toCheck != typeof(object))
+        {
+            var cur = toCheck.IsGenericType ? toCheck.GetGenericTypeDefinition() : toCheck;
+            if (generic == cur)
+            {
+                return true;
+            }
+            toCheck = toCheck.BaseType;
+        }
+        return false;
     }
 
     private sealed class ProbeEndpointWithLambdaDbContext : IEndpoint
