@@ -1,4 +1,4 @@
-namespace ExamPrism.Infrastructure.Persistence.Catalog;
+namespace Common.Persistence;
 
 using ExamPrism.Domain.Tenants;
 using ExamPrism.Infrastructure.Identity;
@@ -41,3 +41,4 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
         });
     }
 }
+

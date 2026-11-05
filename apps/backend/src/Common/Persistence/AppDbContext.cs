@@ -1,4 +1,4 @@
-namespace ExamPrism.Infrastructure.Persistence;
+namespace Common.Persistence;
 
 using ExamPrism.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -28,3 +28,4 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         });
     }
 }
+
