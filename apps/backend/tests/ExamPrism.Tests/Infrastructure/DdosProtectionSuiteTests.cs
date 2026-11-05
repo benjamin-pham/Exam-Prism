@@ -410,16 +410,16 @@ public class DdosProtectionSuiteTests
 
             var table = new DataTable();
             table.Columns.Add("Id", typeof(Guid));
-            table.Columns.Add("CreatedAt", typeof(DateTimeOffset));
+            table.Columns.Add("CreatedAt", typeof(DateTime));
             table.Columns.Add("EncryptedConnectionString", typeof(string));
             table.Columns.Add("EncryptedOwnerPassword", typeof(string));
             table.Columns.Add("FailureReason", typeof(string));
             table.Columns.Add("Name", typeof(string));
             table.Columns.Add("OwnerEmail", typeof(string));
-            table.Columns.Add("ProvisionedAt", typeof(DateTimeOffset));
+            table.Columns.Add("ProvisionedAt", typeof(DateTime));
             table.Columns.Add("Slug", typeof(string));
             table.Columns.Add("Status", typeof(string));
-            table.Columns.Add("UpdatedAt", typeof(DateTimeOffset));
+            table.Columns.Add("UpdatedAt", typeof(DateTime));
 
             return new ValueTask<InterceptionResult<DbDataReader>>(
                 InterceptionResult<DbDataReader>.SuppressWithResult(table.CreateDataReader()));

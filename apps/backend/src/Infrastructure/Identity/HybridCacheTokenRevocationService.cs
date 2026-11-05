@@ -45,7 +45,7 @@ public sealed class HybridCacheTokenRevocationService : ITokenRevocationService
 
         var key = GetUserRevocationKey(userId, tenantId);
         var effectiveTtl = ttl ?? _options.TokenRevocationCacheTtl;
-        var revocationTime = _timeProvider.GetUtcNow();
+        var revocationTime = _timeProvider.GetUtcNow().UtcDateTime;
         await _cacheService.SetAsync(key, revocationTime, expiration: effectiveTtl, cancellationToken: cancellationToken);
     }
 
@@ -56,7 +56,7 @@ public sealed class HybridCacheTokenRevocationService : ITokenRevocationService
         string jti,
         string? userId,
         string? tenantId,
-        DateTimeOffset? issuedAt,
+        DateTime? issuedAt,
         CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(jti))
@@ -72,7 +72,7 @@ public sealed class HybridCacheTokenRevocationService : ITokenRevocationService
         if (!string.IsNullOrWhiteSpace(userId) && issuedAt.HasValue)
         {
             var userKey = GetUserRevocationKey(userId, tenantId);
-            var userRevokedAt = await _cacheService.GetOrDefaultAsync<DateTimeOffset?>(userKey, cancellationToken);
+            var userRevokedAt = await _cacheService.GetOrDefaultAsync<DateTime?>(userKey, cancellationToken);
             if (userRevokedAt.HasValue && issuedAt.Value <= userRevokedAt.Value)
             {
                 return true;
@@ -83,7 +83,7 @@ public sealed class HybridCacheTokenRevocationService : ITokenRevocationService
                 !string.Equals(tenantId, "platform", StringComparison.OrdinalIgnoreCase))
             {
                 var platformKey = GetUserRevocationKey(userId, "platform");
-                var platformRevokedAt = await _cacheService.GetOrDefaultAsync<DateTimeOffset?>(platformKey, cancellationToken);
+                var platformRevokedAt = await _cacheService.GetOrDefaultAsync<DateTime?>(platformKey, cancellationToken);
                 if (platformRevokedAt.HasValue && issuedAt.Value <= platformRevokedAt.Value)
                 {
                     return true;

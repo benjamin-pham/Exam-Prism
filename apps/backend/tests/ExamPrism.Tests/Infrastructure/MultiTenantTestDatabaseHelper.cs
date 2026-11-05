@@ -105,7 +105,7 @@ public static class MultiTenantTestDatabaseHelper
             await seeder.SeedAsync();
 
             var protector = scope.ServiceProvider.GetRequiredService<IConnectionStringProtector>();
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTime.UtcNow;
 
             var connStrA = new NpgsqlConnectionStringBuilder(dbContainer.GetConnectionString())
             {

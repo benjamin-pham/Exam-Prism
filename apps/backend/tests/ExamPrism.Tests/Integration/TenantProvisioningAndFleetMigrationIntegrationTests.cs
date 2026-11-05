@@ -228,8 +228,8 @@ public class TenantProvisioningAndFleetMigrationIntegrationTests : IClassFixture
             Status = TenantStatus.Provisioning,
             OwnerEmail = "owner@isolated-org.edu",
             EncryptedOwnerPassword = protector.Protect("OwnerPassword123!"),
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         catalogDb.Tenants.Add(tenant);

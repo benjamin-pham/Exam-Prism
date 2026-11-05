@@ -14,8 +14,8 @@ public class RefreshTokenTests
     {
         var token = new RefreshToken
         {
-            ExpiresAt = _timeProvider.GetUtcNow().AddDays(7),
-            CreatedAt = _timeProvider.GetUtcNow(),
+            ExpiresAt = _timeProvider.GetUtcNow().UtcDateTime.AddDays(7),
+            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
             RevokedAt = null
         };
 
@@ -29,8 +29,8 @@ public class RefreshTokenTests
     {
         var token = new RefreshToken
         {
-            ExpiresAt = _timeProvider.GetUtcNow().AddDays(-1),
-            CreatedAt = _timeProvider.GetUtcNow().AddDays(-8),
+            ExpiresAt = _timeProvider.GetUtcNow().UtcDateTime.AddDays(-1),
+            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime.AddDays(-8),
             RevokedAt = null
         };
 
@@ -43,9 +43,9 @@ public class RefreshTokenTests
     {
         var token = new RefreshToken
         {
-            ExpiresAt = _timeProvider.GetUtcNow().AddDays(7),
-            CreatedAt = _timeProvider.GetUtcNow(),
-            RevokedAt = _timeProvider.GetUtcNow()
+            ExpiresAt = _timeProvider.GetUtcNow().UtcDateTime.AddDays(7),
+            CreatedAt = _timeProvider.GetUtcNow().UtcDateTime,
+            RevokedAt = _timeProvider.GetUtcNow().UtcDateTime
         };
 
         token.IsActive(_timeProvider).Should().BeFalse();

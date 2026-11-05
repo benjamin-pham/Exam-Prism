@@ -45,8 +45,8 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
             Slug = takenSlug,
             Name = "Existing Organization",
             Status = TenantStatus.Active,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
 
@@ -99,7 +99,7 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
         {
             ReservedSubdomains = ["admin", "api", "www"]
         });
-        var now = new DateTimeOffset(2026, 11, 3, 12, 0, 0, TimeSpan.Zero);
+        var now = new DateTime(2026, 11, 3, 12, 0, 0, DateTimeKind.Utc);
         var timeProvider = new FakeTimeProvider(now);
 
         var handler = new CreateTenantHandler(db, protector, cacheInvalidator, bus, options, timeProvider);
@@ -148,8 +148,8 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
             Slug = existingSlug,
             Name = "Existing Org",
             Status = TenantStatus.Active,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
 
@@ -234,7 +234,7 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
         await using var db = CreateDbContext();
         var prefix = Guid.NewGuid().ToString("N")[..8];
         var slug = $"{prefix}-status-test";
-        var provisionedAt = new DateTimeOffset(2026, 11, 3, 11, 30, 0, TimeSpan.Zero);
+        var provisionedAt = new DateTime(2026, 11, 3, 11, 30, 0, DateTimeKind.Utc);
 
         db.Tenants.Add(new Tenant
         {
@@ -282,8 +282,8 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
             Name = "Failed Academy",
             Status = TenantStatus.Failed,
             FailureReason = "Database creation timeout",
-            CreatedAt = DateTimeOffset.UtcNow.AddHours(-1),
-            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-1)
+            CreatedAt = DateTime.UtcNow.AddHours(-1),
+            UpdatedAt = DateTime.UtcNow.AddHours(-1)
         };
 
         var activeTenant = new Tenant
@@ -292,8 +292,8 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
             Slug = $"{prefix}-active",
             Name = "Active Academy",
             Status = TenantStatus.Active,
-            CreatedAt = DateTimeOffset.UtcNow.AddHours(-2),
-            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-2)
+            CreatedAt = DateTime.UtcNow.AddHours(-2),
+            UpdatedAt = DateTime.UtcNow.AddHours(-2)
         };
 
         var suspendedTenant = new Tenant
@@ -302,8 +302,8 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
             Slug = $"{prefix}-suspended",
             Name = "Suspended Academy",
             Status = TenantStatus.Suspended,
-            CreatedAt = DateTimeOffset.UtcNow.AddHours(-3),
-            UpdatedAt = DateTimeOffset.UtcNow.AddHours(-3)
+            CreatedAt = DateTime.UtcNow.AddHours(-3),
+            UpdatedAt = DateTime.UtcNow.AddHours(-3)
         };
 
         db.Tenants.AddRange(failedTenant, activeTenant, suspendedTenant);
@@ -311,7 +311,7 @@ public class TenantOnboardingHandlersTests : IClassFixture<CatalogDbFixture>
 
         var cacheInvalidator = Substitute.For<ITenantCacheInvalidator>();
         var bus = Substitute.For<IMessageBus>();
-        var now = new DateTimeOffset(2026, 11, 3, 14, 0, 0, TimeSpan.Zero);
+        var now = new DateTime(2026, 11, 3, 14, 0, 0, DateTimeKind.Utc);
         var timeProvider = new FakeTimeProvider(now);
 
         var handler = new RetryTenantProvisioningHandler(db, cacheInvalidator, bus, timeProvider);

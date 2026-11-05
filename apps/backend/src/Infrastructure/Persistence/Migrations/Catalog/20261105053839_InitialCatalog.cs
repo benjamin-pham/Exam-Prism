@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
 {
     /// <inheritdoc />
-    public partial class AddPlatformIdentity : Migration
+    public partial class InitialCatalog : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -49,6 +49,27 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Tenants",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Slug = table.Column<string>(type: "character varying(63)", maxLength: 63, nullable: false),
+                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    EncryptedConnectionString = table.Column<string>(type: "text", nullable: true),
+                    Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    FailureReason = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    OwnerEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    EncryptedOwnerPassword = table.Column<string>(type: "text", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ProvisionedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Tenants", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -164,9 +185,9 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
                     TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    RevokedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    RevokedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     ReplacedByTokenHash = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
@@ -227,6 +248,17 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
                 name: "IX_PlatformRefreshTokens_UserId",
                 table: "PlatformRefreshTokens",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Tenants_Slug",
+                table: "Tenants",
+                column: "Slug",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Tenants_Status",
+                table: "Tenants",
+                column: "Status");
         }
 
         /// <inheritdoc />
@@ -249,6 +281,9 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Catalog
 
             migrationBuilder.DropTable(
                 name: "PlatformRefreshTokens");
+
+            migrationBuilder.DropTable(
+                name: "Tenants");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");

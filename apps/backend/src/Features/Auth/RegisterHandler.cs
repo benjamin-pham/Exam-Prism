@@ -77,7 +77,7 @@ public sealed class RegisterHandler(
 
         if (db is not null)
         {
-            var now = timeProvider.GetUtcNow();
+            var now = timeProvider.GetUtcNow().UtcDateTime;
             var refreshToken = new RefreshToken
             {
                 Id = Guid.NewGuid(),

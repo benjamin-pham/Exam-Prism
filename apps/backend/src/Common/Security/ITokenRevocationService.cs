@@ -16,6 +16,6 @@ public interface ITokenRevocationService
         string jti,
         string? userId,
         string? tenantId,
-        DateTimeOffset? issuedAt,
+        DateTime? issuedAt,
         CancellationToken cancellationToken = default);
 }

@@ -23,7 +23,7 @@ public sealed class ReactivateTenantHandler(
             return TenantErrors.TenantNotFound();
         }
 
-        var reactivateResult = tenant.Reactivate(timeProvider.GetUtcNow());
+        var reactivateResult = tenant.Reactivate(timeProvider.GetUtcNow().UtcDateTime);
         if (reactivateResult.IsFailure)
         {
             return reactivateResult.Error;

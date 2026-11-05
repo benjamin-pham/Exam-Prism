@@ -127,15 +127,15 @@ public class IdentityHighLoadAndTelemetryTests
                 return ValueTask.FromResult(cacheDict.TryGetValue(key, out var val) && val is bool b && b);
             });
 
-        cacheService.GetOrDefaultAsync<DateTimeOffset?>(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        cacheService.GetOrDefaultAsync<DateTime?>(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 var key = callInfo.Arg<string>();
-                if (cacheDict.TryGetValue(key, out var val) && val is DateTimeOffset dto)
+                if (cacheDict.TryGetValue(key, out var val) && val is DateTime dto)
                 {
-                    return ValueTask.FromResult<DateTimeOffset?>(dto);
+                    return ValueTask.FromResult<DateTime?>(dto);
                 }
-                return ValueTask.FromResult<DateTimeOffset?>(null);
+                return ValueTask.FromResult<DateTime?>(null);
             });
 
         var highLoadOptions = Options.Create(new IdentityHighLoadOptions
@@ -153,7 +153,7 @@ public class IdentityHighLoadAndTelemetryTests
         // 2. RevokeUserTokensAsync(userId, tenantId) at T1
         var userId = "user-abc-123";
         var tenantId = "tenant-xyz-789";
-        var t1 = DateTimeOffset.UtcNow;
+        var t1 = DateTime.UtcNow;
 
         await revocationService.RevokeUserTokensAsync(userId, tenantId);
 
@@ -226,15 +226,15 @@ public class IdentityHighLoadAndTelemetryTests
                 return ValueTask.FromResult(cacheDict.TryGetValue(key, out var val) && val is bool b && b);
             });
 
-        cacheService.GetOrDefaultAsync<DateTimeOffset?>(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        cacheService.GetOrDefaultAsync<DateTime?>(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
                 var key = callInfo.Arg<string>();
-                if (cacheDict.TryGetValue(key, out var val) && val is DateTimeOffset dto)
+                if (cacheDict.TryGetValue(key, out var val) && val is DateTime dto)
                 {
-                    return ValueTask.FromResult<DateTimeOffset?>(dto);
+                    return ValueTask.FromResult<DateTime?>(dto);
                 }
-                return ValueTask.FromResult<DateTimeOffset?>(null);
+                return ValueTask.FromResult<DateTime?>(null);
             });
 
         var highLoadOptions = Options.Create(new IdentityHighLoadOptions
@@ -245,7 +245,7 @@ public class IdentityHighLoadAndTelemetryTests
         var revocationService = new HybridCacheTokenRevocationService(cacheService, highLoadOptions);
 
         var platformUserId = "user-global-admin";
-        var tRevoke = DateTimeOffset.UtcNow;
+        var tRevoke = DateTime.UtcNow;
         var tOld = tRevoke.AddMinutes(-5);
         var tNew = tRevoke.AddMinutes(5);
 
@@ -287,8 +287,8 @@ public class IdentityHighLoadAndTelemetryTests
                 new Claim(CustomClaimTypes.TenantId, tenantInfo.Id),
                 new Claim(ClaimTypes.NameIdentifier, platformUserId)
             ],
-            notBefore: tOld.UtcDateTime,
-            expires: tRevoke.AddHours(1).UtcDateTime);
+            notBefore: tOld,
+            expires: tRevoke.AddHours(1));
 
         var tokenContext = new TokenValidatedContext(httpContext, scheme, jwtBearerOptions)
         {

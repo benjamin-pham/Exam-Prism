@@ -24,7 +24,7 @@ public sealed class PlatformLogoutHandler(
         var token = await db.PlatformRefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
         if (token is not null && !token.IsRevoked)
         {
-            token.RevokedAt = timeProvider.GetUtcNow();
+            token.RevokedAt = timeProvider.GetUtcNow().UtcDateTime;
             await db.SaveChangesAsync(ct);
         }
 

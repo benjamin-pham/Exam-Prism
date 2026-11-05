@@ -164,9 +164,9 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
                     TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    RevokedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    RevokedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     ReplacedByTokenHash = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>

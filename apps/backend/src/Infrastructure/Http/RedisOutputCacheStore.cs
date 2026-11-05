@@ -201,7 +201,7 @@ return #members";
 
     internal sealed class MemoryOutputCacheFallbackStore : IOutputCacheStore
     {
-        private sealed record Entry(byte[] Value, DateTimeOffset ExpiresAt, HashSet<string>? Tags);
+        private sealed record Entry(byte[] Value, DateTime ExpiresAt, HashSet<string>? Tags);
 
         private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _tagToKeys = new(StringComparer.OrdinalIgnoreCase);
@@ -210,7 +210,7 @@ return #members";
         {
             if (_entries.TryGetValue(key, out var entry))
             {
-                if (entry.ExpiresAt > DateTimeOffset.UtcNow)
+                if (entry.ExpiresAt > DateTime.UtcNow)
                 {
                     return ValueTask.FromResult<byte[]?>(entry.Value);
                 }
@@ -223,7 +223,7 @@ return #members";
 
         public ValueTask SetAsync(string key, byte[] value, string[]? tags, TimeSpan validFor, CancellationToken cancellationToken)
         {
-            var expiresAt = DateTimeOffset.UtcNow.Add(validFor);
+            var expiresAt = DateTime.UtcNow.Add(validFor);
             HashSet<string>? tagSet = null;
 
             if (tags is { Length: > 0 })

@@ -83,9 +83,9 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         await using var db = CreateCatalogDbContext();
         var prefix = "query-test-" + Guid.NewGuid().ToString("N")[..6];
 
-        var t1 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-1", Name = "Tenant One", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
-        var t2 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-2", Name = "Tenant Two", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
-        var t3 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-3", Name = "Tenant Three", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        var t1 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-1", Name = "Tenant One", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+        var t2 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-2", Name = "Tenant Two", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+        var t3 = new Tenant { Id = Guid.NewGuid(), Slug = $"{prefix}-3", Name = "Tenant Three", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
 
         db.Tenants.AddRange(t1, t2, t3);
         await db.SaveChangesAsync();
@@ -144,8 +144,8 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
     {
         public string Title { get; set; } = string.Empty;
         public string UniqueKey { get; set; } = string.Empty;
-        public DateTimeOffset CreatedAt { get; private set; }
-        public DateTimeOffset UpdatedAt { get; private set; }
+        public DateTime CreatedAt { get; private set; }
+        public DateTime UpdatedAt { get; private set; }
 
         public TestAuditableItem() { }
         public TestAuditableItem(Guid id, string title, string uniqueKey) : base(id)
@@ -155,8 +155,8 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         }
 
         public void TriggerEvent(string msg) => RaiseDomainEvent(new SampleAuditedEvent(msg));
-        public void SetCreated(DateTimeOffset now) => CreatedAt = now;
-        public void SetUpdated(DateTimeOffset now) => UpdatedAt = now;
+        public void SetCreated(DateTime now) => CreatedAt = now;
+        public void SetUpdated(DateTime now) => UpdatedAt = now;
     }
 
     public sealed class TestDddDbContext(
@@ -186,7 +186,7 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
     [Fact]
     public async Task AuditableEntityInterceptor_AutomaticallyStampsCreatedAtAndUpdatedAt_WhenNotExplicitlySet()
     {
-        var now = new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.Zero);
+        var now = new DateTime(2026, 11, 5, 12, 0, 0, DateTimeKind.Utc);
         var timeProvider = new FakeTimeProvider(now);
         var auditableInterceptor = new AuditableEntityInterceptor(timeProvider);
         var dispatchInterceptor = new DomainEventDispatchInterceptor(new ServiceCollection().BuildServiceProvider());

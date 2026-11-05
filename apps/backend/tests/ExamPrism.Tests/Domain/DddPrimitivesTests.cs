@@ -59,8 +59,8 @@ public class DddPrimitivesTests
 
     private sealed class SampleAggregate : AggregateRoot<Guid>, IAuditableEntity
     {
-        public DateTimeOffset CreatedAt { get; private set; }
-        public DateTimeOffset UpdatedAt { get; private set; }
+        public DateTime CreatedAt { get; private set; }
+        public DateTime UpdatedAt { get; private set; }
 
         public SampleAggregate(Guid id) : base(id) { }
 
@@ -69,8 +69,8 @@ public class DddPrimitivesTests
             RaiseDomainEvent(new TestDomainEvent(message));
         }
 
-        public void SetCreated(DateTimeOffset now) => CreatedAt = now;
-        public void SetUpdated(DateTimeOffset now) => UpdatedAt = now;
+        public void SetCreated(DateTime now) => CreatedAt = now;
+        public void SetUpdated(DateTime now) => UpdatedAt = now;
     }
 
     private sealed class ProductItem

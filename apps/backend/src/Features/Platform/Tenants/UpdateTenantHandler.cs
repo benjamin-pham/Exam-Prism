@@ -37,7 +37,7 @@ public sealed class UpdateTenantHandler(
             return TenantErrors.TenantNotFound();
         }
 
-        var renameResult = tenant.Rename(command.Name, timeProvider.GetUtcNow());
+        var renameResult = tenant.Rename(command.Name, timeProvider.GetUtcNow().UtcDateTime);
         if (renameResult.IsFailure)
         {
             return renameResult.Error;

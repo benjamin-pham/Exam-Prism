@@ -23,7 +23,7 @@ public sealed class SuspendTenantHandler(
             return TenantErrors.TenantNotFound();
         }
 
-        var suspendResult = tenant.Suspend(timeProvider.GetUtcNow());
+        var suspendResult = tenant.Suspend(timeProvider.GetUtcNow().UtcDateTime);
         if (suspendResult.IsFailure)
         {
             return suspendResult.Error;

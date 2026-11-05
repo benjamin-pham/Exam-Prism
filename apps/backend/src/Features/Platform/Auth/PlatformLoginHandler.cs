@@ -61,7 +61,7 @@ public sealed class PlatformLoginHandler(
 
         if (db is not null)
         {
-            var now = timeProvider.GetUtcNow();
+            var now = timeProvider.GetUtcNow().UtcDateTime;
             var refreshToken = new PlatformRefreshToken
             {
                 Id = Guid.NewGuid(),

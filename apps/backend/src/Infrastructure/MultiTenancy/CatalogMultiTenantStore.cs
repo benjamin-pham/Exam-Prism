@@ -327,8 +327,8 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
             Name = tenantInfo.Name ?? string.Empty,
             Status = tenantInfo.Status,
             EncryptedConnectionString = encryptedConnStr,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         await _db.Tenants.AddAsync(tenant);
@@ -365,7 +365,7 @@ public class CatalogMultiTenantStore : IMultiTenantStore<ExamPrismTenantInfo>, I
                 ? _protector.Protect(tenantInfo.ConnectionString)
                 : null;
         }
-        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        existing.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
         await InvalidateTenantAsync(existing.Id, existing.Slug);

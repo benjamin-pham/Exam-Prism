@@ -8,9 +8,9 @@ public record TenantSummaryItem(
     string Slug,
     string Name,
     TenantStatus Status,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? ProvisionedAt,
-    DateTimeOffset UpdatedAt);
+    DateTime CreatedAt,
+    DateTime? ProvisionedAt,
+    DateTime UpdatedAt);
 
 public record TenantDetailResult(
     Guid Id,
@@ -18,9 +18,9 @@ public record TenantDetailResult(
     string Name,
     TenantStatus Status,
     string? FailureReason,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset? ProvisionedAt,
-    DateTimeOffset UpdatedAt);
+    DateTime CreatedAt,
+    DateTime? ProvisionedAt,
+    DateTime UpdatedAt);
 
 public record UpdateTenantRequest(string Name);
 

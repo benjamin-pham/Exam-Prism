@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261102121954_InitialTenant")]
+    [Migration("20261105053905_InitialTenant")]
     partial class InitialTenant
     {
         /// <inheritdoc />
@@ -96,16 +96,16 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTimeOffset>("ExpiresAt")
+                    b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ReplacedByTokenHash")
                         .HasColumnType("text");
 
-                    b.Property<DateTimeOffset?>("RevokedAt")
+                    b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("TokenHash")

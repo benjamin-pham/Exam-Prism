@@ -272,7 +272,7 @@ public class AuthEndpointTests : IClassFixture<CustomWebApplicationFactory>
             var tokenService = scope.ServiceProvider.GetRequiredService<ITokenService>();
             var hash = tokenService.HashToken(rawRefresh!);
             var dbToken = await db.RefreshTokens.FirstAsync(t => t.TokenHash == hash);
-            dbToken.ExpiresAt = DateTimeOffset.UtcNow.AddDays(-1);
+            dbToken.ExpiresAt = DateTime.UtcNow.AddDays(-1);
             await db.SaveChangesAsync();
         }
 

@@ -50,7 +50,7 @@ public record TenantProvisioningAcceptedResult(
     string Slug,
     string Name,
     TenantStatus Status,
-    DateTimeOffset CreatedAt);
+    DateTime CreatedAt);
 
 public sealed class CreateTenantHandler(
     CatalogDbContext db,
@@ -97,7 +97,7 @@ public sealed class CreateTenantHandler(
 
         var name = (command.Name ?? string.Empty).Trim();
         var ownerEmail = (command.OwnerEmail ?? string.Empty).Trim();
-        var now = timeProvider.GetUtcNow();
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
         var tenantResult = Tenant.Create(slug, name, ownerEmail, protector.Protect(command.OwnerPassword), now);
         if (tenantResult.IsFailure)

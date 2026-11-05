@@ -14,7 +14,7 @@ public record GetTenantProvisioningStatusResult(
     string Slug,
     string Name,
     TenantStatus Status,
-    DateTimeOffset? ProvisionedAt);
+    DateTime? ProvisionedAt);
 
 public sealed class GetTenantProvisioningStatusHandler(CatalogDbContext db)
     : IHandler<GetTenantProvisioningStatusQuery, GetTenantProvisioningStatusResult>

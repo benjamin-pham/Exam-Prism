@@ -26,7 +26,7 @@ public sealed class RetryTenantProvisioningHandler(
             return TenantErrors.TenantNotFound();
         }
 
-        var retryResult = tenant.RetryProvisioning(timeProvider.GetUtcNow());
+        var retryResult = tenant.RetryProvisioning(timeProvider.GetUtcNow().UtcDateTime);
         if (retryResult.IsFailure)
         {
             return retryResult.Error;

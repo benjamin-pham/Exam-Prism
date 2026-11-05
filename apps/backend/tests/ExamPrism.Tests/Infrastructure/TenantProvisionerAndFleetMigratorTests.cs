@@ -53,7 +53,7 @@ public class TenantProvisionerAndFleetMigratorTests : IClassFixture<CatalogDbFix
     {
         // Arrange
         await using var db = CreateCatalogDbContext();
-        var baseTime = DateTimeOffset.UtcNow;
+        var baseTime = DateTime.UtcNow;
         var prefix = Guid.NewGuid().ToString("N")[..8];
 
         var activeTenant = new Tenant
@@ -126,7 +126,7 @@ public class TenantProvisionerAndFleetMigratorTests : IClassFixture<CatalogDbFix
         // Arrange
         await using var db = CreateCatalogDbContext();
         var prefix = Guid.NewGuid().ToString("N")[..8];
-        var baseTime = DateTimeOffset.UtcNow;
+        var baseTime = DateTime.UtcNow;
 
         var protector = Substitute.For<IConnectionStringProtector>();
         protector.Protect("OwnerPass123!").Returns("EncryptedOwnerPass123!");
@@ -192,7 +192,7 @@ public class TenantProvisionerAndFleetMigratorTests : IClassFixture<CatalogDbFix
         // Arrange
         await using var db = CreateCatalogDbContext();
         var prefix = Guid.NewGuid().ToString("N")[..8];
-        var baseTime = DateTimeOffset.UtcNow;
+        var baseTime = DateTime.UtcNow;
 
         var tenantWithoutConnStr = new Tenant
         {

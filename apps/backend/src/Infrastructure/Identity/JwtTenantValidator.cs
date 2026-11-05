@@ -88,19 +88,19 @@ public sealed class JwtTenantValidator
             var iatClaim = context.Principal?.FindFirst(JwtRegisteredClaimNames.Iat)?.Value
                 ?? context.Principal?.FindFirst("iat")?.Value;
 
-            DateTimeOffset? issuedAt = null;
+            DateTime? issuedAt = null;
             if (!string.IsNullOrWhiteSpace(iatClaim) && long.TryParse(iatClaim, out var iatSeconds))
             {
-                issuedAt = DateTimeOffset.FromUnixTimeSeconds(iatSeconds);
+                issuedAt = DateTimeOffset.FromUnixTimeSeconds(iatSeconds).UtcDateTime;
             }
             else if (context.SecurityToken is not null && context.SecurityToken.ValidFrom != DateTime.MinValue)
             {
                 var validFrom = context.SecurityToken.ValidFrom;
                 issuedAt = validFrom.Kind switch
                 {
-                    DateTimeKind.Utc => new DateTimeOffset(validFrom),
-                    DateTimeKind.Local => new DateTimeOffset(validFrom).ToUniversalTime(),
-                    _ => new DateTimeOffset(DateTime.SpecifyKind(validFrom, DateTimeKind.Utc))
+                    DateTimeKind.Utc => validFrom,
+                    DateTimeKind.Local => validFrom.ToUniversalTime(),
+                    _ => DateTime.SpecifyKind(validFrom, DateTimeKind.Utc)
                 };
             }
 

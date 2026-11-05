@@ -33,7 +33,7 @@ public class PlatformTenantHandlersTests : IClassFixture<CatalogDbFixture>
     public async Task ListTenantsHandler_FiltersByStatusAndSearch_AndPaginatesOrderedByCreatedAtDesc()
     {
         await using var db = CreateDbContext();
-        var baseTime = new DateTimeOffset(2026, 11, 3, 10, 0, 0, TimeSpan.Zero);
+        var baseTime = new DateTime(2026, 11, 3, 10, 0, 0, DateTimeKind.Utc);
         var prefix = Guid.NewGuid().ToString("N")[..8];
 
         var t1 = new Tenant
@@ -113,7 +113,7 @@ public class PlatformTenantHandlersTests : IClassFixture<CatalogDbFixture>
     public async Task GetTenantByIdHandler_ReturnsDetailWhenFound_AndNotFoundWhenMissing()
     {
         await using var db = CreateDbContext();
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var tenant = new Tenant
         {
             Id = Guid.NewGuid(),
@@ -154,7 +154,7 @@ public class PlatformTenantHandlersTests : IClassFixture<CatalogDbFixture>
     public async Task UpdateTenantHandler_TrimsAndUpdatesName_AndInvalidatesCache()
     {
         await using var db = CreateDbContext();
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var tenant = new Tenant
         {
             Id = Guid.NewGuid(),
@@ -194,7 +194,7 @@ public class PlatformTenantHandlersTests : IClassFixture<CatalogDbFixture>
     public async Task SuspendTenantHandler_TransitionsActiveToSuspended_InvalidatesCache_AndRejectsNonActiveTenants()
     {
         await using var db = CreateDbContext();
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var activeTenant = new Tenant
         {
             Id = Guid.NewGuid(),
@@ -272,7 +272,7 @@ public class PlatformTenantHandlersTests : IClassFixture<CatalogDbFixture>
     public async Task ReactivateTenantHandler_TransitionsSuspendedWithConnectionStringToActive_InvalidatesCache_AndRejectsInvalidStates()
     {
         await using var db = CreateDbContext();
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var suspendedValidTenant = new Tenant
         {
             Id = Guid.NewGuid(),

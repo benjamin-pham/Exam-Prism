@@ -33,7 +33,7 @@ public class TenantDomainTests
     [Fact]
     public void Tenant_Create_ValidatesInvariants_InitializesProvisioningStatus_AndRaisesTenantCreatedDomainEvent()
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var result = Tenant.Create("my-org", "My Organization", "owner@example.com", "enc-pass", now);
 
         result.IsSuccess.Should().BeTrue();
@@ -70,7 +70,7 @@ public class TenantDomainTests
     [Fact]
     public void Tenant_Rename_TrimsName_ValidatesLength_UpdatesTimestamp_AndRaisesTenantRenamedDomainEvent()
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var tenant = Tenant.Create("test-org", "Original Name", "owner@test.com", "pass", now).Value;
         tenant.ClearDomainEvents();
 
@@ -97,7 +97,7 @@ public class TenantDomainTests
     [Fact]
     public void Tenant_Suspend_And_Reactivate_EnforceStateTransitionsAndConnectionStringInvariants_AndRaiseDomainEvents()
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var tenant = Tenant.Create("lifecycle-org", "Lifecycle Org", "owner@test.com", "pass", now).Value;
         tenant.ClearDomainEvents();
 
@@ -144,7 +144,7 @@ public class TenantDomainTests
     [Fact]
     public void Tenant_RetryProvisioning_MarkProvisioned_And_MarkProvisioningFailed_EnforceInvariantsTruncateFailureReasonAndRaiseDomainEvents()
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var tenant = Tenant.Create("retry-org", "Retry Org", "owner@test.com", "pass", now).Value;
         tenant.ClearDomainEvents();
 
@@ -191,8 +191,8 @@ public class TenantDomainTests
     [Fact]
     public void TenantSpecs_TenantByIdSpec_And_TenantBySlugSpec_EvaluateInMemoryCriteriaAndConfigureTracking()
     {
-        var tenant1 = Tenant.Create("org-one", "Org One", "a@test.com", "p", DateTimeOffset.UtcNow).Value;
-        var tenant2 = Tenant.Create("org-two", "Org Two", "b@test.com", "p", DateTimeOffset.UtcNow).Value;
+        var tenant1 = Tenant.Create("org-one", "Org One", "a@test.com", "p", DateTime.UtcNow).Value;
+        var tenant2 = Tenant.Create("org-two", "Org Two", "b@test.com", "p", DateTime.UtcNow).Value;
 
         var idSpec = new TenantByIdSpec(tenant1.Id, track: true);
         idSpec.IsSatisfiedBy(tenant1).Should().BeTrue();

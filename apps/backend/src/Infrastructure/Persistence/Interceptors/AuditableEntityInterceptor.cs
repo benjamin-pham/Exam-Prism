@@ -30,7 +30,7 @@ public sealed class AuditableEntityInterceptor(TimeProvider timeProvider) : Save
             return;
         }
 
-        var now = timeProvider.GetUtcNow();
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
         foreach (var entry in context.ChangeTracker.Entries<IAuditableEntity>())
         {

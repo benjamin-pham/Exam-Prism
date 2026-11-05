@@ -90,14 +90,17 @@ public class CatalogDbContextSchemaTests
         var createdProp = entityType.FindProperty(nameof(Tenant.CreatedAt))!;
         createdProp.Should().NotBeNull();
         createdProp.IsNullable.Should().BeFalse();
+        createdProp.ClrType.Should().Be(typeof(DateTime));
 
         var provisionedProp = entityType.FindProperty(nameof(Tenant.ProvisionedAt))!;
         provisionedProp.Should().NotBeNull();
         provisionedProp.IsNullable.Should().BeTrue();
+        provisionedProp.ClrType.Should().Be(typeof(DateTime?));
 
         var updatedProp = entityType.FindProperty(nameof(Tenant.UpdatedAt))!;
         updatedProp.Should().NotBeNull();
         updatedProp.IsNullable.Should().BeFalse();
+        updatedProp.ClrType.Should().Be(typeof(DateTime));
 
         // OwnerEmail & EncryptedOwnerPassword
         var ownerEmailProp = entityType.FindProperty(nameof(Tenant.OwnerEmail))!;
@@ -166,9 +169,7 @@ public class CatalogDbContextSchemaTests
         var tenantMigrations = appAssembly.Migrations.Keys.ToList();
 
         catalogMigrations.Should().NotBeEmpty();
-        catalogMigrations.Should().Contain(m => m.EndsWith("_InitialCatalog"));
-        catalogMigrations.Should().Contain(m => m.EndsWith("_AddPlatformIdentity"));
-        catalogMigrations.Should().Contain(m => m.EndsWith("_AddTenantProvisioningMetadata"));
+        catalogMigrations.Should().ContainSingle(m => m.EndsWith("_InitialCatalog"));
 
         tenantMigrations.Should().NotBeEmpty();
         tenantMigrations.Should().ContainSingle(m => m.EndsWith("_InitialTenant"));

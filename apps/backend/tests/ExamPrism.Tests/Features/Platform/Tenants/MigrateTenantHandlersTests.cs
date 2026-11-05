@@ -67,7 +67,7 @@ public class MigrateTenantHandlersTests : IClassFixture<CatalogDbFixture>
         // Arrange
         await using var db = CreateDbContext();
         var prefix = Guid.NewGuid().ToString("N")[..8];
-        var baseTime = DateTimeOffset.UtcNow;
+        var baseTime = DateTime.UtcNow;
 
         var provisioningTenant = new Tenant
         {

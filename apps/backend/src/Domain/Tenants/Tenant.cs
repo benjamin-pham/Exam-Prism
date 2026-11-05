@@ -21,11 +21,11 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
 
     public string? EncryptedOwnerPassword { get; set; }
 
-    public DateTimeOffset CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
 
-    public DateTimeOffset? ProvisionedAt { get; set; }
+    public DateTime? ProvisionedAt { get; set; }
 
-    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 
     public Tenant()
     {
@@ -36,7 +36,7 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
         string name,
         string ownerEmail,
         string encryptedOwnerPassword,
-        DateTimeOffset now)
+        DateTime now)
     {
         var slugResult = TenantSlug.Create(slug);
         if (slugResult.IsFailure)
@@ -71,7 +71,7 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
         return tenant;
     }
 
-    public Result Rename(string newName, DateTimeOffset now)
+    public Result Rename(string newName, DateTime now)
     {
         var trimmed = (newName ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
@@ -92,7 +92,7 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
         return Result.Success();
     }
 
-    public Result Suspend(DateTimeOffset now)
+    public Result Suspend(DateTime now)
     {
         if (Status != TenantStatus.Active)
         {
@@ -106,7 +106,7 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
         return Result.Success();
     }
 
-    public Result Reactivate(DateTimeOffset now)
+    public Result Reactivate(DateTime now)
     {
         if (Status != TenantStatus.Suspended || string.IsNullOrWhiteSpace(EncryptedConnectionString))
         {
@@ -120,7 +120,7 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
         return Result.Success();
     }
 
-    public Result RetryProvisioning(DateTimeOffset now)
+    public Result RetryProvisioning(DateTime now)
     {
         if (Status is TenantStatus.Active or TenantStatus.Suspended)
         {
@@ -135,13 +135,13 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
         return Result.Success();
     }
 
-    public void SetEncryptedConnectionString(string encryptedConnectionString, DateTimeOffset now)
+    public void SetEncryptedConnectionString(string encryptedConnectionString, DateTime now)
     {
         EncryptedConnectionString = encryptedConnectionString;
         UpdatedAt = now;
     }
 
-    public void MarkProvisioned(string encryptedConnectionString, DateTimeOffset now)
+    public void MarkProvisioned(string encryptedConnectionString, DateTime now)
     {
         EncryptedConnectionString = encryptedConnectionString;
         Status = TenantStatus.Active;
@@ -153,7 +153,7 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
         RaiseDomainEvent(new TenantProvisionedDomainEvent(Id, Slug, now));
     }
 
-    public void MarkProvisioningFailed(string failureReason, DateTimeOffset now)
+    public void MarkProvisioningFailed(string failureReason, DateTime now)
     {
         Status = TenantStatus.Failed;
         FailureReason = failureReason is { Length: > 1000 } ? failureReason[..1000] : (failureReason ?? string.Empty);
@@ -162,7 +162,7 @@ public class Tenant : AggregateRoot<Guid>, IAuditableEntity
         RaiseDomainEvent(new TenantProvisioningFailedDomainEvent(Id, Slug, FailureReason, now));
     }
 
-    public void SetCreated(DateTimeOffset now) => CreatedAt = now;
-    public void SetUpdated(DateTimeOffset now) => UpdatedAt = now;
+    public void SetCreated(DateTime now) => CreatedAt = now;
+    public void SetUpdated(DateTime now) => UpdatedAt = now;
 }
 

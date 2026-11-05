@@ -216,8 +216,8 @@ public class SubdomainAndCatalogStoreTests : IClassFixture<CatalogDbFixture>
             Name = "Active School",
             Status = TenantStatus.Active,
             EncryptedConnectionString = ciphertext,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         var suspendedTenant = new Tenant
@@ -227,8 +227,8 @@ public class SubdomainAndCatalogStoreTests : IClassFixture<CatalogDbFixture>
             Name = "Suspended School",
             Status = TenantStatus.Suspended,
             EncryptedConnectionString = ciphertext,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         db.Tenants.AddRange(activeTenant, suspendedTenant);
@@ -363,8 +363,8 @@ public class SubdomainAndCatalogStoreTests : IClassFixture<CatalogDbFixture>
             Name = "ID Lookup Tenant",
             Status = TenantStatus.Active,
             EncryptedConnectionString = "ENC:Host=pg;Database=id_test",
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         db.Tenants.Add(tenant);

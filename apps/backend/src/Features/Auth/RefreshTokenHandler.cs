@@ -38,7 +38,7 @@ public sealed class RefreshTokenHandler(
             return Error.Unauthorized("INVALID_REFRESH_TOKEN", "Invalid or expired refresh token.");
         }
 
-        var now = timeProvider.GetUtcNow();
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
         // Compromised reuse detection
         if (token.IsRevoked || token.ReplacedByTokenHash != null)

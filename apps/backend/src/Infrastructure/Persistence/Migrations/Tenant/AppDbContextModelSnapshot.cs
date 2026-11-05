@@ -93,16 +93,16 @@ namespace ExamPrism.Infrastructure.Persistence.Migrations.Tenant
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTimeOffset>("ExpiresAt")
+                    b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ReplacedByTokenHash")
                         .HasColumnType("text");
 
-                    b.Property<DateTimeOffset?>("RevokedAt")
+                    b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("TokenHash")

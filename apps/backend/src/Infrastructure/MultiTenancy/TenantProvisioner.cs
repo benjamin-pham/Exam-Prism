@@ -92,7 +92,7 @@ public sealed class TenantProvisioner(
                         Password = rolePassword
                     };
                     rawTenantConnStr = tenantConnBuilder.ConnectionString;
-                    tenant.SetEncryptedConnectionString(protector.Protect(rawTenantConnStr), timeProvider.GetUtcNow());
+                    tenant.SetEncryptedConnectionString(protector.Protect(rawTenantConnStr), timeProvider.GetUtcNow().UtcDateTime);
                     await catalogDb.SaveChangesAsync(ct);
                 }
             }
@@ -221,7 +221,7 @@ public sealed class TenantProvisioner(
                 }
             }
 
-            var now = timeProvider.GetUtcNow();
+            var now = timeProvider.GetUtcNow().UtcDateTime;
             tenant.MarkProvisioned(protector.Protect(rawTenantConnStr), now);
 
             await catalogDb.SaveChangesAsync(ct);
@@ -233,7 +233,7 @@ public sealed class TenantProvisioner(
 
             if (tenant != null)
             {
-                var now = timeProvider.GetUtcNow();
+                var now = timeProvider.GetUtcNow().UtcDateTime;
                 tenant.MarkProvisioningFailed(ex.Message, now);
 
                 try

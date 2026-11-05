@@ -85,7 +85,7 @@ public class PlatformAuthHandlersTests : IClassFixture<CatalogDbFixture>
             .FirstOrDefaultAsync(t => t.UserId == user.Id && t.TokenHash == "hash-refresh-123");
         persistedToken.Should().NotBeNull();
         persistedToken!.RevokedAt.Should().BeNull();
-        persistedToken.ExpiresAt.Should().Be(timeProvider.GetUtcNow().AddDays(14));
+        persistedToken.ExpiresAt.Should().Be(timeProvider.GetUtcNow().UtcDateTime.AddDays(14));
     }
 
     [Fact]
@@ -147,8 +147,8 @@ public class PlatformAuthHandlersTests : IClassFixture<CatalogDbFixture>
             Id = Guid.NewGuid(),
             UserId = user.Id,
             TokenHash = initialHash,
-            CreatedAt = timeProvider.GetUtcNow().AddHours(-1),
-            ExpiresAt = timeProvider.GetUtcNow().AddDays(7)
+            CreatedAt = timeProvider.GetUtcNow().UtcDateTime.AddHours(-1),
+            ExpiresAt = timeProvider.GetUtcNow().UtcDateTime.AddDays(7)
         };
         db.PlatformRefreshTokens.Add(activeToken);
         await db.SaveChangesAsync();
@@ -214,8 +214,8 @@ public class PlatformAuthHandlersTests : IClassFixture<CatalogDbFixture>
             Id = Guid.NewGuid(),
             UserId = user.Id,
             TokenHash = tokenHash,
-            CreatedAt = timeProvider.GetUtcNow().AddHours(-1),
-            ExpiresAt = timeProvider.GetUtcNow().AddDays(7)
+            CreatedAt = timeProvider.GetUtcNow().UtcDateTime.AddHours(-1),
+            ExpiresAt = timeProvider.GetUtcNow().UtcDateTime.AddDays(7)
         };
         db.PlatformRefreshTokens.Add(token);
         await db.SaveChangesAsync();
