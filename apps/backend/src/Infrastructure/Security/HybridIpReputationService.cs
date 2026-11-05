@@ -7,27 +7,69 @@ using System.Threading.Tasks;
 using Common.Caching;
 using Common.Security;
 using Common.Telemetry;
+using ExamPrism.Infrastructure.Caching;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 
 public sealed class HybridIpReputationService : IIpReputationService
 {
     private sealed record StrikeState(long WindowStartUnixMs, int Score);
 
+    private const string AtomicStrikeLuaScript = @"
+local current = redis.call('INCRBY', KEYS[1], tonumber(ARGV[1]))
+if current == tonumber(ARGV[1]) then
+    redis.call('PEXPIRE', KEYS[1], tonumber(ARGV[2]))
+end
+return current";
+
     private readonly IOptions<DdosProtectionOptions> _options;
     private readonly ICacheService? _cache;
     private readonly TimeProvider _timeProvider;
+    private readonly IConnectionMultiplexer? _multiplexer;
+    private readonly ICacheBackplane? _backplane;
+    private readonly string _keyPrefix;
 
     private readonly ConcurrentDictionary<string, long> _localBans = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, long> _checkedIps = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, StrikeState> _strikes = new(StringComparer.OrdinalIgnoreCase);
 
     public HybridIpReputationService(
         IOptions<DdosProtectionOptions> options,
         ICacheService? cache = null,
         TimeProvider? timeProvider = null)
+        : this(options, cache, timeProvider, multiplexer: null, backplane: null, cacheOptions: null)
+    {
+    }
+
+    public HybridIpReputationService(
+        IOptions<DdosProtectionOptions> options,
+        ICacheService? cache,
+        TimeProvider? timeProvider,
+        IConnectionMultiplexer? multiplexer,
+        ICacheBackplane? backplane = null,
+        IOptions<CacheOptions>? cacheOptions = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _cache = cache;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _multiplexer = multiplexer;
+        _backplane = backplane;
+        _keyPrefix = cacheOptions?.Value.KeyPrefix ?? "examprism:";
+
+        if (_backplane is not null)
+        {
+            _backplane.KeyInvalidated += OnBackplaneKeyInvalidated;
+        }
+    }
+
+    private void OnBackplaneKeyInvalidated(string key)
+    {
+        if (key.StartsWith("ddos:ban:ip:", StringComparison.OrdinalIgnoreCase))
+        {
+            var ip = key["ddos:ban:ip:".Length..];
+            _checkedIps.TryRemove(ip, out _);
+            _localBans.TryRemove(ip, out _);
+        }
     }
 
     public async ValueTask<TimeSpan?> GetBanRemainingAsync(string ipAddress, CancellationToken cancellationToken = default)
@@ -39,6 +81,7 @@ public sealed class HybridIpReputationService : IIpReputationService
 
         var nowMs = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
 
+        // 1. Check local in-memory bans
         if (_localBans.TryGetValue(ipAddress, out var expiresAt))
         {
             if (nowMs < expiresAt)
@@ -49,22 +92,70 @@ public sealed class HybridIpReputationService : IIpReputationService
             _localBans.TryRemove(ipAddress, out _);
         }
 
-        if (_cache is not null)
+        // 2. Check local in-memory checked unbanned IPs (0 Redis L2 calls on clean traffic)
+        if (_checkedIps.TryGetValue(ipAddress, out var checkedUntil))
+        {
+            if (nowMs < checkedUntil)
+            {
+                return null;
+            }
+
+            _checkedIps.TryRemove(ipAddress, out _);
+        }
+
+        // 3. Fallback to shared Redis or ICacheService
+        long? remoteExpiresAt = null;
+
+        if (_multiplexer is { IsConnected: true })
+        {
+            try
+            {
+                var db = _multiplexer.GetDatabase();
+                var redisVal = await db.StringGetAsync($"{_keyPrefix}ddos:ban:ip:{ipAddress}");
+                if (redisVal.HasValue && redisVal.TryParse(out long parsedExp))
+                {
+                    remoteExpiresAt = parsedExp;
+                }
+            }
+            catch
+            {
+                // fail open
+            }
+        }
+        else if (_cache is not null)
         {
             var cacheKey = $"ddos:ban:ip:{ipAddress}";
-            var cachedExpiry = await _cache.GetOrDefaultAsync<long?>(cacheKey, cancellationToken);
-            if (cachedExpiry.HasValue)
-            {
-                if (nowMs < cachedExpiry.Value)
-                {
-                    _localBans[ipAddress] = cachedExpiry.Value;
-                    return TimeSpan.FromMilliseconds(cachedExpiry.Value - nowMs);
-                }
+            remoteExpiresAt = await _cache.GetOrDefaultAsync<long?>(cacheKey, cancellationToken);
+        }
 
-                await _cache.RemoveAsync(cacheKey, cancellationToken);
+        if (remoteExpiresAt.HasValue)
+        {
+            if (nowMs < remoteExpiresAt.Value)
+            {
+                _localBans[ipAddress] = remoteExpiresAt.Value;
+                _checkedIps.TryRemove(ipAddress, out _);
+                return TimeSpan.FromMilliseconds(remoteExpiresAt.Value - nowMs);
+            }
+
+            if (_multiplexer is { IsConnected: true })
+            {
+                try
+                {
+                    var db = _multiplexer.GetDatabase();
+                    await db.KeyDeleteAsync($"{_keyPrefix}ddos:ban:ip:{ipAddress}");
+                }
+                catch { }
+            }
+            else if (_cache is not null)
+            {
+                await _cache.RemoveAsync($"ddos:ban:ip:{ipAddress}", cancellationToken);
             }
         }
 
+        // Cache as clean in L1 for the duration of StrikeWindowSeconds
+        var cleanTtlMs = Math.Max(1000L, _options.Value.StrikeWindowSeconds * 1000L);
+        _checkedIps[ipAddress] = nowMs + cleanTtlMs;
+        PruneIfExceededCapacity();
         return null;
     }
 
@@ -108,7 +199,30 @@ public sealed class HybridIpReputationService : IIpReputationService
                 return new StrikeState(existing.WindowStartUnixMs, existing.Score + weight);
             });
 
-        if (newState.Score >= opt.BanThresholdScore)
+        var effectiveScore = newState.Score;
+
+        if (_multiplexer is { IsConnected: true })
+        {
+            try
+            {
+                var db = _multiplexer.GetDatabase();
+                var redisResult = await db.ScriptEvaluateAsync(
+                    AtomicStrikeLuaScript,
+                    keys: [(RedisKey)$"{_keyPrefix}ddos:strike:ip:{ipAddress}"],
+                    values: [(RedisValue)weight, (RedisValue)windowMs]);
+
+                if (redisResult is not null)
+                {
+                    effectiveScore = Math.Max(effectiveScore, (int)(long)redisResult);
+                }
+            }
+            catch
+            {
+                // fail open to in-memory score
+            }
+        }
+
+        if (effectiveScore >= opt.BanThresholdScore)
         {
             _strikes.TryRemove(ipAddress, out _);
             await BanIpAsync(ipAddress, TimeSpan.FromSeconds(opt.BanDurationSeconds), cancellationToken);
@@ -128,11 +242,33 @@ public sealed class HybridIpReputationService : IIpReputationService
         var expiresAt = nowMs + Math.Max(1000L, (long)duration.TotalMilliseconds);
 
         _localBans[ipAddress] = expiresAt;
+        _checkedIps.TryRemove(ipAddress, out _);
         ExamPrismDiagnostics.RecordIpBanIssued();
+
+        if (_multiplexer is { IsConnected: true })
+        {
+            try
+            {
+                var db = _multiplexer.GetDatabase();
+                await db.StringSetAsync(
+                    (RedisKey)$"{_keyPrefix}ddos:ban:ip:{ipAddress}",
+                    (RedisValue)expiresAt,
+                    duration,
+                    keepTtl: false,
+                    When.Always,
+                    CommandFlags.None);
+            }
+            catch { }
+        }
 
         if (_cache is not null)
         {
             await _cache.SetAsync($"ddos:ban:ip:{ipAddress}", expiresAt, duration, duration, tags: null, cancellationToken);
+        }
+
+        if (_backplane is not null)
+        {
+            await _backplane.PublishKeyInvalidationAsync($"ddos:ban:ip:{ipAddress}", cancellationToken);
         }
 
         PruneIfExceededCapacity();
@@ -146,9 +282,26 @@ public sealed class HybridIpReputationService : IIpReputationService
         }
 
         _localBans.TryRemove(ipAddress, out _);
+        _checkedIps.TryRemove(ipAddress, out _);
+
+        if (_multiplexer is { IsConnected: true })
+        {
+            try
+            {
+                var db = _multiplexer.GetDatabase();
+                await db.KeyDeleteAsync($"{_keyPrefix}ddos:ban:ip:{ipAddress}");
+            }
+            catch { }
+        }
+
         if (_cache is not null)
         {
             await _cache.RemoveAsync($"ddos:ban:ip:{ipAddress}", cancellationToken);
+        }
+
+        if (_backplane is not null)
+        {
+            await _backplane.PublishKeyInvalidationAsync($"ddos:ban:ip:{ipAddress}", cancellationToken);
         }
     }
 
@@ -163,6 +316,18 @@ public sealed class HybridIpReputationService : IIpReputationService
                 if (nowMs >= kvp.Value)
                 {
                     _localBans.TryRemove(kvp.Key, out _);
+                }
+            }
+        }
+
+        if (_checkedIps.Count > max)
+        {
+            var nowMs = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
+            foreach (var kvp in _checkedIps)
+            {
+                if (nowMs >= kvp.Value)
+                {
+                    _checkedIps.TryRemove(kvp.Key, out _);
                 }
             }
         }

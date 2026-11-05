@@ -77,5 +77,90 @@ public class LoadBalancingMultiReplicaTests
         invalidatedKeys.Should().ContainSingle().Which.Should().Be("ddos:ban:ip:1.2.3.4");
         invalidatedTags.Should().ContainSingle().Which.Should().Be("catalog:tenant:slug:acme");
     }
+
+    [Fact]
+    public async Task HybridIpReputationService_CrossTenantBan_AndCleanTraffic_ZeroRepeatedL2Calls_AndBackplaneSync()
+    {
+        var ddosOpts = Options.Create(new ExamPrism.Infrastructure.Security.DdosProtectionOptions
+        {
+            Enabled = true,
+            BanThresholdScore = 30,
+            UnknownTenantProbeWeight = 20,
+            StrikeWindowSeconds = 60,
+            BanDurationSeconds = 300
+        });
+        var cacheOpts = Options.Create(new CacheOptions { KeyPrefix = "examprism:" });
+
+        var redisStore = new Dictionary<string, RedisValue>(StringComparer.Ordinal);
+        var db = Substitute.For<IDatabase>();
+        db.StringSetAsync(Arg.Any<RedisKey>(), Arg.Any<RedisValue>(), Arg.Any<TimeSpan?>(), Arg.Any<bool>(), Arg.Any<When>(), Arg.Any<CommandFlags>())
+            .Returns(ci =>
+            {
+                redisStore[ci.ArgAt<RedisKey>(0).ToString()] = ci.ArgAt<RedisValue>(1);
+                return Task.FromResult(true);
+            });
+        db.StringSetAsync(Arg.Any<RedisKey>(), Arg.Any<RedisValue>(), Arg.Any<TimeSpan?>(), Arg.Any<When>(), Arg.Any<CommandFlags>())
+            .Returns(ci =>
+            {
+                redisStore[ci.ArgAt<RedisKey>(0).ToString()] = ci.ArgAt<RedisValue>(1);
+                return Task.FromResult(true);
+            });
+        var stringGetCalls = 0;
+        db.StringGetAsync(Arg.Any<RedisKey>(), Arg.Any<CommandFlags>())
+            .Returns(ci =>
+            {
+                Interlocked.Increment(ref stringGetCalls);
+                var k = ci.ArgAt<RedisKey>(0).ToString();
+                return Task.FromResult(redisStore.TryGetValue(k, out var v) ? v : RedisValue.Null);
+            });
+        db.KeyDeleteAsync(Arg.Any<RedisKey>(), Arg.Any<CommandFlags>())
+            .Returns(ci => Task.FromResult(redisStore.Remove(ci.ArgAt<RedisKey>(0).ToString())));
+        db.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]?>(), Arg.Any<RedisValue[]?>(), Arg.Any<CommandFlags>())
+            .Returns(ci =>
+            {
+                var k = ci.ArgAt<RedisKey[]>(1)[0].ToString();
+                var delta = (long)ci.ArgAt<RedisValue[]>(2)[0];
+                var cur = redisStore.TryGetValue(k, out var existing) && existing.TryParse(out long parsed) ? parsed : 0L;
+                var next = cur + delta;
+                redisStore[k] = next;
+                return Task.FromResult(RedisResult.Create((RedisValue)next));
+            });
+
+        var mux = Substitute.For<IConnectionMultiplexer>();
+        mux.IsConnected.Returns(true);
+        mux.GetDatabase(Arg.Any<int>(), Arg.Any<object?>()).Returns(db);
+
+        var backplaneA = Substitute.For<ICacheBackplane>();
+        var backplaneB = Substitute.For<ICacheBackplane>();
+        Action<string>? onKeyInvalidatedOnB = null;
+        backplaneB.KeyInvalidated += Arg.Do<Action<string>>(h => onKeyInvalidatedOnB += h);
+        backplaneA.When(b => b.PublishKeyInvalidationAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()))
+            .Do(ci => onKeyInvalidatedOnB?.Invoke(ci.ArgAt<string>(0)));
+
+        var replicaA = new ExamPrism.Infrastructure.Security.HybridIpReputationService(
+            ddosOpts, cache: null, TimeProvider.System, mux, backplaneA, cacheOpts);
+        var replicaB = new ExamPrism.Infrastructure.Security.HybridIpReputationService(
+            ddosOpts, cache: null, TimeProvider.System, mux, backplaneB, cacheOpts);
+
+        // 1. Clean IP checked 5 times on Replica B -> only 1 L2 Redis lookup, then cached clean in L1
+        for (var i = 0; i < 5; i++)
+        {
+            (await replicaB.GetBanRemainingAsync("203.0.113.50")).Should().BeNull();
+        }
+        stringGetCalls.Should().Be(1);
+
+        // 2. Round-robin strikes: 1st strike on Replica A (score 20 < 30), 2nd strike on Replica A or B (score 40 >= 30 -> banned!)
+        await replicaB.RecordStrikeAsync("203.0.113.50", Common.Security.IpStrikeReason.UnknownTenantProbe);
+        (await replicaB.GetBanRemainingAsync("203.0.113.50")).Should().BeNull();
+
+        await replicaA.RecordStrikeAsync("203.0.113.50", Common.Security.IpStrikeReason.UnknownTenantProbe);
+        await backplaneA.Received(1).PublishKeyInvalidationAsync("ddos:ban:ip:203.0.113.50", Arg.Any<CancellationToken>());
+        redisStore.Should().ContainKey("examprism:ddos:ban:ip:203.0.113.50");
+
+        // 3. Replica B immediately sees the ban via backplane invalidation of _checkedIps + shared Redis ban key
+        var banOnB = await replicaB.GetBanRemainingAsync("203.0.113.50");
+        banOnB.Should().NotBeNull();
+        banOnB!.Value.TotalSeconds.Should().BeGreaterThan(200);
+    }
 }
 

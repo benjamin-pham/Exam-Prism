@@ -2,10 +2,12 @@ namespace ExamPrism.Infrastructure.Security;
 
 using Common.Caching;
 using Common.Security;
+using ExamPrism.Infrastructure.Caching;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 
 public static class DdosProtectionSetup
 {
@@ -23,7 +25,10 @@ public static class DdosProtectionSetup
             var options = sp.GetRequiredService<IOptions<DdosProtectionOptions>>();
             var cache = sp.GetService<ICacheService>();
             var timeProvider = sp.GetService<TimeProvider>() ?? TimeProvider.System;
-            return new HybridIpReputationService(options, cache, timeProvider);
+            var multiplexer = sp.GetService<IConnectionMultiplexer>();
+            var backplane = sp.GetService<ICacheBackplane>();
+            var cacheOptions = sp.GetService<IOptions<CacheOptions>>();
+            return new HybridIpReputationService(options, cache, timeProvider, multiplexer, backplane, cacheOptions);
         });
 
         return services;
