@@ -320,3 +320,4 @@ New architecture tests added to `ExamPrism.Tests/Architecture/ArchitectureTests.
    * `DomainEventDispatchInterceptor` post-save Wolverine `IMessageBus` dispatch and rollback discard behavior.
 4. **Full Regression Suite**:
    * All existing unit, architecture, and integration tests continue to pass without regression.
+

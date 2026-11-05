@@ -277,3 +277,4 @@ Expected: PASS (all architecture tests pass).
 git add apps/backend/tests/ExamPrism.Tests/Architecture/ArchitectureTests.cs
 git commit -m "test(arch): enforce DDD domain purity and building block conventions"
 ```
+
