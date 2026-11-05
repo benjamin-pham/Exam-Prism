@@ -104,6 +104,9 @@ public class SerilogConfigurationTests
         writeTo.Should().Contain(s => s["Name"] == "Console");
         var consoleSink = writeTo.First(s => s["Name"] == "Console");
         consoleSink["Args:formatter"].Should().Contain("RenderedCompactJsonFormatter");
+
+        var usingList = serilogSection.GetSection("Using").GetChildren().Select(c => c.Value).ToList();
+        usingList.Should().Contain("Serilog.Sinks.Seq");
     }
 
     [Fact]
@@ -161,6 +164,28 @@ public class SerilogConfigurationTests
 
         logger.Should().NotBeNull();
         var act = () => logger.Information("Test log message from Serilog LoggerConfiguration with dev appsettings");
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Serilog_ConfiguredWithSeqSinkEnvironmentVariables_CreatesWorkingLogger()
+    {
+        var jsonPath = GetSrcPath("appsettings.json");
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(jsonPath)
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Serilog:WriteTo:1:Name"] = "Seq",
+                ["Serilog:WriteTo:1:Args:serverUrl"] = "http://localhost:5341"
+            })
+            .Build();
+
+        var logger = new Serilog.LoggerConfiguration()
+            .ReadFrom.Configuration(configuration)
+            .CreateLogger();
+
+        logger.Should().NotBeNull();
+        var act = () => logger.Information("Test log message sending to Seq sink config");
         act.Should().NotThrow();
     }
 

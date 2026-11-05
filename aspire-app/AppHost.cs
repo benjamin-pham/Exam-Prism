@@ -7,13 +7,19 @@ var catalogDb = postgres.AddDatabase("CatalogConnection", "examprism_catalog_dev
 var redis = builder.AddRedis("Redis")
     .WithContainerRuntimeArgs("--cpus=1", "--memory=512m")
     .WithRedisCommander(c => c.WithContainerRuntimeArgs("--cpus=0.5", "--memory=256m"));
+var seq = builder.AddSeq("seq")
+    .WithContainerRuntimeArgs("--cpus=1", "--memory=512m");
 
 builder.AddProject("examprism-api", "../apps/backend/src/ExamPrism.csproj")
     .WaitFor(catalogDb)
     .WaitFor(redis)
+    .WaitFor(seq)
     .WithEnvironment("ConnectionStrings__CatalogConnection", catalogDb.Resource.ConnectionStringExpression)
     .WithEnvironment("ConnectionStrings__Redis", redis.Resource.ConnectionStringExpression)
     .WithEnvironment("AllowedHosts", "*")
+    // Serilog Seq
+    .WithEnvironment("Serilog__WriteTo__1__Name", "Seq")
+    .WithEnvironment("Serilog__WriteTo__1__Args__serverUrl", seq.GetEndpoint("http"))
     // Persistence
     .WithEnvironment("Persistence__CommandTimeoutSeconds", "30")
     .WithEnvironment("Persistence__MaxBatchSize", "100")

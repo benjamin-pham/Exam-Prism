@@ -32,6 +32,7 @@ public class AspireAppHostConfigurationTests
         doc.Root.Should().NotBeNull();
         doc.Root!.Attribute("Sdk")?.Value.Should().StartWith("Aspire.AppHost.Sdk/");
         doc.Descendants("ProjectReference").Should().BeEmpty("ExamPrism.csproj must be registered by path, not ProjectReference");
+        doc.Descendants("PackageReference").Should().Contain(e => e.Attribute("Include") != null && e.Attribute("Include")!.Value == "Aspire.Hosting.Seq");
     }
 
     [Fact]
@@ -46,6 +47,8 @@ public class AspireAppHostConfigurationTests
         content.Should().Contain("AddDatabase(\"CatalogConnection\", \"examprism_catalog_dev\")");
         content.Should().Contain("AddRedis(\"Redis\")");
         content.Should().Contain("WithRedisCommander");
+        content.Should().Contain("AddSeq(\"seq\")");
+        content.Should().Contain("WaitFor(seq)");
         content.Should().Contain("WithContainerRuntimeArgs(\"--cpus=2\", \"--memory=1024m\")");
         content.Should().Contain("WithContainerRuntimeArgs(\"--cpus=1\", \"--memory=512m\")");
         content.Should().Contain("WithContainerRuntimeArgs(\"--cpus=0.5\", \"--memory=256m\")");
@@ -56,6 +59,8 @@ public class AspireAppHostConfigurationTests
             "\"ConnectionStrings__CatalogConnection\"",
             "\"ConnectionStrings__Redis\"",
             "\"AllowedHosts\"",
+            "\"Serilog__WriteTo__1__Name\"",
+            "\"Serilog__WriteTo__1__Args__serverUrl\"",
             "\"Persistence__CommandTimeoutSeconds\"",
             "\"MultiTenancy__BaseDomains__0\"",
             "\"MultiTenancy__FleetMigration__MigrateOnStartup\"",
