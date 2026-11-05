@@ -1,5 +1,6 @@
 namespace ExamPrism.Infrastructure.Persistence.Catalog;
 
+using Common.Persistence;
 using ExamPrism.Domain.Tenants;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence.Catalog.Configurations;
@@ -7,7 +8,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
-    : IdentityDbContext<PlatformUser, PlatformRole, Guid>(options)
+    : IdentityDbContext<PlatformUser, PlatformRole, Guid>(options), ICatalogDbContext
 {
     static CatalogDbContext()
     {
@@ -25,4 +26,3 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
         builder.ApplyConfiguration(new PlatformRefreshTokenEntityTypeConfiguration());
     }
 }
-

@@ -467,6 +467,7 @@ public class ArchitectureTests
 
         var commonTypes = AppAssembly.GetTypes()
             .Where(t => t.Namespace != null && (t.Namespace == "Common" || t.Namespace.StartsWith("Common.") || t.Namespace == "ExamPrism.Common" || t.Namespace.StartsWith("ExamPrism.Common.")))
+            .Where(t => t != typeof(IAppDbContext) && t != typeof(ICatalogDbContext))
             .ToList();
 
         commonTypes.Should().NotBeEmpty();
@@ -668,6 +669,7 @@ public class ArchitectureTests
     {
         var commonTypes = AppTypes
             .Where(t => t.Namespace != null && (t.Namespace == "Common" || t.Namespace.StartsWith("Common.", StringComparison.Ordinal)))
+            .Where(t => t != typeof(ICatalogDbContext))
             .ToList();
 
         commonTypes.Should().NotBeEmpty();
@@ -796,6 +798,13 @@ public class ArchitectureTests
     {
         typeof(AppDbContext).Namespace.Should().Be("ExamPrism.Infrastructure.Persistence");
         typeof(CatalogDbContext).Namespace.Should().Be("ExamPrism.Infrastructure.Persistence.Catalog");
+    }
+
+    [Fact]
+    public void DbContextInterfaces_MustBeInCommonPersistence()
+    {
+        typeof(IAppDbContext).Namespace.Should().Be("Common.Persistence");
+        typeof(ICatalogDbContext).Namespace.Should().Be("Common.Persistence");
     }
 
     private static bool IsSubclassOfRawGeneric(Type generic, Type? toCheck)

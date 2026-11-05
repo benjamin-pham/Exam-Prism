@@ -2,6 +2,7 @@ namespace ExamPrism.Infrastructure.Persistence;
 
 using System;
 using Common.MultiTenancy;
+using Common.Persistence;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using ExamPrism.Infrastructure.Persistence.Interceptors;
@@ -67,6 +68,9 @@ public static class PersistenceSetup
             options.UseNpgsql(dataSource, npgsqlOptions =>
                 ConfigureNpgsql(npgsqlOptions, persistenceOptions));
         });
+
+        services.AddScoped<ICatalogDbContext>(sp => sp.GetRequiredService<CatalogDbContext>());
+        services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         healthChecksBuilder.AddDbContextCheck<CatalogDbContext>(name: "catalog_db");
 
