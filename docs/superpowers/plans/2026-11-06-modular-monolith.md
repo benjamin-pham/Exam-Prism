@@ -72,7 +72,7 @@
     - `public static ModuleRegistry AddModules(this WebApplicationBuilder builder, IEnumerable<Assembly>? additionalAssemblies = null, string? searchDirectory = null)`
     - `public static ModuleRegistry DiscoverAndLoadModules(IEnumerable<Assembly>? additionalAssemblies = null, string? searchDirectory = null)`
 
-- [ ] **Step 1: Create `ExamPrism.Contracts` project and move shared `Common` primitives**
+- [x] **Step 1: Create `ExamPrism.Contracts` project and move shared `Common` primitives**
 
 Create `apps/backend/src/ExamPrism.Contracts/ExamPrism.Contracts.csproj` with `<FrameworkReference Include="Microsoft.AspNetCore.App" />` and package references `FluentValidation.DependencyInjectionExtensions`, `Microsoft.EntityFrameworkCore`, `Microsoft.Orleans.Server`, and `WolverineFx`. Move all files from `apps/backend/src/Common/` (excluding `Common/Persistence/IAppDbContext.cs` and `Common/Persistence/ICatalogDbContext.cs`) into `apps/backend/src/ExamPrism.Contracts/`, keeping the embedded resource logical names for `SharedResources.resx` and `SharedResources.vi.resx`:
 ```xml
@@ -85,7 +85,7 @@ Create `apps/backend/src/ExamPrism.Contracts/ExamPrism.Contracts.csproj` with `<
 ```
 Add `IModule.cs` (`namespace Common.Modules`), `IStartupInitializer.cs` (`namespace Common.Modules`), and `TenantIntegrationMessages.cs` (`namespace Common.Messages.Tenants`).
 
-- [ ] **Step 2: Create `ExamPrism.Infrastructure` project with `ModuleRegistry` and `ModuleLoader`**
+- [x] **Step 2: Create `ExamPrism.Infrastructure` project with `ModuleRegistry` and `ModuleLoader`**
 
 Create `apps/backend/src/ExamPrism.Infrastructure/ExamPrism.Infrastructure.csproj` referencing `ExamPrism.Contracts.csproj` and the infrastructure NuGet packages (`Dapper`, `Finbuckle.MultiTenant`, `Finbuckle.MultiTenant.AspNetCore`, `Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.AspNetCore.Identity.EntityFrameworkCore`, `Microsoft.AspNetCore.OpenApi`, `Microsoft.Extensions.Caching.Hybrid`, `Microsoft.Extensions.Caching.StackExchangeRedis`, `Scalar.AspNetCore`, `Serilog.AspNetCore`, `Serilog.Formatting.Compact`, `Serilog.Sinks.Seq`, `StackExchange.Redis`, `Npgsql.EntityFrameworkCore.PostgreSQL`, `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`, `Microsoft.Orleans.*`, `WolverineFx.*`, `Microsoft.Extensions.Resilience`, `Microsoft.Extensions.Http.Resilience`, `OpenTelemetry.*`).
 
@@ -97,7 +97,7 @@ Implement `ModuleRegistry` and `ModuleLoader` in `apps/backend/src/ExamPrism.Inf
   - Calls `module.ConfigureServices(builder)` and `builder.Services.AddValidatorsFromAssembly(module.GetType().Assembly, includeInternalTypes: true)`.
   - Registers `ModuleRegistry` as singleton in `builder.Services`.
 
-- [ ] **Step 3: Write failing unit tests in `apps/backend/tests/ExamPrism.Tests/Infrastructure/Modules/ModuleLoaderTests.cs`**
+- [x] **Step 3: Write failing unit tests in `apps/backend/tests/ExamPrism.Tests/Infrastructure/Modules/ModuleLoaderTests.cs`**
 
 ```csharp
 [Fact]
@@ -138,12 +138,12 @@ public void AddModules_LoadsModuleSettingFiles_WithoutOverridingInMemoryTestSett
 }
 ```
 
-- [ ] **Step 4: Run `ModuleLoaderTests` to verify they pass**
+- [x] **Step 4: Run `ModuleLoaderTests` to verify they pass**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter "FullyQualifiedName~ModuleLoaderTests"`
 Expected: PASS (3 passed, 0 failed)
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 git add apps/backend/
