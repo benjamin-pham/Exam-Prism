@@ -40,15 +40,15 @@ public sealed class ListTenantsHandler(CatalogDbContext db) : IHandler<ListTenan
 {
     private const string ListTenantsSql = """
         SELECT COUNT(*)
-        FROM "Tenants"
-        WHERE (CAST(@Status AS varchar(32)) IS NULL OR "Status" = @Status)
-          AND (CAST(@Pattern AS text) IS NULL OR "Slug" ILIKE @Pattern OR "Name" ILIKE @Pattern);
+        FROM tenants
+        WHERE (CAST(@Status AS varchar(32)) IS NULL OR status = @Status)
+          AND (CAST(@Pattern AS text) IS NULL OR slug ILIKE @Pattern OR name ILIKE @Pattern);
 
-        SELECT "Id", "Slug", "Name", "Status", "CreatedAt", "ProvisionedAt", "UpdatedAt"
-        FROM "Tenants"
-        WHERE (CAST(@Status AS varchar(32)) IS NULL OR "Status" = @Status)
-          AND (CAST(@Pattern AS text) IS NULL OR "Slug" ILIKE @Pattern OR "Name" ILIKE @Pattern)
-        ORDER BY "CreatedAt" DESC, "Slug" ASC
+        SELECT id AS "Id", slug AS "Slug", name AS "Name", status AS "Status", created_at AS "CreatedAt", provisioned_at AS "ProvisionedAt", updated_at AS "UpdatedAt"
+        FROM tenants
+        WHERE (CAST(@Status AS varchar(32)) IS NULL OR status = @Status)
+          AND (CAST(@Pattern AS text) IS NULL OR slug ILIKE @Pattern OR name ILIKE @Pattern)
+        ORDER BY created_at DESC, slug ASC
         LIMIT @Take OFFSET @Skip;
         """;
 

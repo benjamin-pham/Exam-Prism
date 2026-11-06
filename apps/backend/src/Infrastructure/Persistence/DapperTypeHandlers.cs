@@ -34,7 +34,7 @@ public static class DapperTypeHandlers
             return;
         }
 
+        DefaultTypeMap.MatchNamesWithUnderscores = true;
         SqlMapper.AddTypeHandler(new StringEnumTypeHandler<TenantStatus>());
     }
 }
-

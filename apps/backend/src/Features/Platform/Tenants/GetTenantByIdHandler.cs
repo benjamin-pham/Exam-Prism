@@ -12,9 +12,9 @@ public record GetTenantByIdQuery(Guid Id);
 public sealed class GetTenantByIdHandler(CatalogDbContext db) : IHandler<GetTenantByIdQuery, TenantDetailResult>
 {
     private const string GetTenantByIdSql = """
-        SELECT "Id", "Slug", "Name", "Status", "FailureReason", "CreatedAt", "ProvisionedAt", "UpdatedAt"
-        FROM "Tenants"
-        WHERE "Id" = @Id
+        SELECT id AS "Id", slug AS "Slug", name AS "Name", status AS "Status", failure_reason AS "FailureReason", created_at AS "CreatedAt", provisioned_at AS "ProvisionedAt", updated_at AS "UpdatedAt"
+        FROM tenants
+        WHERE id = @Id
         LIMIT 1;
         """;
 

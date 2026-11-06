@@ -117,7 +117,7 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         // 1. QueryAsync
         var list = (await connection.QueryAsync<TenantSummaryDto>(
             new CommandDefinition(
-                "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" LIKE @Pattern ORDER BY \"Slug\"",
+                "SELECT id AS \"Id\", slug AS \"Slug\", name AS \"Name\", status AS \"Status\" FROM tenants WHERE slug LIKE @Pattern ORDER BY slug",
                 new { Pattern = $"{prefix}%" }))).AsList();
         list.Should().HaveCount(2);
         list[0].Status.Should().Be(TenantStatus.Active);
@@ -126,7 +126,7 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         // 2. QueryFirstOrDefaultAsync
         var found = await connection.QueryFirstOrDefaultAsync<TenantSummaryDto>(
             new CommandDefinition(
-                "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
+                "SELECT id AS \"Id\", slug AS \"Slug\", name AS \"Name\", status AS \"Status\" FROM tenants WHERE slug = @Slug",
                 new { Slug = $"{prefix}-active" }));
         found.Should().NotBeNull();
         found!.Name.Should().Be("Active Org");
@@ -135,7 +135,7 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         // 3. QuerySingleOrDefaultAsync
         var single = await connection.QuerySingleOrDefaultAsync<TenantSummaryDto>(
             new CommandDefinition(
-                "SELECT \"Id\", \"Slug\", \"Name\", \"Status\" FROM \"Tenants\" WHERE \"Slug\" = @Slug",
+                "SELECT id AS \"Id\", slug AS \"Slug\", name AS \"Name\", status AS \"Status\" FROM tenants WHERE slug = @Slug",
                 new { Slug = $"{prefix}-suspended" }));
         single.Should().NotBeNull();
         single!.Status.Should().Be(TenantStatus.Suspended);
@@ -143,14 +143,14 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         // 4. QuerySingleAsync
         var count = await connection.QuerySingleAsync<int>(
             new CommandDefinition(
-                "SELECT COUNT(*) FROM \"Tenants\" WHERE \"Slug\" LIKE @Pattern",
+                "SELECT COUNT(*) FROM tenants WHERE slug LIKE @Pattern",
                 new { Pattern = $"{prefix}%" }));
         count.Should().Be(2);
 
         // 5. ExecuteScalarAsync
         var exists = await connection.ExecuteScalarAsync<bool>(
             new CommandDefinition(
-                "SELECT EXISTS (SELECT 1 FROM \"Tenants\" WHERE \"Slug\" = @Slug)",
+                "SELECT EXISTS (SELECT 1 FROM tenants WHERE slug = @Slug)",
                 new { Slug = $"{prefix}-active" }));
         exists.Should().BeTrue();
 
@@ -158,8 +158,8 @@ public class DddPersistenceIntegrationTests : IClassFixture<CatalogDbFixture>
         await using var grid = await connection.QueryMultipleAsync(
             new CommandDefinition(
                 $"""
-                SELECT COUNT(*) FROM "Tenants" WHERE "Slug" LIKE @Pattern;
-                SELECT "Id", "Slug", "Name", "Status" FROM "Tenants" WHERE "Slug" LIKE @Pattern ORDER BY "Slug";
+                SELECT COUNT(*) FROM tenants WHERE slug LIKE @Pattern;
+                SELECT id AS "Id", slug AS "Slug", name AS "Name", status AS "Status" FROM tenants WHERE slug LIKE @Pattern ORDER BY slug;
                 """,
                 new { Pattern = $"{prefix}%" }));
 

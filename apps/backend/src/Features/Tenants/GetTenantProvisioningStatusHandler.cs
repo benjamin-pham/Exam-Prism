@@ -20,9 +20,9 @@ public sealed class GetTenantProvisioningStatusHandler(CatalogDbContext db)
     : IHandler<GetTenantProvisioningStatusQuery, GetTenantProvisioningStatusResult>
 {
     private const string GetStatusSql = """
-        SELECT "Slug", "Name", "Status", "ProvisionedAt"
-        FROM "Tenants"
-        WHERE "Slug" = @Slug
+        SELECT slug AS "Slug", name AS "Name", status AS "Status", provisioned_at AS "ProvisionedAt"
+        FROM tenants
+        WHERE slug = @Slug
         LIMIT 1;
         """;
 

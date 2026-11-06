@@ -273,7 +273,7 @@ public class TenantProvisioningAndFleetMigrationIntegrationTests : IClassFixture
             await tenantConn.OpenAsync();
 
             await using var userCmd = tenantConn.CreateCommand();
-            userCmd.CommandText = "SELECT \"Email\" FROM \"AspNetUsers\" WHERE \"Email\" = 'owner@isolated-org.edu';";
+            userCmd.CommandText = "SELECT email FROM users WHERE email = 'owner@isolated-org.edu';";
             var ownerEmail = await userCmd.ExecuteScalarAsync();
             ownerEmail.Should().Be("owner@isolated-org.edu");
         }

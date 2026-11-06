@@ -1,9 +1,10 @@
 namespace ExamPrism.Infrastructure.Persistence.Catalog;
 
 using Common.Persistence;
+using ExamPrism.Domain.Identity;
 using ExamPrism.Domain.Tenants;
-using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence.Catalog.Configurations;
+using ExamPrism.Infrastructure.Persistence.Identity.Configurations;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,5 +25,12 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
 
         builder.ApplyConfiguration(new TenantEntityTypeConfiguration());
         builder.ApplyConfiguration(new PlatformRefreshTokenEntityTypeConfiguration());
+        builder.ApplyConfiguration(new PlatformUserEntityTypeConfiguration());
+        builder.ApplyConfiguration(new PlatformRoleEntityTypeConfiguration());
+        builder.ApplyConfiguration(new IdentityUserRoleEntityTypeConfiguration());
+        builder.ApplyConfiguration(new IdentityUserClaimEntityTypeConfiguration());
+        builder.ApplyConfiguration(new IdentityUserLoginEntityTypeConfiguration());
+        builder.ApplyConfiguration(new IdentityRoleClaimEntityTypeConfiguration());
+        builder.ApplyConfiguration(new IdentityUserTokenEntityTypeConfiguration());
     }
 }

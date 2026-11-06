@@ -20,8 +20,8 @@ public sealed class CheckTenantSlugHandler(
     private const string CheckSlugSql = """
         SELECT EXISTS (
             SELECT 1
-            FROM "Tenants"
-            WHERE "Slug" = @Slug
+            FROM tenants
+            WHERE slug = @Slug
         );
         """;
 
