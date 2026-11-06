@@ -65,9 +65,24 @@ public static class ModuleLoader
             {
                 types = assembly.GetExportedTypes();
             }
+            catch (ReflectionTypeLoadException ex)
+            {
+                types = ex.Types.Where(t => t != null).Select(t => t!).ToArray();
+            }
             catch
             {
-                types = assembly.GetTypes();
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    types = ex.Types.Where(t => t != null).Select(t => t!).ToArray();
+                }
+                catch
+                {
+                    types = [];
+                }
             }
 
             foreach (var type in types)

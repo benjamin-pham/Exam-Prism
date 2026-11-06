@@ -8,3 +8,4 @@ public interface IModule
     string[] ModuleSettingFiles { get; }
     void ConfigureServices(WebApplicationBuilder builder);
 }
+

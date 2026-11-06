@@ -13,11 +13,12 @@
 
   <ItemGroup>
     <EmbeddedResource Update="Localization/Resources/SharedResources.resx">
-      <LogicalName>ExamPrism.Common.Localization.Resources.Common.Localization.SharedResources.resources</LogicalName>
+      <LogicalName>ExamPrism.Contracts.Common.Localization.Resources.Common.Localization.SharedResources.resources</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Update="Localization/Resources/SharedResources.vi.resx">
-      <LogicalName>ExamPrism.Common.Localization.Resources.Common.Localization.SharedResources.vi.resources</LogicalName>
+      <LogicalName>ExamPrism.Contracts.Common.Localization.Resources.Common.Localization.SharedResources.vi.resources</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 
 </Project>
+

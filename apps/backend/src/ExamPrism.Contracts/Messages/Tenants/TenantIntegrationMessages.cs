@@ -6,3 +6,4 @@ public sealed record InitializeTenantIdentityCommand(Guid TenantId, string Tenan
 public sealed record InitializeTenantIdentityResult(bool Succeeded);
 public sealed record MigrateTenantDatabaseCommand(Guid TenantId, string TenantSlug, string RawConnectionString);
 public sealed record MigrateTenantDatabaseResult(int AppliedMigrationsCount);
+

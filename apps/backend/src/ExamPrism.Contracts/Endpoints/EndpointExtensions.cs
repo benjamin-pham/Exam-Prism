@@ -18,9 +18,44 @@ public static class EndpointExtensions
         ArgumentNullException.ThrowIfNull(app);
         ArgumentNullException.ThrowIfNull(assemblies);
 
-        var targetAssemblies = assemblies.Length > 0
-            ? assemblies.Where(a => a is not null)
-            : [typeof(EndpointExtensions).Assembly];
+        IEnumerable<Assembly> targetAssemblies;
+        if (assemblies.Length > 0)
+        {
+            targetAssemblies = assemblies.Where(a => a is not null);
+        }
+        else
+        {
+            var defaultList = new List<Assembly>();
+
+            if (Assembly.GetEntryAssembly() is { } entryAssembly)
+            {
+                defaultList.Add(entryAssembly);
+            }
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var name = asm.GetName().Name;
+                if (name != null && (name == "ExamPrism" || name.StartsWith("ExamPrism.Modules.", StringComparison.Ordinal)))
+                {
+                    defaultList.Add(asm);
+                }
+            }
+
+            var registryType = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(a => a.GetType("ExamPrism.Infrastructure.Modules.ModuleRegistry"))
+                .FirstOrDefault(t => t != null);
+            if (registryType != null && app.ServiceProvider.GetService(registryType) is { } registry)
+            {
+                var prop = registryType.GetProperty("ModuleAssemblies");
+                if (prop?.GetValue(registry) is IEnumerable<Assembly> moduleAssemblies)
+                {
+                    defaultList.AddRange(moduleAssemblies);
+                }
+            }
+
+            defaultList.Add(typeof(EndpointExtensions).Assembly);
+            targetAssemblies = defaultList;
+        }
 
         var endpointTypes = targetAssemblies
             .Distinct()

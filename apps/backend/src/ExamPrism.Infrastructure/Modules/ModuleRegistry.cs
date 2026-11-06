@@ -16,3 +16,4 @@ public sealed class ModuleRegistry
     public IReadOnlyList<IModule> Modules { get; }
     public IReadOnlyList<Assembly> ModuleAssemblies { get; }
 }
+

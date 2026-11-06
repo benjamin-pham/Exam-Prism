@@ -8,3 +8,4 @@ public interface IStartupInitializer
 {
     Task InitializeAsync(IServiceProvider services, CancellationToken cancellationToken = default);
 }
+
