@@ -11,6 +11,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.Common" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
@@ -31,6 +32,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ExamPrism.csproj" />
+    <ProjectReference Include="..\..\src\ExamPrism.Contracts\ExamPrism.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ExamPrism.Infrastructure\ExamPrism.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

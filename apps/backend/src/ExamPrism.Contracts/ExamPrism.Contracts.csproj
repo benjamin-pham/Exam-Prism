@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="WolverineFx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Localization/Resources/SharedResources.resx">
+      <LogicalName>ExamPrism.Common.Localization.Resources.Common.Localization.SharedResources.resources</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Localization/Resources/SharedResources.vi.resx">
+      <LogicalName>ExamPrism.Common.Localization.Resources.Common.Localization.SharedResources.vi.resources</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

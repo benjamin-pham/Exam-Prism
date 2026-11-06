@@ -42,13 +42,12 @@
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Update="Common/Localization/Resources/SharedResources.resx">
-      <LogicalName>ExamPrism.Common.Localization.Resources.Common.Localization.SharedResources.resources</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Common/Localization/Resources/SharedResources.vi.resx">
-      <LogicalName>ExamPrism.Common.Localization.Resources.Common.Localization.SharedResources.vi.resources</LogicalName>
-    </EmbeddedResource>
-  </ItemGroup>
+  <PropertyGroup>
+    <DefaultItemExcludes>$(DefaultItemExcludes);ExamPrism.Contracts/**;ExamPrism.Infrastructure/**;Modules/**</DefaultItemExcludes>
+  </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="ExamPrism.Contracts\ExamPrism.Contracts.csproj" />
+    <ProjectReference Include="ExamPrism.Infrastructure\ExamPrism.Infrastructure.csproj" />
+  </ItemGroup>
 </Project>

@@ -6,7 +6,7 @@ using Finbuckle.MultiTenant.Abstractions;
 using Wolverine;
 using Wolverine.Configuration;
 
-internal sealed class MultiTenantMessageBus : IMessageBus
+public sealed class MultiTenantMessageBus : IMessageBus
 {
     private readonly IMessageBus _inner;
     private readonly IMultiTenantStore<ExamPrismTenantInfo> _store;

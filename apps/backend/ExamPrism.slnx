@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ExamPrism.Contracts/ExamPrism.Contracts.csproj" />
+    <Project Path="src/ExamPrism.Infrastructure/ExamPrism.Infrastructure.csproj" />
     <Project Path="src/ExamPrism.csproj" />
   </Folder>
   <Folder Name="/tests/">
