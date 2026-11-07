@@ -19,7 +19,7 @@ public sealed class InitializeTenantIdentityHandler(
     ITenantConnectionStringNormalizer normalizer,
     IConnectionStringProtector protector,
     IServiceProvider serviceProvider,
-    IOptions<PersistenceOptions>? persistenceOptions = null)
+    IOptions<PersistenceOptions> persistenceOptions)
     : IHandler<InitializeTenantIdentityCommand, InitializeTenantIdentityResult>
 {
     public async Task<Result<InitializeTenantIdentityResult>> Handle(

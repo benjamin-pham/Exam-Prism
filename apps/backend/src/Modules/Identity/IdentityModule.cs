@@ -89,10 +89,12 @@ public static class IdentityModuleExtensions
         services.AddScoped(sp => new ExamPrism.Features.Tenants.InitializeTenantIdentityHandler(
             sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
             sp.GetRequiredService<IConnectionStringProtector>(),
-            sp));
+            sp,
+            sp.GetRequiredService<IOptions<PersistenceOptions>>()));
 
         services.AddScoped(sp => new ExamPrism.Features.Tenants.MigrateTenantDatabaseHandler(
-            sp.GetRequiredService<ITenantConnectionStringNormalizer>()));
+            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
+            sp.GetRequiredService<IOptions<PersistenceOptions>>()));
 
         return services;
     }

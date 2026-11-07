@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Xunit;
 
@@ -49,7 +50,7 @@ public class IdentityModuleTests
         normalizer.Normalize("Host=localhost;Database=tenant_test;Username=postgres;Password=postgres")
             .Returns("Host=localhost;Database=tenant_test;Username=postgres;Password=postgres");
 
-        var handler = new MigrateTenantDatabaseHandler(normalizer);
+        var handler = new MigrateTenantDatabaseHandler(normalizer, Options.Create(new PersistenceOptions()));
         var command = new MigrateTenantDatabaseCommand(
             Guid.NewGuid(),
             "tenant-test",
@@ -74,7 +75,7 @@ public class IdentityModuleTests
         var protector = Substitute.For<IConnectionStringProtector>();
         var serviceProvider = Substitute.For<IServiceProvider>();
 
-        var handler = new InitializeTenantIdentityHandler(normalizer, protector, serviceProvider);
+        var handler = new InitializeTenantIdentityHandler(normalizer, protector, serviceProvider, Options.Create(new PersistenceOptions()));
         var command = new InitializeTenantIdentityCommand(
             Guid.NewGuid(),
             "tenant-init-test",

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 
 public sealed class MigrateTenantDatabaseHandler(
     ITenantConnectionStringNormalizer normalizer,
-    IOptions<PersistenceOptions>? persistenceOptions = null)
+    IOptions<PersistenceOptions> persistenceOptions)
     : IHandler<MigrateTenantDatabaseCommand, MigrateTenantDatabaseResult>
 {
     public async Task<Result<MigrateTenantDatabaseResult>> Handle(
