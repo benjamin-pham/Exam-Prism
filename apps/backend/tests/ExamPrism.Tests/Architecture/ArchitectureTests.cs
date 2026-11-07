@@ -5,12 +5,16 @@ using Common.Domain;
 using Common.Domain.Specifications;
 using Common.Endpoints;
 using Common.Handlers;
+using Common.Modules;
 using Common.Orleans;
 using Common.Results;
 using ExamPrism.Features.Auth;
 using ExamPrism.Features.Health;
+using ExamPrism.Infrastructure;
 using ExamPrism.Infrastructure.Orleans;
 using ExamPrism.Infrastructure.Persistence;
+using ExamPrism.Modules.Identity;
+using ExamPrism.Modules.Tenants;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -20,9 +24,17 @@ using Xunit;
 
 public class ArchitectureTests
 {
-    private static readonly Assembly AppAssembly = typeof(Program).Assembly;
+    private static readonly Assembly[] AppAssemblies =
+    [
+        typeof(Program).Assembly,
+        typeof(IModule).Assembly,
+        typeof(DependencyInjection).Assembly,
+        typeof(TenantsModule).Assembly,
+        typeof(IdentityModule).Assembly
+    ];
 
-    private static IEnumerable<Type> AppTypes => AppAssembly.GetTypes()
+    private static IEnumerable<Type> AppTypes => AppAssemblies
+        .SelectMany(a => a.GetTypes())
         .Where(t => !t.IsNested && !t.Name.Contains('<'));
 
     [Fact]
@@ -175,7 +187,7 @@ public class ArchitectureTests
             "Microsoft.AspNetCore.Mvc"
         };
 
-        var featureTypes = AppAssembly.GetTypes()
+        var featureTypes = AppTypes
             .Where(t => t.Namespace != null && t.Namespace.StartsWith("ExamPrism.Features"))
             .ToList();
 
@@ -466,7 +478,7 @@ public class ArchitectureTests
             "ExamPrism.Endpoints"
         };
 
-        var commonTypes = AppAssembly.GetTypes()
+        var commonTypes = AppTypes
             .Where(t => t.Namespace != null && (t.Namespace == "Common" || t.Namespace.StartsWith("Common.") || t.Namespace == "ExamPrism.Common" || t.Namespace.StartsWith("ExamPrism.Common.")))
             .Where(t => t != typeof(IAppDbContext) && t != typeof(ICatalogDbContext))
             .ToList();
@@ -516,7 +528,7 @@ public class ArchitectureTests
     [Fact]
     public void TypesInFeatures_MustNotDependOnInfrastructureInterfaces()
     {
-        var featureTypes = AppAssembly.GetTypes()
+        var featureTypes = AppTypes
             .Where(t => t.Namespace != null && t.Namespace.StartsWith("ExamPrism.Features"))
             .ToList();
 
@@ -790,14 +802,14 @@ public class ArchitectureTests
     [Fact]
     public void ReadOnlyDbContextWrappers_MustNotExistInAssembly()
     {
-        AppAssembly.GetType("ExamPrism.Infrastructure.Persistence.ReadOnlyCatalogDbContext")
-            .Should().BeNull("ReadOnlyCatalogDbContext wrapper must be removed; queries use CatalogDbContext directly with Dapper");
+        AppAssemblies.Select(a => a.GetType("ExamPrism.Infrastructure.Persistence.ReadOnlyCatalogDbContext")).Where(t => t != null)
+            .Should().BeEmpty("ReadOnlyCatalogDbContext wrapper must be removed; queries use CatalogDbContext directly with Dapper");
 
-        AppAssembly.GetType("ExamPrism.Infrastructure.Persistence.ReadOnlyAppDbContext")
-            .Should().BeNull("ReadOnlyAppDbContext wrapper must be removed; queries use AppDbContext directly with Dapper");
+        AppAssemblies.Select(a => a.GetType("ExamPrism.Infrastructure.Persistence.ReadOnlyAppDbContext")).Where(t => t != null)
+            .Should().BeEmpty("ReadOnlyAppDbContext wrapper must be removed; queries use AppDbContext directly with Dapper");
 
-        AppAssembly.GetType("ExamPrism.Infrastructure.Persistence.DapperCommandExecutor")
-            .Should().BeNull("DapperCommandExecutor must be removed; queries use native Dapper directly on DbConnection");
+        AppAssemblies.Select(a => a.GetType("ExamPrism.Infrastructure.Persistence.DapperCommandExecutor")).Where(t => t != null)
+            .Should().BeEmpty("DapperCommandExecutor must be removed; queries use native Dapper directly on DbConnection");
     }
 
     [Fact]
@@ -822,6 +834,39 @@ public class ArchitectureTests
         typeof(PlatformRole).Namespace.Should().Be("ExamPrism.Domain.Identity");
         typeof(RefreshToken).Namespace.Should().Be("ExamPrism.Domain.Identity");
         typeof(PlatformRefreshToken).Namespace.Should().Be("ExamPrism.Domain.Identity");
+    }
+
+    [Fact]
+    public void Modules_MustImplementIModule_AndNotReferenceEachOther()
+    {
+        var tenantsAssembly = typeof(TenantsModule).Assembly;
+        var identityAssembly = typeof(IdentityModule).Assembly;
+
+        tenantsAssembly.GetTypes().Where(t => typeof(IModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
+            .Should().ContainSingle().Which.IsSealed.Should().BeTrue();
+
+        identityAssembly.GetTypes().Where(t => typeof(IModule).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
+            .Should().ContainSingle().Which.IsSealed.Should().BeTrue();
+
+        tenantsAssembly.GetReferencedAssemblies().Select(a => a.Name)
+            .Should().NotContain(identityAssembly.GetName().Name);
+
+        identityAssembly.GetReferencedAssemblies().Select(a => a.Name)
+            .Should().NotContain(tenantsAssembly.GetName().Name);
+    }
+
+    [Fact]
+    public void HostAssembly_MustNotHaveStaticAssemblyReferencesToModules()
+    {
+        var referencedNames = typeof(Program).Assembly.GetReferencedAssemblies().Select(a => a.Name).ToList();
+        referencedNames.Should().NotContain(n => n != null && n.StartsWith("ExamPrism.Modules.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void InfrastructureAssembly_MustNotHaveStaticAssemblyReferencesToModules()
+    {
+        var referencedNames = typeof(DependencyInjection).Assembly.GetReferencedAssemblies().Select(a => a.Name).ToList();
+        referencedNames.Should().NotContain(n => n != null && n.StartsWith("ExamPrism.Modules.", StringComparison.Ordinal));
     }
 
     private static bool IsSubclassOfRawGeneric(Type generic, Type? toCheck)

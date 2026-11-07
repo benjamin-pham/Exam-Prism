@@ -24,7 +24,12 @@ public sealed class IdentityModule : IModule
 
     public void ConfigureServices(WebApplicationBuilder builder)
     {
-        builder.Services.AddTenantIdentityModule(builder.Configuration);
+        ConfigureServices(builder.Services, builder.Configuration);
+    }
+
+    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddTenantIdentityModule(configuration);
     }
 }
 

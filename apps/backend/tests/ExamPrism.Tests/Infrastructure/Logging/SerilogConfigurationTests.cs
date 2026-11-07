@@ -72,6 +72,14 @@ public class SerilogConfigurationTests
         var current = AppContext.BaseDirectory;
         while (!string.IsNullOrEmpty(current))
         {
+            var candidateHost = Path.Combine(current, "apps", "backend", "src", "ExamPrism", fileName);
+            if (File.Exists(candidateHost))
+                return candidateHost;
+
+            var candidateHost2 = Path.Combine(current, "src", "ExamPrism", fileName);
+            if (File.Exists(candidateHost2))
+                return candidateHost2;
+
             var candidate = Path.Combine(current, "apps", "backend", "src", fileName);
             if (File.Exists(candidate))
                 return candidate;

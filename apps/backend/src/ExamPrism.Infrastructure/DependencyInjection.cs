@@ -1,6 +1,8 @@
 namespace ExamPrism.Infrastructure;
 
+using System.Linq;
 using Common.Exceptions;
+using Common.Modules;
 using ExamPrism.Infrastructure.Batching;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Cors;
@@ -47,12 +49,25 @@ public static class DependencyInjection
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
         builder.Services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var name = asm.GetName().Name;
+            if (name != null && (name == "ExamPrism" || name.StartsWith("ExamPrism.Modules.", StringComparison.OrdinalIgnoreCase)))
+            {
+                builder.Services.AddValidatorsFromAssembly(asm, includeInternalTypes: true);
+            }
+        }
 
         return builder;
     }
 
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        if (string.IsNullOrWhiteSpace(configuration.GetConnectionString("CatalogConnection")))
+        {
+            throw new InvalidOperationException("Connection string 'CatalogConnection' not found.");
+        }
+
         services.AddLogging();
         services.TryAddSingleton(configuration);
         services.TryAddSingleton(TimeProvider.System);
@@ -67,6 +82,9 @@ public static class DependencyInjection
         services.AddAppHealthDrain(configuration);
         services.AddPersistence(configuration, healthChecksBuilder);
         services.AddMultiTenancy(configuration);
+
+        ModuleLoader.ConfigureDiscoveredModules(services, configuration);
+
         services.AddCaching(configuration, healthChecksBuilder, out var useRedis);
         services.AddLocking(configuration, useRedis);
         services.AddRateLimiting(configuration, useRedis);

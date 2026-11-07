@@ -10,7 +10,7 @@ var redis = builder.AddRedis("Redis")
 var seq = builder.AddSeq("seq")
     .WithContainerRuntimeArgs("--cpus=1", "--memory=512m");
 
-builder.AddProject("examprism-api", "../apps/backend/src/ExamPrism.csproj")
+builder.AddProject("examprism-api", "../apps/backend/src/ExamPrism/ExamPrism.csproj")
     .WaitFor(catalogDb)
     .WaitFor(redis)
     .WaitFor(seq)

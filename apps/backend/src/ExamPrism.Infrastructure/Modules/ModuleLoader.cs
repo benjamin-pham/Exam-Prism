@@ -189,7 +189,7 @@ public static class ModuleLoader
                     {
                         Path = resolvedPath,
                         Optional = false,
-                        ReloadOnChange = true
+                        ReloadOnChange = false
                     };
                     baseSource.ResolveFileProvider();
                     builder.Configuration.Sources.Insert(insertIndex++, baseSource);
@@ -202,7 +202,7 @@ public static class ModuleLoader
                     {
                         Path = envSpecificPath,
                         Optional = true,
-                        ReloadOnChange = true
+                        ReloadOnChange = false
                     };
                     envSource.ResolveFileProvider();
                     builder.Configuration.Sources.Insert(insertIndex++, envSource);
@@ -218,7 +218,42 @@ public static class ModuleLoader
 
         builder.Services.RemoveAll<ModuleRegistry>();
         builder.Services.AddSingleton(registry);
+        builder.Services.AddSingleton(new ModuleConfiguredMarker());
 
         return registry;
     }
+
+    public static void ConfigureDiscoveredModules(
+        IServiceCollection services,
+        IConfiguration configuration,
+        string? searchDirectory = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        if (services.Any(s => s.ServiceType == typeof(ModuleConfiguredMarker)))
+        {
+            return;
+        }
+
+        var registry = DiscoverAndLoadModules(searchDirectory: searchDirectory);
+        foreach (var module in registry.Modules)
+        {
+            module.ConfigureServices(services, configuration);
+            services.AddValidatorsFromAssembly(module.GetType().Assembly, includeInternalTypes: true);
+        }
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            var name = asm.GetName().Name;
+            if (name != null && name == "ExamPrism")
+            {
+                services.AddValidatorsFromAssembly(asm, includeInternalTypes: true);
+            }
+        }
+        services.RemoveAll<ModuleRegistry>();
+        services.AddSingleton(registry);
+        services.AddSingleton(new ModuleConfiguredMarker());
+    }
 }
+
+internal sealed class ModuleConfiguredMarker { }

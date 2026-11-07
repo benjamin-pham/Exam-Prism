@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ExamPrism.Contracts\ExamPrism.Contracts.csproj" />
+    <ProjectReference Include="..\ExamPrism.Infrastructure\ExamPrism.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Tenants\ExamPrism.Modules.Tenants.csproj"
+                      ReferenceOutputAssembly="false"
+                      CopyLocalSatelliteAssemblies="false" />
+    <ProjectReference Include="..\Modules\Identity\ExamPrism.Modules.Identity.csproj"
+                      ReferenceOutputAssembly="false"
+                      CopyLocalSatelliteAssemblies="false" />
+  </ItemGroup>
+
+  <Target Name="CopyModulePluginOutputs" AfterTargets="Build">
+    <ItemGroup>
+      <ModulePluginFiles Include="..\Modules\*\bin\$(Configuration)\$(TargetFramework)\ExamPrism.Modules.*" />
+      <ModuleSettingFiles Include="..\Modules\*\appsettings.*.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ModulePluginFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ModuleSettingFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

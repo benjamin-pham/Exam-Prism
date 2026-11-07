@@ -2,7 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/ExamPrism.Contracts/ExamPrism.Contracts.csproj" />
     <Project Path="src/ExamPrism.Infrastructure/ExamPrism.Infrastructure.csproj" />
-    <Project Path="src/ExamPrism.csproj" />
+    <Project Path="src/ExamPrism/ExamPrism.csproj" />
   </Folder>
   <Folder Name="/src/Modules/">
     <Project Path="src/Modules/Identity/ExamPrism.Modules.Identity.csproj" />

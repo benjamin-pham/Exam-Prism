@@ -1,14 +1,13 @@
 namespace ExamPrism.Infrastructure.MultiTenancy;
 
+using Common.Modules;
 using Common.MultiTenancy;
-using ExamPrism.Features.Tenants;
 using ExamPrism.Infrastructure.Caching;
-using ExamPrism.Infrastructure.Persistence.Catalog;
+using ExamPrism.Infrastructure.Modules;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -26,10 +25,19 @@ public static class MultiTenancySetup
         return hostBuilder.UseWolverine(opts =>
         {
             opts.Discovery.IncludeAssembly(typeof(MultiTenancySetup).Assembly);
+            var moduleRegistry = ModuleLoader.DiscoverAndLoadModules();
+            foreach (var asm in moduleRegistry.ModuleAssemblies)
+            {
+                opts.Discovery.IncludeAssembly(asm);
+            }
+            if (System.Reflection.Assembly.GetEntryAssembly() is { } entryAssembly)
+            {
+                opts.Discovery.IncludeAssembly(entryAssembly);
+            }
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
                 var name = asm.GetName().Name;
-                if (name != null && name.StartsWith("ExamPrism.Modules.", StringComparison.OrdinalIgnoreCase))
+                if (name != null && (name == "ExamPrism" || name.StartsWith("ExamPrism.Modules.", StringComparison.OrdinalIgnoreCase)))
                 {
                     opts.Discovery.IncludeAssembly(asm);
                 }
@@ -103,36 +111,24 @@ public static class MultiTenancySetup
         this WebApplication app,
         CancellationToken cancellationToken = default)
     {
+        var initializers = app.Services.GetServices<IStartupInitializer>()
+            .Where(i => i.GetType().Name.Contains("MultiTenancy", StringComparison.OrdinalIgnoreCase) ||
+                        i.GetType().Name.Contains("Tenant", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (initializers.Count > 0)
+        {
+            foreach (var init in initializers)
+            {
+                await init.InitializeAsync(app.Services, cancellationToken);
+            }
+            return;
+        }
+
         var multiTenancyOptions = app.Services.GetService<IOptions<MultiTenancyOptions>>()?.Value;
         if (multiTenancyOptions is null)
         {
             return;
-        }
-
-        if (multiTenancyOptions.Provisioning.RecoverStuckProvisioningOnStartup)
-        {
-            try
-            {
-                await using var scope = app.Services.CreateAsyncScope();
-                var catalogDb = scope.ServiceProvider.GetService<CatalogDbContext>();
-                var bus = scope.ServiceProvider.GetService<IMessageBus>();
-                if (catalogDb is not null && bus is not null)
-                {
-                    var stuckTenants = await catalogDb.Tenants
-                        .Where(t => t.Status == TenantStatus.Provisioning)
-                        .Select(t => t.Id)
-                        .ToListAsync(cancellationToken);
-
-                    foreach (var tenantId in stuckTenants)
-                    {
-                        await bus.SendAsync(new StartTenantProvisioningCommand(tenantId));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                app.Logger.LogWarning(ex, "Stuck provisioning recovery skipped on startup because database or bus is not available.");
-            }
         }
 
         if (multiTenancyOptions.FleetMigration.MigrateOnStartup)

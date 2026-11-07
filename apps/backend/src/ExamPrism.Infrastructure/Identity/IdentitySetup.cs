@@ -1,13 +1,12 @@
 namespace ExamPrism.Infrastructure.Identity;
 
 using System.Text;
+using Common.Modules;
 using Common.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 public static class IdentitySetup
@@ -94,22 +93,14 @@ public static class IdentitySetup
         this WebApplication app,
         CancellationToken cancellationToken = default)
     {
-        var platformAdminOptions = app.Services.GetService<IOptions<PlatformAdminOptions>>()?.Value;
-        if (platformAdminOptions is not null && platformAdminOptions.SeedOnStartup)
+        var initializers = app.Services.GetServices<IStartupInitializer>()
+            .Where(i => i.GetType().Name.Contains("PlatformAdmin", StringComparison.OrdinalIgnoreCase) ||
+                        i.GetType().Name.Contains("Identity", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        foreach (var init in initializers)
         {
-            try
-            {
-                await using var scope = app.Services.CreateAsyncScope();
-                var scopedSeeder = scope.ServiceProvider.GetService<PlatformAdminSeeder>();
-                if (scopedSeeder is not null)
-                {
-                    await scopedSeeder.SeedAsync(cancellationToken);
-                }
-            }
-            catch (Exception ex)
-            {
-                app.Logger.LogWarning(ex, "PlatformAdminSeeder skipped on startup because database is not available or not yet migrated.");
-            }
+            await init.InitializeAsync(app.Services, cancellationToken);
         }
     }
 }

@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Wolverine;
@@ -32,7 +33,12 @@ public sealed class TenantsModule : IModule
 
     public void ConfigureServices(WebApplicationBuilder builder)
     {
-        builder.Services.AddTenantsModule(builder.Configuration);
+        ConfigureServices(builder.Services, builder.Configuration);
+    }
+
+    public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddTenantsModule(configuration);
     }
 }
 
@@ -44,11 +50,12 @@ public static class TenantsModuleExtensions
     {
         DapperTypeHandlers.EnsureRegistered();
 
-        var catalogConnection = configuration.GetConnectionString("CatalogConnection")
-            ?? throw new InvalidOperationException("Connection string 'CatalogConnection' not found.");
-
         services.AddDbContext<CatalogDbContext>((sp, options) =>
         {
+            var config = sp.GetService<IConfiguration>() ?? configuration;
+            var catalogConnection = config.GetConnectionString("CatalogConnection")
+                ?? throw new InvalidOperationException("Connection string 'CatalogConnection' not found.");
+
             var persistenceOptions = sp.GetRequiredService<IOptions<PersistenceOptions>>().Value;
             var interceptor = sp.GetRequiredService<SlowQueryTelemetryInterceptor>();
             var auditableInterceptor = sp.GetRequiredService<AuditableEntityInterceptor>();
@@ -109,9 +116,17 @@ public static class TenantsModuleExtensions
             sp.GetService<IServiceScopeFactory>(),
             sp.GetService<IMessageBus>()));
 
+        var existingAccessor = services.LastOrDefault(s => s.ServiceType == typeof(IMultiTenantContextAccessor<ExamPrismTenantInfo>));
+
         services.AddMultiTenant<ExamPrismTenantInfo>()
             .WithStrategy<SubdomainMultiTenantStrategy>(ServiceLifetime.Scoped)
             .WithStore<CatalogMultiTenantStore>(ServiceLifetime.Scoped);
+
+        if (existingAccessor is not null)
+        {
+            services.RemoveAll<IMultiTenantContextAccessor<ExamPrismTenantInfo>>();
+            services.Add(existingAccessor);
+        }
 
         services.AddSingleton<IStartupInitializer, PlatformAdminStartupInitializer>();
         services.AddSingleton<IStartupInitializer, MultiTenancyStartupInitializer>();
