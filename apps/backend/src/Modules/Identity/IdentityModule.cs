@@ -57,10 +57,7 @@ public static class IdentityModuleExtensions
 
             options.AddInterceptors(interceptor, auditableInterceptor, dispatchInterceptor);
             options.UseNpgsql(dataSource, npgsqlOptions =>
-            {
-                npgsqlOptions.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
-                npgsqlOptions.MaxBatchSize(persistenceOptions.MaxBatchSize);
-            });
+                npgsqlOptions.ConfigureNpgsql(persistenceOptions));
         });
 
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());

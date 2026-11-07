@@ -54,14 +54,6 @@ public static class PersistenceSetup
         NpgsqlDbContextOptionsBuilder npgsqlOptions,
         PersistenceOptions persistenceOptions)
     {
-        npgsqlOptions.CommandTimeout(persistenceOptions.CommandTimeoutSeconds);
-        npgsqlOptions.MaxBatchSize(persistenceOptions.MaxBatchSize);
-        if (persistenceOptions.MaxRetryCount > 0)
-        {
-            npgsqlOptions.EnableRetryOnFailure(
-                maxRetryCount: persistenceOptions.MaxRetryCount,
-                maxRetryDelay: TimeSpan.FromSeconds(persistenceOptions.MaxRetryDelaySeconds),
-                errorCodesToAdd: null);
-        }
+        npgsqlOptions.ConfigureNpgsql(persistenceOptions);
     }
 }

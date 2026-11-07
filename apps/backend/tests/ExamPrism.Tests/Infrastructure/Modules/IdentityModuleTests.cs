@@ -12,6 +12,7 @@ using ExamPrism.Modules.Identity;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -88,5 +89,31 @@ public class IdentityModuleTests
         await act.Should().ThrowAsync<OperationCanceledException>();
 
         normalizer.Received(1).Normalize(command.RawConnectionString);
+    }
+
+    [Fact]
+    public void ConfigureNpgsql_ConfiguresTimeoutBatchSizeAndRetryOnFailure()
+    {
+        var optionsBuilder = new DbContextOptionsBuilder();
+        var persistenceOptions = new PersistenceOptions
+        {
+            CommandTimeoutSeconds = 45,
+            MaxBatchSize = 50,
+            MaxRetryCount = 4,
+            MaxRetryDelaySeconds = 7
+        };
+
+        optionsBuilder.UseNpgsql("Host=localhost;Database=test", npgsql =>
+        {
+            npgsql.ConfigureNpgsql(persistenceOptions);
+        });
+
+#pragma warning disable EF1001
+        var extension = optionsBuilder.Options.FindExtension<Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.Internal.NpgsqlOptionsExtension>();
+        extension.Should().NotBeNull();
+        extension!.CommandTimeout.Should().Be(45);
+        extension.MaxBatchSize.Should().Be(50);
+        extension.ExecutionStrategyFactory.Should().NotBeNull();
+#pragma warning restore EF1001
     }
 }
