@@ -217,7 +217,9 @@ public static class ModuleLoader
         var registry = new ModuleRegistry(moduleList, moduleAssemblies);
 
         builder.Services.RemoveAll<ModuleRegistry>();
+        builder.Services.RemoveAll<IModuleRegistry>();
         builder.Services.AddSingleton(registry);
+        builder.Services.AddSingleton<IModuleRegistry>(registry);
         builder.Services.AddSingleton(new ModuleConfiguredMarker());
 
         return registry;
@@ -251,7 +253,9 @@ public static class ModuleLoader
             }
         }
         services.RemoveAll<ModuleRegistry>();
+        services.RemoveAll<IModuleRegistry>();
         services.AddSingleton(registry);
+        services.AddSingleton<IModuleRegistry>(registry);
         services.AddSingleton(new ModuleConfiguredMarker());
     }
 }

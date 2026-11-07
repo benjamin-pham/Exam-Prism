@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using Common.Modules;
 
-public sealed class ModuleRegistry
+public sealed class ModuleRegistry : IModuleRegistry
 {
     public ModuleRegistry(IReadOnlyList<IModule> modules, IReadOnlyList<Assembly> moduleAssemblies)
     {

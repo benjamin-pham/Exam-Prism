@@ -100,7 +100,6 @@ public static class TenantsModuleExtensions
             sp.GetRequiredService<IConfiguration>(),
             sp.GetRequiredService<IOptions<MultiTenancyOptions>>(),
             sp.GetRequiredService<IConnectionStringProtector>(),
-            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
             sp.GetRequiredService<ITenantCacheInvalidator>(),
             sp.GetService<IServiceScopeFactory>(),
             sp.GetRequiredService<TimeProvider>(),
@@ -110,7 +109,6 @@ public static class TenantsModuleExtensions
         services.AddScoped<ITenantFleetMigrator>(sp => new TenantFleetMigrator(
             sp.GetRequiredService<CatalogDbContext>(),
             sp.GetRequiredService<IConnectionStringProtector>(),
-            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
             sp.GetRequiredService<IOptions<MultiTenancyOptions>>(),
             sp.GetRequiredService<ILogger<TenantFleetMigrator>>(),
             sp.GetService<IServiceScopeFactory>(),

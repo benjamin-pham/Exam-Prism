@@ -22,7 +22,6 @@ public sealed class TenantProvisioner(
     IConfiguration configuration,
     IOptions<MultiTenancyOptions> options,
     IConnectionStringProtector protector,
-    ITenantConnectionStringNormalizer normalizer,
     ITenantCacheInvalidator cacheInvalidator,
     IServiceScopeFactory? serviceScopeFactory = null,
     TimeProvider? timeProvider = null,
@@ -39,11 +38,28 @@ public sealed class TenantProvisioner(
         IConnectionStringProtector protector,
         ITenantConnectionStringNormalizer normalizer,
         ITenantCacheInvalidator cacheInvalidator,
+        IServiceScopeFactory? serviceScopeFactory = null,
+        TimeProvider? timeProvider = null,
+        ILogger<TenantProvisioner>? logger = null,
+        IMessageBus? bus = null)
+        : this(catalogDb, configuration, options, protector, cacheInvalidator, serviceScopeFactory, timeProvider, logger, bus)
+    {
+        _ = normalizer;
+    }
+
+    public TenantProvisioner(
+        CatalogDbContext catalogDb,
+        IConfiguration configuration,
+        IOptions<MultiTenancyOptions> options,
+        IConnectionStringProtector protector,
+        ITenantConnectionStringNormalizer normalizer,
+        ITenantCacheInvalidator cacheInvalidator,
         IMessageBus bus,
         TimeProvider? timeProvider = null,
         ILogger<TenantProvisioner>? logger = null)
-        : this(catalogDb, configuration, options, protector, normalizer, cacheInvalidator, null, timeProvider, logger, bus)
+        : this(catalogDb, configuration, options, protector, cacheInvalidator, null, timeProvider, logger, bus)
     {
+        _ = normalizer;
     }
 
     public async Task ProvisionAsync(Guid tenantId, CancellationToken ct = default)
@@ -166,19 +182,43 @@ public sealed class TenantProvisioner(
                 }
             }
 
-            var messageBus = bus ?? serviceScopeFactory?.CreateScope().ServiceProvider.GetService<IMessageBus>()
-                ?? throw new InvalidOperationException("IMessageBus is required to initialize tenant identity.");
-
-            var initCommand = new InitializeTenantIdentityCommand(
-                tenant.Id,
-                tenant.Slug,
-                rawTenantConnStr,
-                tenant.OwnerEmail,
-                tenant.EncryptedOwnerPassword);
-            var initResult = await messageBus.InvokeAsync<Result<InitializeTenantIdentityResult>>(initCommand, ct);
-            if (initResult.IsFailure)
+            AsyncServiceScope? fallbackScope = null;
+            IMessageBus messageBus;
+            if (bus is not null)
             {
-                throw new InvalidOperationException(initResult.Error.Message);
+                messageBus = bus;
+            }
+            else if (serviceScopeFactory is not null)
+            {
+                fallbackScope = serviceScopeFactory.CreateAsyncScope();
+                messageBus = fallbackScope.Value.ServiceProvider.GetService<IMessageBus>()
+                    ?? throw new InvalidOperationException("IMessageBus is required to initialize tenant identity.");
+            }
+            else
+            {
+                throw new InvalidOperationException("IMessageBus is required to initialize tenant identity.");
+            }
+
+            try
+            {
+                var initCommand = new InitializeTenantIdentityCommand(
+                    tenant.Id,
+                    tenant.Slug,
+                    rawTenantConnStr,
+                    tenant.OwnerEmail,
+                    tenant.EncryptedOwnerPassword);
+                var initResult = await messageBus.InvokeAsync<Result<InitializeTenantIdentityResult>>(initCommand, ct);
+                if (initResult is null || initResult.IsFailure)
+                {
+                    throw new InvalidOperationException(initResult?.Error.Message ?? "Identity initialization returned null result.");
+                }
+            }
+            finally
+            {
+                if (fallbackScope.HasValue)
+                {
+                    await fallbackScope.Value.DisposeAsync();
+                }
             }
 
             var now = _timeProvider.GetUtcNow().UtcDateTime;

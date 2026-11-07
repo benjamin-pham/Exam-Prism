@@ -41,16 +41,9 @@ public static class EndpointExtensions
                 }
             }
 
-            var registryType = AppDomain.CurrentDomain.GetAssemblies()
-                .Select(a => a.GetType("ExamPrism.Infrastructure.Modules.ModuleRegistry"))
-                .FirstOrDefault(t => t != null);
-            if (registryType != null && app.ServiceProvider.GetService(registryType) is { } registry)
+            if (app.ServiceProvider.GetService<Common.Modules.IModuleRegistry>() is { } moduleRegistry)
             {
-                var prop = registryType.GetProperty("ModuleAssemblies");
-                if (prop?.GetValue(registry) is IEnumerable<Assembly> moduleAssemblies)
-                {
-                    defaultList.AddRange(moduleAssemblies);
-                }
+                defaultList.AddRange(moduleRegistry.ModuleAssemblies);
             }
 
             defaultList.Add(typeof(EndpointExtensions).Assembly);

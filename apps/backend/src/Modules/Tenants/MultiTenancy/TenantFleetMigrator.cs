@@ -16,12 +16,23 @@ using Wolverine;
 public sealed class TenantFleetMigrator(
     CatalogDbContext catalogDb,
     IConnectionStringProtector protector,
-    ITenantConnectionStringNormalizer normalizer,
     IOptions<MultiTenancyOptions> options,
     ILogger<TenantFleetMigrator> logger,
     IServiceScopeFactory? serviceScopeFactory = null,
     IMessageBus? bus = null) : ITenantFleetMigrator
 {
+    public TenantFleetMigrator(
+        CatalogDbContext catalogDb,
+        IConnectionStringProtector protector,
+        ITenantConnectionStringNormalizer normalizer,
+        IOptions<MultiTenancyOptions> options,
+        ILogger<TenantFleetMigrator> logger,
+        IServiceScopeFactory? serviceScopeFactory = null,
+        IMessageBus? bus = null)
+        : this(catalogDb, protector, options, logger, serviceScopeFactory, bus)
+    {
+        _ = normalizer;
+    }
     public async Task<TenantMigrationItemResult> MigrateTenantAsync(Guid tenantId, CancellationToken ct = default)
     {
         var tenant = await catalogDb.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tenantId, ct);
@@ -51,32 +62,56 @@ public sealed class TenantFleetMigrator(
         try
         {
             var rawConnStr = protector.Unprotect(tenant.EncryptedConnectionString);
-            var messageBus = bus ?? serviceScopeFactory?.CreateScope().ServiceProvider.GetService<IMessageBus>()
-                ?? throw new InvalidOperationException("IMessageBus is required to migrate tenant database.");
-
-            var command = new MigrateTenantDatabaseCommand(tenant.Id, tenant.Slug, rawConnStr);
-            var result = await messageBus.InvokeAsync<Result<MigrateTenantDatabaseResult>>(command, ct);
-
-            sw.Stop();
-
-            if (result.IsFailure)
+            AsyncServiceScope? fallbackScope = null;
+            IMessageBus messageBus;
+            if (bus is not null)
             {
+                messageBus = bus;
+            }
+            else if (serviceScopeFactory is not null)
+            {
+                fallbackScope = serviceScopeFactory.CreateAsyncScope();
+                messageBus = fallbackScope.Value.ServiceProvider.GetService<IMessageBus>()
+                    ?? throw new InvalidOperationException("IMessageBus is required to migrate tenant database.");
+            }
+            else
+            {
+                throw new InvalidOperationException("IMessageBus is required to migrate tenant database.");
+            }
+
+            try
+            {
+                var command = new MigrateTenantDatabaseCommand(tenant.Id, tenant.Slug, rawConnStr);
+                var result = await messageBus.InvokeAsync<Result<MigrateTenantDatabaseResult>>(command, ct);
+
+                sw.Stop();
+
+                if (result is null || result.IsFailure)
+                {
+                    return new TenantMigrationItemResult(
+                        tenant.Id,
+                        tenant.Slug,
+                        Succeeded: false,
+                        AppliedMigrationsCount: 0,
+                        ErrorMessage: result?.Error.Message ?? "Database migration returned null result.",
+                        DurationMs: sw.ElapsedMilliseconds);
+                }
+
                 return new TenantMigrationItemResult(
                     tenant.Id,
                     tenant.Slug,
-                    Succeeded: false,
-                    AppliedMigrationsCount: 0,
-                    ErrorMessage: result.Error.Message,
+                    Succeeded: true,
+                    AppliedMigrationsCount: result.Value.AppliedMigrationsCount,
+                    ErrorMessage: null,
                     DurationMs: sw.ElapsedMilliseconds);
             }
-
-            return new TenantMigrationItemResult(
-                tenant.Id,
-                tenant.Slug,
-                Succeeded: true,
-                AppliedMigrationsCount: result.Value.AppliedMigrationsCount,
-                ErrorMessage: null,
-                DurationMs: sw.ElapsedMilliseconds);
+            finally
+            {
+                if (fallbackScope.HasValue)
+                {
+                    await fallbackScope.Value.DisposeAsync();
+                }
+            }
         }
         catch (Exception ex)
         {
