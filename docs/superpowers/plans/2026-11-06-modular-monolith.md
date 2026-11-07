@@ -179,11 +179,11 @@ git commit -m "feat(contracts,infrastructure): extract Contracts and Infrastruct
   - `ExamPrism.Features.Tenants.InitializeTenantIdentityHandler : IHandler<InitializeTenantIdentityCommand, InitializeTenantIdentityResult>`
   - `ExamPrism.Features.Tenants.MigrateTenantDatabaseHandler : IHandler<MigrateTenantDatabaseCommand, MigrateTenantDatabaseResult>`
 
-- [ ] **Step 1: Create `ExamPrism.Modules.Identity.csproj`, `appsettings.identity.json`, and move Tenant Identity files**
+- [x] **Step 1: Create `ExamPrism.Modules.Identity.csproj`, `appsettings.identity.json`, and move Tenant Identity files**
 
 Create `apps/backend/src/Modules/Identity/ExamPrism.Modules.Identity.csproj` referencing `ExamPrism.Contracts` and `ExamPrism.Infrastructure`, with `<Content Include="appsettings.identity.json" CopyToOutputDirectory="PreserveNewest" />`. Move `ApplicationUser`, `RefreshToken`, `IAppDbContext`, `AppDbContext`, `AppDbContextFactory`, `App/Configurations/*`, `Migrations/Tenant/*`, `TenantProbeGrain`, `Features/Auth/*`, and `Endpoints/Auth/*` into `apps/backend/src/Modules/Identity/`.
 
-- [ ] **Step 2: Implement `IdentityModule`, `InitializeTenantIdentityHandler`, and `MigrateTenantDatabaseHandler`**
+- [x] **Step 2: Implement `IdentityModule`, `InitializeTenantIdentityHandler`, and `MigrateTenantDatabaseHandler`**
 
 In `IdentityModule.cs` (`namespace ExamPrism.Modules.Identity`):
 - `Name => "Identity"`
@@ -196,7 +196,7 @@ In `InitializeTenantIdentityHandler.cs` (`namespace ExamPrism.Features.Tenants`,
 In `MigrateTenantDatabaseHandler.cs` (`namespace ExamPrism.Features.Tenants`, `public sealed class MigrateTenantDatabaseHandler : IHandler<MigrateTenantDatabaseCommand, MigrateTenantDatabaseResult>`):
 - Normalizes `command.RawConnectionString`, counts `GetPendingMigrationsAsync(ct)` on `AppDbContext`, runs `MigrateAsync(ct)`, and returns `new MigrateTenantDatabaseResult(pendingCount)`.
 
-- [ ] **Step 3: Write tests in `apps/backend/tests/ExamPrism.Tests/Infrastructure/Modules/IdentityModuleTests.cs`**
+- [x] **Step 3: Write tests in `apps/backend/tests/ExamPrism.Tests/Infrastructure/Modules/IdentityModuleTests.cs`**
 
 ```csharp
 [Fact]
@@ -222,12 +222,12 @@ public void IdentityModule_ExposesExpectedNameAndSettingFiles_AndRegistersAppDbC
 }
 ```
 
-- [ ] **Step 4: Run `IdentityModuleTests` and `AuthEndpointTests`**
+- [x] **Step 4: Run `IdentityModuleTests` and `AuthEndpointTests`**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter "FullyQualifiedName~IdentityModuleTests"`
 Expected: PASS
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 git add apps/backend/
