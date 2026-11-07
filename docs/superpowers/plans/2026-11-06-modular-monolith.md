@@ -376,7 +376,7 @@ git commit -m "feat(tenants): extract ExamPrism.Modules.Tenants DLL and decouple
   - `apps/backend/src/ExamPrism/ExamPrism.csproj` with dynamic plugin output copy target (`ReferenceOutputAssembly="false"`)
   - Updated `ArchitectureTests` enforcing module isolation, `IModule` implementation rules, and zero static Host-to-Module assembly references
 
-- [ ] **Step 1: Move Host files into `apps/backend/src/ExamPrism/` and configure MSBuild plugin output copying**
+- [x] **Step 1: Move Host files into `apps/backend/src/ExamPrism/` and configure MSBuild plugin output copying**
 
 In `apps/backend/src/ExamPrism/ExamPrism.csproj`:
 - Keep compile-time `<ProjectReference>` only to `..\ExamPrism.Contracts\ExamPrism.Contracts.csproj` and `..\ExamPrism.Infrastructure\ExamPrism.Infrastructure.csproj`.
@@ -404,7 +404,7 @@ In `apps/backend/src/ExamPrism/ExamPrism.csproj`:
 ```
 Update `apps/backend/ExamPrism.slnx` to include all 5 `src` projects and `tests/ExamPrism.Tests/ExamPrism.Tests.csproj`. Update `aspire-app/AppHost.cs` and `AspireAppHostConfigurationTests.cs` path to `"../apps/backend/src/ExamPrism/ExamPrism.csproj"`.
 
-- [ ] **Step 2: Write failing Modular Monolith architecture tests in `apps/backend/tests/ExamPrism.Tests/Architecture/ArchitectureTests.cs`**
+- [x] **Step 2: Write failing Modular Monolith architecture tests in `apps/backend/tests/ExamPrism.Tests/Architecture/ArchitectureTests.cs`**
 
 Update `ArchitectureTests.AppAssemblies` to include `typeof(Program).Assembly`, `typeof(IModule).Assembly`, `typeof(DependencyInjection).Assembly`, `typeof(TenantsModule).Assembly`, and `typeof(IdentityModule).Assembly`, and add:
 ```csharp
@@ -435,17 +435,17 @@ public void HostAssembly_MustNotHaveStaticAssemblyReferencesToModules()
 }
 ```
 
-- [ ] **Step 3: Run `ArchitectureTests` to verify all architecture rules pass**
+- [x] **Step 3: Run `ArchitectureTests` to verify all architecture rules pass**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter "FullyQualifiedName~ArchitectureTests"`
 Expected: PASS
 
-- [ ] **Step 4: Run the full solution test suite to verify zero regressions**
+- [x] **Step 4: Run the full solution test suite to verify zero regressions**
 
 Run: `dotnet test apps/backend/ExamPrism.slnx`
 Expected: PASS (all unit, architecture, and integration tests pass)
 
-- [ ] **Step 5: Commit Task 4**
+- [x] **Step 5: Commit Task 4**
 
 ```bash
 git add apps/backend/ aspire-app/
