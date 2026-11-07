@@ -4,6 +4,9 @@
     <Project Path="src/ExamPrism.Infrastructure/ExamPrism.Infrastructure.csproj" />
     <Project Path="src/ExamPrism.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/">
+    <Project Path="src/Modules/Identity/ExamPrism.Modules.Identity.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ExamPrism.Tests/ExamPrism.Tests.csproj" />
   </Folder>

@@ -34,6 +34,7 @@
     <ProjectReference Include="..\..\src\ExamPrism.csproj" />
     <ProjectReference Include="..\..\src\ExamPrism.Contracts\ExamPrism.Contracts.csproj" />
     <ProjectReference Include="..\..\src\ExamPrism.Infrastructure\ExamPrism.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\ExamPrism.Modules.Identity.csproj" />
   </ItemGroup>
 
 </Project>

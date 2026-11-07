@@ -2,6 +2,7 @@ namespace ExamPrism.Tests.Features;
 
 using Common.Handlers;
 using Common.Results;
+using ExamPrism.Modules.Identity;
 using FluentAssertions;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -66,6 +67,7 @@ public class BusValidationTests
     {
         var services = new ServiceCollection();
         services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
+        services.AddValidatorsFromAssemblyContaining<IdentityModule>(includeInternalTypes: true);
         var provider = services.BuildServiceProvider();
 
         provider.GetService<IValidator<ExamPrism.Features.Auth.RegisterCommand>>().Should().NotBeNull();

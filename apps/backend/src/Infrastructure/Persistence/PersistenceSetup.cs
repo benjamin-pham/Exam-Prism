@@ -43,34 +43,7 @@ public static class PersistenceSetup
                 ConfigureNpgsql(npgsqlOptions, persistenceOptions));
         });
 
-        services.AddDbContext<AppDbContext>((sp, options) =>
-        {
-            var tenantInfo = sp.GetRequiredService<IMultiTenantContextAccessor<ExamPrismTenantInfo>>()
-                .MultiTenantContext?.TenantInfo;
-
-            if (tenantInfo is null || tenantInfo.Status != TenantStatus.Active || string.IsNullOrWhiteSpace(tenantInfo.ConnectionString))
-            {
-                throw new InvalidOperationException(
-                    "An active tenant context with a valid connection string is required to resolve AppDbContext.");
-            }
-
-            var normalizer = sp.GetRequiredService<ITenantConnectionStringNormalizer>();
-            var registry = sp.GetRequiredService<TenantDataSourceRegistry>();
-            var persistenceOptions = sp.GetRequiredService<IOptions<PersistenceOptions>>().Value;
-            var interceptor = sp.GetRequiredService<SlowQueryTelemetryInterceptor>();
-            var auditableInterceptor = sp.GetRequiredService<AuditableEntityInterceptor>();
-            var dispatchInterceptor = sp.GetRequiredService<DomainEventDispatchInterceptor>();
-
-            var normalized = normalizer.Normalize(tenantInfo.ConnectionString);
-            var dataSource = registry.GetOrCreate(normalized);
-
-            options.AddInterceptors(interceptor, auditableInterceptor, dispatchInterceptor);
-            options.UseNpgsql(dataSource, npgsqlOptions =>
-                ConfigureNpgsql(npgsqlOptions, persistenceOptions));
-        });
-
         services.AddScoped<ICatalogDbContext>(sp => sp.GetRequiredService<CatalogDbContext>());
-        services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         healthChecksBuilder.AddDbContextCheck<CatalogDbContext>(name: "catalog_db");
 

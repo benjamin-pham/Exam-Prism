@@ -11,6 +11,7 @@ using ExamPrism.Infrastructure.Idempotency;
 using ExamPrism.Infrastructure.Localization;
 using ExamPrism.Infrastructure.Locking;
 using ExamPrism.Infrastructure.Logging;
+using ExamPrism.Infrastructure.Modules;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.OpenApi;
 using ExamPrism.Infrastructure.Orleans;
@@ -32,6 +33,7 @@ public static class DependencyInjection
 
     public static WebApplicationBuilder AddInfrastructure(this WebApplicationBuilder builder)
     {
+        builder.AddModules();
         builder.ConfigureAppKestrel();
         builder.Services.AddAppCors(builder.Environment);
 

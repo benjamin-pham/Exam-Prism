@@ -49,5 +49,6 @@
   <ItemGroup>
     <ProjectReference Include="ExamPrism.Contracts\ExamPrism.Contracts.csproj" />
     <ProjectReference Include="ExamPrism.Infrastructure\ExamPrism.Infrastructure.csproj" />
+    <ProjectReference Include="Modules\Identity\ExamPrism.Modules.Identity.csproj" />
   </ItemGroup>
 </Project>

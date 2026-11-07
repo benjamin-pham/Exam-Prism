@@ -33,11 +33,6 @@ public static class IdentitySetup
             options.User.RequireUniqueEmail = true;
         };
 
-        services.AddIdentityCore<ApplicationUser>(configureIdentity)
-            .AddRoles<IdentityRole<Guid>>()
-            .AddEntityFrameworkStores<AppDbContext>()
-            .AddDefaultTokenProviders();
-
         services.AddIdentityCore<PlatformUser>(configureIdentity)
             .AddRoles<PlatformRole>()
             .AddEntityFrameworkStores<CatalogDbContext>()
@@ -45,9 +40,6 @@ public static class IdentitySetup
 
         // High-load identity: CPU password hash bulkhead & hybrid cache token revocation
         services.Configure<IdentityHighLoadOptions>(configuration.GetSection(IdentityHighLoadOptions.SectionName));
-        services.AddSingleton<IPasswordHasher<ApplicationUser>>(sp =>
-            new BulkheadPasswordHasher<ApplicationUser>(
-                sp.GetRequiredService<IOptions<IdentityHighLoadOptions>>()));
         services.AddSingleton<IPasswordHasher<PlatformUser>>(sp =>
             new BulkheadPasswordHasher<PlatformUser>(
                 sp.GetRequiredService<IOptions<IdentityHighLoadOptions>>()));

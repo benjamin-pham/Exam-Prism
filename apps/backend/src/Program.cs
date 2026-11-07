@@ -46,7 +46,7 @@ if (app.Environment.IsDevelopment())
     app.MapAppOpenApi();
 }
 
-app.MapEndpoints(typeof(Program).Assembly);
+app.MapEndpoints();
 
 try
 {

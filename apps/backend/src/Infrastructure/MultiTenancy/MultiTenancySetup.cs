@@ -27,6 +27,14 @@ public static class MultiTenancySetup
         return hostBuilder.UseWolverine(opts =>
         {
             opts.Discovery.IncludeAssembly(typeof(MultiTenancySetup).Assembly);
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var name = asm.GetName().Name;
+                if (name != null && name.StartsWith("ExamPrism.Modules.", StringComparison.OrdinalIgnoreCase))
+                {
+                    opts.Discovery.IncludeAssembly(asm);
+                }
+            }
             opts.UseFluentValidation();
             opts.Policies.AddMiddleware<TenantWolverineMiddleware>();
             opts.Policies.OnException<Npgsql.NpgsqlException>(ex => ex.IsTransient)

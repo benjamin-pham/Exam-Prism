@@ -6,6 +6,7 @@ using Common.Handlers;
 using Common.Results;
 using Common.Security;
 using Common.Validation;
+using ExamPrism.Domain.Identity;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using FluentValidation;

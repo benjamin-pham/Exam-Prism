@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Common.Handlers;
 using Common.Results;
 using Common.Security;
+using ExamPrism.Domain.Identity;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using FluentValidation;
