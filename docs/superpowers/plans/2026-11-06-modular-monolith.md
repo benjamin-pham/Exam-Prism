@@ -263,11 +263,11 @@ git commit -m "feat(identity): extract ExamPrism.Modules.Identity DLL with IModu
   - `ExamPrism.Infrastructure.MultiTenancy.TenantProvisioner` (sends `InitializeTenantIdentityCommand` via `IMessageBus`)
   - `ExamPrism.Infrastructure.MultiTenancy.TenantFleetMigrator` (sends `MigrateTenantDatabaseCommand` via `IMessageBus`)
 
-- [ ] **Step 1: Create `ExamPrism.Modules.Tenants.csproj`, `appsettings.tenants.json`, and move Tenants/Platform files**
+- [x] **Step 1: Create `ExamPrism.Modules.Tenants.csproj`, `appsettings.tenants.json`, and move Tenants/Platform files**
 
 Create `apps/backend/src/Modules/Tenants/ExamPrism.Modules.Tenants.csproj` referencing **only** `ExamPrism.Contracts` and `ExamPrism.Infrastructure` (no reference to `ExamPrism.Modules.Identity`), with `<Content Include="appsettings.tenants.json" CopyToOutputDirectory="PreserveNewest" />`. Move all Tenant and Platform domain entities, `CatalogDbContext`, Catalog migrations, `PlatformAdminSeeder`, `CatalogMultiTenantStore`, `TenantProvisioner`, `TenantFleetMigrator`, and Tenant/Platform features and endpoints into `apps/backend/src/Modules/Tenants/`.
 
-- [ ] **Step 2: Refactor `TenantProvisioner` and `TenantFleetMigrator` to use `IMessageBus` instead of `AppDbContext` / `ApplicationUser`**
+- [x] **Step 2: Refactor `TenantProvisioner` and `TenantFleetMigrator` to use `IMessageBus` instead of `AppDbContext` / `ApplicationUser`**
 
 In `TenantProvisioner`:
 - Replace `IServiceScopeFactory` / direct `AppDbContext` / `UserManager<ApplicationUser>` usage with `IMessageBus? bus = null` (or resolve `IMessageBus` from `IServiceScopeFactory` / constructor injection).
@@ -288,14 +288,14 @@ In `TenantProvisioner`:
 In `TenantFleetMigrator`:
 - Replace direct `new AppDbContext(dbOptions)` migration with dispatching `MigrateTenantDatabaseCommand(tenant.Id, tenant.Slug, rawConnStr)` via `IMessageBus.InvokeAsync<Result<MigrateTenantDatabaseResult>>` (resolved from `IServiceScopeFactory` or constructor).
 
-- [ ] **Step 3: Implement `TenantsModule : IModule` and `IStartupInitializer`s**
+- [x] **Step 3: Implement `TenantsModule : IModule` and `IStartupInitializer`s**
 
 In `TenantsModule.cs` (`namespace ExamPrism.Modules.Tenants`):
 - `Name => "Tenants"`
 - `ModuleSettingFiles => ["appsettings.tenants.json"]`
 - `ConfigureServices(WebApplicationBuilder builder)` registers `CatalogDbContext`, `ICatalogDbContext`, `catalog_db` health check, `PlatformUser`/`PlatformRole` Identity stores on `CatalogDbContext`, `PlatformAdminSeeder`, `CatalogMultiTenantStore`, `TenantProvisioner`, `TenantFleetMigrator`, Finbuckle store wiring, and `IStartupInitializer`s for PlatformAdmin seeding and MultiTenancy startup recovery/fleet migration.
 
-- [ ] **Step 4: Add unit tests in `TenantProvisionerAndFleetMigratorTests.cs` for cross-module message failure handling**
+- [x] **Step 4: Add unit tests in `TenantProvisionerAndFleetMigratorTests.cs` for cross-module message failure handling**
 
 ```csharp
 [Fact]
@@ -340,12 +340,12 @@ public async Task TenantFleetMigrator_MigrateTenantAsync_DispatchesMigrateTenant
 }
 ```
 
-- [ ] **Step 5: Run `TenantProvisionerAndFleetMigratorTests`**
+- [x] **Step 5: Run `TenantProvisionerAndFleetMigratorTests`**
 
 Run: `dotnet test apps/backend/tests/ExamPrism.Tests/ExamPrism.Tests.csproj --filter "FullyQualifiedName~TenantProvisionerAndFleetMigratorTests"`
 Expected: PASS
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```bash
 git add apps/backend/
