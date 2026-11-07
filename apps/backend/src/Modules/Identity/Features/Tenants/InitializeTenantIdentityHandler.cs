@@ -13,11 +13,13 @@ using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 public sealed class InitializeTenantIdentityHandler(
     ITenantConnectionStringNormalizer normalizer,
     IConnectionStringProtector protector,
-    IServiceProvider serviceProvider)
+    IServiceProvider serviceProvider,
+    IOptions<PersistenceOptions>? persistenceOptions = null)
     : IHandler<InitializeTenantIdentityCommand, InitializeTenantIdentityResult>
 {
     public async Task<Result<InitializeTenantIdentityResult>> Handle(
@@ -26,7 +28,13 @@ public sealed class InitializeTenantIdentityHandler(
     {
         var normalizedConnStr = normalizer.Normalize(command.RawConnectionString);
         var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(normalizedConnStr)
+            .UseNpgsql(normalizedConnStr, npgsql =>
+            {
+                if (persistenceOptions?.Value is { } opts)
+                {
+                    npgsql.ConfigureNpgsql(opts);
+                }
+            })
             .Options;
 
         await using (var tenantDb = new AppDbContext(dbOptions))

@@ -6,8 +6,11 @@ using Common.MultiTenancy;
 using Common.Results;
 using ExamPrism.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
-public sealed class MigrateTenantDatabaseHandler(ITenantConnectionStringNormalizer normalizer)
+public sealed class MigrateTenantDatabaseHandler(
+    ITenantConnectionStringNormalizer normalizer,
+    IOptions<PersistenceOptions>? persistenceOptions = null)
     : IHandler<MigrateTenantDatabaseCommand, MigrateTenantDatabaseResult>
 {
     public async Task<Result<MigrateTenantDatabaseResult>> Handle(
@@ -16,7 +19,13 @@ public sealed class MigrateTenantDatabaseHandler(ITenantConnectionStringNormaliz
     {
         var normalizedConnStr = normalizer.Normalize(command.RawConnectionString);
         var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(normalizedConnStr)
+            .UseNpgsql(normalizedConnStr, npgsql =>
+            {
+                if (persistenceOptions?.Value is { } opts)
+                {
+                    npgsql.ConfigureNpgsql(opts);
+                }
+            })
             .Options;
 
         await using var tenantDb = new AppDbContext(dbOptions);
