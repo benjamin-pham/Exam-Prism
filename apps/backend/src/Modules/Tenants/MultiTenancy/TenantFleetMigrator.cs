@@ -2,13 +2,16 @@ namespace ExamPrism.Infrastructure.MultiTenancy;
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using Common.Messages.Tenants;
 using Common.MultiTenancy;
-using ExamPrism.Infrastructure.Persistence;
+using Common.Results;
+using ExamPrism.Domain.Tenants;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Wolverine;
 
 public sealed class TenantFleetMigrator(
     CatalogDbContext catalogDb,
@@ -16,7 +19,8 @@ public sealed class TenantFleetMigrator(
     ITenantConnectionStringNormalizer normalizer,
     IOptions<MultiTenancyOptions> options,
     ILogger<TenantFleetMigrator> logger,
-    IServiceScopeFactory? serviceScopeFactory = null) : ITenantFleetMigrator
+    IServiceScopeFactory? serviceScopeFactory = null,
+    IMessageBus? bus = null) : ITenantFleetMigrator
 {
     public async Task<TenantMigrationItemResult> MigrateTenantAsync(Guid tenantId, CancellationToken ct = default)
     {
@@ -47,22 +51,30 @@ public sealed class TenantFleetMigrator(
         try
         {
             var rawConnStr = protector.Unprotect(tenant.EncryptedConnectionString);
-            var normalizedConnStr = normalizer.Normalize(rawConnStr);
+            var messageBus = bus ?? serviceScopeFactory?.CreateScope().ServiceProvider.GetService<IMessageBus>()
+                ?? throw new InvalidOperationException("IMessageBus is required to migrate tenant database.");
 
-            var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(normalizedConnStr)
-                .Options;
+            var command = new MigrateTenantDatabaseCommand(tenant.Id, tenant.Slug, rawConnStr);
+            var result = await messageBus.InvokeAsync<Result<MigrateTenantDatabaseResult>>(command, ct);
 
-            await using var tenantDb = new AppDbContext(dbOptions);
-            var pending = (await tenantDb.Database.GetPendingMigrationsAsync(ct)).Count();
-            await tenantDb.Database.MigrateAsync(ct);
             sw.Stop();
+
+            if (result.IsFailure)
+            {
+                return new TenantMigrationItemResult(
+                    tenant.Id,
+                    tenant.Slug,
+                    Succeeded: false,
+                    AppliedMigrationsCount: 0,
+                    ErrorMessage: result.Error.Message,
+                    DurationMs: sw.ElapsedMilliseconds);
+            }
 
             return new TenantMigrationItemResult(
                 tenant.Id,
                 tenant.Slug,
                 Succeeded: true,
-                AppliedMigrationsCount: pending,
+                AppliedMigrationsCount: result.Value.AppliedMigrationsCount,
                 ErrorMessage: null,
                 DurationMs: sw.ElapsedMilliseconds);
         }

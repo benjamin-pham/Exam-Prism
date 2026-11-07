@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using Common.Handlers;
 using Common.MultiTenancy;
 using Common.Results;
+using ExamPrism.Domain.Tenants;
 using ExamPrism.Domain.Tenants.Specifications;
 using ExamPrism.Infrastructure.MultiTenancy;
 using ExamPrism.Infrastructure.Persistence;

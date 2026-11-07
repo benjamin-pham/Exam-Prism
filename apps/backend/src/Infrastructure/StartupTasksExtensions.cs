@@ -2,6 +2,7 @@ namespace ExamPrism.Infrastructure;
 
 using System.Diagnostics;
 using Common.Locking;
+using Common.Modules;
 using ExamPrism.Infrastructure.Health;
 using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.MultiTenancy;
@@ -39,18 +40,33 @@ public static class StartupTasksExtensions
                     return;
                 }
 
-                await app.InitializeIdentityAsync(cancellationToken);
-                await app.InitializeMultiTenancyAsync(cancellationToken);
+                await RunInitializersAsync(app, cancellationToken);
             }
             else
             {
-                await app.InitializeIdentityAsync(cancellationToken);
-                await app.InitializeMultiTenancyAsync(cancellationToken);
+                await RunInitializersAsync(app, cancellationToken);
             }
         }
         finally
         {
             drainState?.MarkStartupComplete();
+        }
+    }
+
+    private static async Task RunInitializersAsync(WebApplication app, CancellationToken cancellationToken)
+    {
+        var initializers = app.Services.GetServices<IStartupInitializer>().ToList();
+        if (initializers.Count > 0)
+        {
+            foreach (var initializer in initializers)
+            {
+                await initializer.InitializeAsync(app.Services, cancellationToken);
+            }
+        }
+        else
+        {
+            await app.InitializeIdentityAsync(cancellationToken);
+            await app.InitializeMultiTenancyAsync(cancellationToken);
         }
     }
 

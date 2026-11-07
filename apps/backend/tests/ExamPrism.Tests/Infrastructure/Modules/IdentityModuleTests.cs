@@ -72,9 +72,9 @@ public class IdentityModuleTests
             .Returns("Host=localhost;Database=tenant_init_test;Username=postgres;Password=postgres");
 
         var protector = Substitute.For<IConnectionStringProtector>();
-        var scopeFactory = Substitute.For<IServiceScopeFactory>();
+        var serviceProvider = Substitute.For<IServiceProvider>();
 
-        var handler = new InitializeTenantIdentityHandler(normalizer, protector, scopeFactory);
+        var handler = new InitializeTenantIdentityHandler(normalizer, protector, serviceProvider);
         var command = new InitializeTenantIdentityCommand(
             Guid.NewGuid(),
             "tenant-init-test",

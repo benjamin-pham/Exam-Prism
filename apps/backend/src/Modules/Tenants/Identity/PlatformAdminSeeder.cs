@@ -1,6 +1,7 @@
 namespace ExamPrism.Infrastructure.Identity;
 
 using Common.Security;
+using ExamPrism.Domain.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

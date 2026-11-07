@@ -81,6 +81,14 @@ public static class IdentityModuleExtensions
             new BulkheadPasswordHasher<ApplicationUser>(
                 sp.GetRequiredService<IOptions<IdentityHighLoadOptions>>()));
 
+        services.AddScoped(sp => new ExamPrism.Features.Tenants.InitializeTenantIdentityHandler(
+            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
+            sp.GetRequiredService<IConnectionStringProtector>(),
+            sp));
+
+        services.AddScoped(sp => new ExamPrism.Features.Tenants.MigrateTenantDatabaseHandler(
+            sp.GetRequiredService<ITenantConnectionStringNormalizer>()));
+
         return services;
     }
 }

@@ -17,7 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 public sealed class InitializeTenantIdentityHandler(
     ITenantConnectionStringNormalizer normalizer,
     IConnectionStringProtector protector,
-    IServiceScopeFactory serviceScopeFactory)
+    IServiceProvider serviceProvider)
     : IHandler<InitializeTenantIdentityCommand, InitializeTenantIdentityResult>
 {
     public async Task<Result<InitializeTenantIdentityResult>> Handle(
@@ -34,7 +34,7 @@ public sealed class InitializeTenantIdentityHandler(
             await tenantDb.Database.MigrateAsync(ct);
         }
 
-        await using (var scope = serviceScopeFactory.CreateAsyncScope())
+        await using (var scope = serviceProvider.CreateAsyncScope())
         {
             var setter = scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>();
             setter.MultiTenantContext = new MultiTenantContext<ExamPrismTenantInfo>(

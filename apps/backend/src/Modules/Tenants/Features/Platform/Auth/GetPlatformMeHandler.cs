@@ -3,6 +3,7 @@ namespace ExamPrism.Features.Platform.Auth;
 using Common.Handlers;
 using Common.Results;
 using Common.Security;
+using ExamPrism.Domain.Identity;
 using ExamPrism.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 

@@ -1,21 +1,21 @@
 namespace ExamPrism.Infrastructure.MultiTenancy;
 
 using System.Security.Cryptography;
+using Common.Messages.Tenants;
 using Common.MultiTenancy;
-using Common.Security;
+using Common.Results;
+using ExamPrism.Domain.Tenants;
 using ExamPrism.Domain.Tenants.Specifications;
-using ExamPrism.Infrastructure.Identity;
 using ExamPrism.Infrastructure.Persistence;
 using ExamPrism.Infrastructure.Persistence.Catalog;
-using Finbuckle.MultiTenant;
-using Finbuckle.MultiTenant.Abstractions;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using Wolverine;
 
 public sealed class TenantProvisioner(
     CatalogDbContext catalogDb,
@@ -24,10 +24,28 @@ public sealed class TenantProvisioner(
     IConnectionStringProtector protector,
     ITenantConnectionStringNormalizer normalizer,
     ITenantCacheInvalidator cacheInvalidator,
-    IServiceScopeFactory serviceScopeFactory,
-    TimeProvider timeProvider,
-    ILogger<TenantProvisioner> logger) : ITenantProvisioner
+    IServiceScopeFactory? serviceScopeFactory = null,
+    TimeProvider? timeProvider = null,
+    ILogger<TenantProvisioner>? logger = null,
+    IMessageBus? bus = null) : ITenantProvisioner
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly ILogger<TenantProvisioner> _logger = logger ?? NullLogger<TenantProvisioner>.Instance;
+
+    public TenantProvisioner(
+        CatalogDbContext catalogDb,
+        IConfiguration configuration,
+        IOptions<MultiTenancyOptions> options,
+        IConnectionStringProtector protector,
+        ITenantConnectionStringNormalizer normalizer,
+        ITenantCacheInvalidator cacheInvalidator,
+        IMessageBus bus,
+        TimeProvider? timeProvider = null,
+        ILogger<TenantProvisioner>? logger = null)
+        : this(catalogDb, configuration, options, protector, normalizer, cacheInvalidator, null, timeProvider, logger, bus)
+    {
+    }
+
     public async Task ProvisionAsync(Guid tenantId, CancellationToken ct = default)
     {
         Tenant? tenant = null;
@@ -92,7 +110,7 @@ public sealed class TenantProvisioner(
                         Password = rolePassword
                     };
                     rawTenantConnStr = tenantConnBuilder.ConnectionString;
-                    tenant.SetEncryptedConnectionString(protector.Protect(rawTenantConnStr), timeProvider.GetUtcNow().UtcDateTime);
+                    tenant.SetEncryptedConnectionString(protector.Protect(rawTenantConnStr), _timeProvider.GetUtcNow().UtcDateTime);
                     await catalogDb.SaveChangesAsync(ct);
                 }
             }
@@ -143,85 +161,27 @@ public sealed class TenantProvisioner(
                 }
                 else if (provisioningOptions.CreateDedicatedPostgresUser && roleName != null)
                 {
-                    // Review Focus #2: if database already existed from a prior failed attempt, run ALTER DATABASE "{dbName}" OWNER TO "{roleName}";
                     await using var alterDbCmd = new NpgsqlCommand($"ALTER DATABASE \"{dbName}\" OWNER TO \"{roleName}\";", adminConn);
                     await alterDbCmd.ExecuteNonQueryAsync(ct);
                 }
             }
 
-            var normalizedTenantConnStr = normalizer.Normalize(rawTenantConnStr);
-            var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(normalizedTenantConnStr)
-                .Options;
+            var messageBus = bus ?? serviceScopeFactory?.CreateScope().ServiceProvider.GetService<IMessageBus>()
+                ?? throw new InvalidOperationException("IMessageBus is required to initialize tenant identity.");
 
-            await using (var tenantDb = new AppDbContext(dbOptions))
+            var initCommand = new InitializeTenantIdentityCommand(
+                tenant.Id,
+                tenant.Slug,
+                rawTenantConnStr,
+                tenant.OwnerEmail,
+                tenant.EncryptedOwnerPassword);
+            var initResult = await messageBus.InvokeAsync<Result<InitializeTenantIdentityResult>>(initCommand, ct);
+            if (initResult.IsFailure)
             {
-                await tenantDb.Database.MigrateAsync(ct);
+                throw new InvalidOperationException(initResult.Error.Message);
             }
 
-            await using (var scope = serviceScopeFactory.CreateAsyncScope())
-            {
-                var setter = scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>();
-                setter.MultiTenantContext = new MultiTenantContext<ExamPrismTenantInfo>(
-                    new ExamPrismTenantInfo(tenant.Id.ToString(), tenant.Slug)
-                    {
-                        Status = TenantStatus.Active,
-                        ConnectionString = rawTenantConnStr
-                    });
-
-                var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-                var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-
-                if (!await roleManager.RoleExistsAsync(TenantRoles.TenantOwner))
-                {
-                    var roleResult = await roleManager.CreateAsync(new IdentityRole<Guid>(TenantRoles.TenantOwner));
-                    if (!roleResult.Succeeded)
-                    {
-                        throw new InvalidOperationException(
-                            $"Failed to create role '{TenantRoles.TenantOwner}': {string.Join(", ", roleResult.Errors.Select(e => e.Description))}");
-                    }
-                }
-
-                if (!string.IsNullOrWhiteSpace(tenant.OwnerEmail))
-                {
-                    var ownerUser = await userManager.FindByEmailAsync(tenant.OwnerEmail);
-                    if (ownerUser is null)
-                    {
-                        if (string.IsNullOrWhiteSpace(tenant.EncryptedOwnerPassword))
-                        {
-                            throw new InvalidOperationException($"Owner password for tenant '{tenant.Slug}' is missing.");
-                        }
-
-                        var ownerPassword = protector.Unprotect(tenant.EncryptedOwnerPassword);
-                        ownerUser = new ApplicationUser
-                        {
-                            Id = Guid.NewGuid(),
-                            UserName = tenant.OwnerEmail,
-                            Email = tenant.OwnerEmail,
-                            EmailConfirmed = true
-                        };
-
-                        var createResult = await userManager.CreateAsync(ownerUser, ownerPassword);
-                        if (!createResult.Succeeded)
-                        {
-                            throw new InvalidOperationException(
-                                $"Failed to create tenant owner: {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
-                        }
-                    }
-
-                    if (!await userManager.IsInRoleAsync(ownerUser, TenantRoles.TenantOwner))
-                    {
-                        var addRoleResult = await userManager.AddToRoleAsync(ownerUser, TenantRoles.TenantOwner);
-                        if (!addRoleResult.Succeeded)
-                        {
-                            throw new InvalidOperationException(
-                                $"Failed to add tenant owner to role '{TenantRoles.TenantOwner}': {string.Join(", ", addRoleResult.Errors.Select(e => e.Description))}");
-                        }
-                    }
-                }
-            }
-
-            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             tenant.MarkProvisioned(protector.Protect(rawTenantConnStr), now);
 
             await catalogDb.SaveChangesAsync(ct);
@@ -229,11 +189,11 @@ public sealed class TenantProvisioner(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to provision tenant {TenantId} ({Slug})", tenantId, tenant?.Slug);
+            _logger.LogError(ex, "Failed to provision tenant {TenantId} ({Slug})", tenantId, tenant?.Slug);
 
             if (tenant != null)
             {
-                var now = timeProvider.GetUtcNow().UtcDateTime;
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
                 tenant.MarkProvisioningFailed(ex.Message, now);
 
                 try
@@ -242,7 +202,7 @@ public sealed class TenantProvisioner(
                 }
                 catch (Exception saveEx)
                 {
-                    logger.LogError(saveEx, "Failed to save failed status for tenant {TenantId}", tenantId);
+                    _logger.LogError(saveEx, "Failed to save failed status for tenant {TenantId}", tenantId);
                 }
 
                 try
@@ -251,7 +211,7 @@ public sealed class TenantProvisioner(
                 }
                 catch (Exception cacheEx)
                 {
-                    logger.LogError(cacheEx, "Failed to invalidate cache for failed tenant {TenantId}", tenantId);
+                    _logger.LogError(cacheEx, "Failed to invalidate cache for failed tenant {TenantId}", tenantId);
                 }
             }
         }

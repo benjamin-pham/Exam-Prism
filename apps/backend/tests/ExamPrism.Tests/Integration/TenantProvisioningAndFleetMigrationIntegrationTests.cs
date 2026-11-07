@@ -240,7 +240,7 @@ public class TenantProvisioningAndFleetMigrationIntegrationTests : IClassFixture
 
         // Verify status and secrets
         var updatedTenant = await catalogDb.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenant.Id);
-        updatedTenant.Status.Should().Be(TenantStatus.Active);
+        updatedTenant.Status.Should().Be(TenantStatus.Active, because: updatedTenant.FailureReason);
         updatedTenant.EncryptedConnectionString.Should().NotBeNullOrWhiteSpace();
         updatedTenant.EncryptedOwnerPassword.Should().BeNull();
 

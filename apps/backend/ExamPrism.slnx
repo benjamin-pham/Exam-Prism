@@ -6,6 +6,7 @@
   </Folder>
   <Folder Name="/src/Modules/">
     <Project Path="src/Modules/Identity/ExamPrism.Modules.Identity.csproj" />
+    <Project Path="src/Modules/Tenants/ExamPrism.Modules.Tenants.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ExamPrism.Tests/ExamPrism.Tests.csproj" />

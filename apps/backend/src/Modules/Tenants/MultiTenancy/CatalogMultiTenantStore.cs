@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Common.Caching;
 using Common.MultiTenancy;
 using Common.Telemetry;
+using ExamPrism.Domain.Tenants;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore;

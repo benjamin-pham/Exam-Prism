@@ -2,11 +2,8 @@ namespace ExamPrism.Infrastructure.Identity;
 
 using System.Text;
 using Common.Security;
-using ExamPrism.Infrastructure.Persistence;
-using ExamPrism.Infrastructure.Persistence.Catalog;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -22,37 +19,14 @@ public static class IdentitySetup
         services.AddHttpContextAccessor();
         services.AddScoped<IUserContext, UserContext>();
 
-        // Identity setup
-        Action<IdentityOptions> configureIdentity = options =>
-        {
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireUppercase = false;
-            options.Password.RequireNonAlphanumeric = false;
-            options.Password.RequiredLength = 6;
-            options.User.RequireUniqueEmail = true;
-        };
-
-        services.AddIdentityCore<PlatformUser>(configureIdentity)
-            .AddRoles<PlatformRole>()
-            .AddEntityFrameworkStores<CatalogDbContext>()
-            .AddDefaultTokenProviders();
-
         // High-load identity: CPU password hash bulkhead & hybrid cache token revocation
         services.Configure<IdentityHighLoadOptions>(configuration.GetSection(IdentityHighLoadOptions.SectionName));
-        services.AddSingleton<IPasswordHasher<PlatformUser>>(sp =>
-            new BulkheadPasswordHasher<PlatformUser>(
-                sp.GetRequiredService<IOptions<IdentityHighLoadOptions>>()));
         services.AddSingleton<ITokenRevocationService, HybridCacheTokenRevocationService>();
 
         // JwtOptions & TokenService
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.AddScoped<ITokenService, TokenService>();
         services.AddSingleton<JwtTenantValidator>();
-
-        // PlatformAdmin
-        services.Configure<PlatformAdminOptions>(configuration.GetSection(PlatformAdminOptions.SectionName));
-        services.AddScoped<PlatformAdminSeeder>();
 
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? throw new InvalidOperationException("Jwt configuration section is missing.");
@@ -120,14 +94,17 @@ public static class IdentitySetup
         this WebApplication app,
         CancellationToken cancellationToken = default)
     {
-        var platformAdminOptions = app.Services.GetRequiredService<IOptions<PlatformAdminOptions>>().Value;
-        if (platformAdminOptions.SeedOnStartup)
+        var platformAdminOptions = app.Services.GetService<IOptions<PlatformAdminOptions>>()?.Value;
+        if (platformAdminOptions is not null && platformAdminOptions.SeedOnStartup)
         {
             try
             {
                 await using var scope = app.Services.CreateAsyncScope();
-                var seeder = scope.ServiceProvider.GetRequiredService<PlatformAdminSeeder>();
-                await seeder.SeedAsync(cancellationToken);
+                var scopedSeeder = scope.ServiceProvider.GetService<PlatformAdminSeeder>();
+                if (scopedSeeder is not null)
+                {
+                    await scopedSeeder.SeedAsync(cancellationToken);
+                }
             }
             catch (Exception ex)
             {
@@ -136,4 +113,3 @@ public static class IdentitySetup
         }
     }
 }
-

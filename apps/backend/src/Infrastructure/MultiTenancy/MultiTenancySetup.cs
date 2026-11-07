@@ -5,7 +5,6 @@ using ExamPrism.Features.Tenants;
 using ExamPrism.Infrastructure.Caching;
 using ExamPrism.Infrastructure.Persistence.Catalog;
 using Finbuckle.MultiTenant.Abstractions;
-using Finbuckle.MultiTenant.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
@@ -96,29 +95,6 @@ public static class MultiTenancySetup
         services.AddSingleton<ITenantConnectionStringNormalizer, TenantConnectionStringNormalizer>();
         services.AddSingleton<TenantCatalogShieldState>();
         services.AddScoped<ITenantContext, TenantContext>();
-        services.AddScoped<CatalogMultiTenantStore>();
-        services.AddScoped<ITenantCacheInvalidator>(sp => sp.GetRequiredService<CatalogMultiTenantStore>());
-        services.AddScoped<ITenantProvisioner>(sp => new TenantProvisioner(
-            sp.GetRequiredService<CatalogDbContext>(),
-            sp.GetRequiredService<IConfiguration>(),
-            sp.GetRequiredService<IOptions<MultiTenancyOptions>>(),
-            sp.GetRequiredService<IConnectionStringProtector>(),
-            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
-            sp.GetRequiredService<ITenantCacheInvalidator>(),
-            sp.GetRequiredService<IServiceScopeFactory>(),
-            sp.GetRequiredService<TimeProvider>(),
-            sp.GetRequiredService<ILogger<TenantProvisioner>>()));
-        services.AddScoped<ITenantFleetMigrator>(sp => new TenantFleetMigrator(
-            sp.GetRequiredService<CatalogDbContext>(),
-            sp.GetRequiredService<IConnectionStringProtector>(),
-            sp.GetRequiredService<ITenantConnectionStringNormalizer>(),
-            sp.GetRequiredService<IOptions<MultiTenancyOptions>>(),
-            sp.GetRequiredService<ILogger<TenantFleetMigrator>>(),
-            sp.GetRequiredService<IServiceScopeFactory>()));
-
-        services.AddMultiTenant<ExamPrismTenantInfo>()
-            .WithStrategy<SubdomainMultiTenantStrategy>(ServiceLifetime.Scoped)
-            .WithStore<CatalogMultiTenantStore>(ServiceLifetime.Scoped);
 
         return services;
     }
@@ -127,22 +103,30 @@ public static class MultiTenancySetup
         this WebApplication app,
         CancellationToken cancellationToken = default)
     {
-        var multiTenancyOptions = app.Services.GetRequiredService<IOptions<MultiTenancyOptions>>().Value;
+        var multiTenancyOptions = app.Services.GetService<IOptions<MultiTenancyOptions>>()?.Value;
+        if (multiTenancyOptions is null)
+        {
+            return;
+        }
+
         if (multiTenancyOptions.Provisioning.RecoverStuckProvisioningOnStartup)
         {
             try
             {
                 await using var scope = app.Services.CreateAsyncScope();
-                var catalogDb = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
-                var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-                var stuckTenants = await catalogDb.Tenants
-                    .Where(t => t.Status == TenantStatus.Provisioning)
-                    .Select(t => t.Id)
-                    .ToListAsync(cancellationToken);
-
-                foreach (var tenantId in stuckTenants)
+                var catalogDb = scope.ServiceProvider.GetService<CatalogDbContext>();
+                var bus = scope.ServiceProvider.GetService<IMessageBus>();
+                if (catalogDb is not null && bus is not null)
                 {
-                    await bus.SendAsync(new StartTenantProvisioningCommand(tenantId));
+                    var stuckTenants = await catalogDb.Tenants
+                        .Where(t => t.Status == TenantStatus.Provisioning)
+                        .Select(t => t.Id)
+                        .ToListAsync(cancellationToken);
+
+                    foreach (var tenantId in stuckTenants)
+                    {
+                        await bus.SendAsync(new StartTenantProvisioningCommand(tenantId));
+                    }
                 }
             }
             catch (Exception ex)
@@ -156,8 +140,11 @@ public static class MultiTenancySetup
             try
             {
                 await using var scope = app.Services.CreateAsyncScope();
-                var fleetMigrator = scope.ServiceProvider.GetRequiredService<ITenantFleetMigrator>();
-                await fleetMigrator.MigrateAllActiveTenantsAsync(cancellationToken);
+                var fleetMigrator = scope.ServiceProvider.GetService<ITenantFleetMigrator>();
+                if (fleetMigrator is not null)
+                {
+                    await fleetMigrator.MigrateAllActiveTenantsAsync(cancellationToken);
+                }
             }
             catch (Exception ex)
             {
@@ -166,4 +153,3 @@ public static class MultiTenancySetup
         }
     }
 }
-
