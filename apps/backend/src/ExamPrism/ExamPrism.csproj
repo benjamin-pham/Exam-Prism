@@ -27,4 +27,13 @@
     <Copy SourceFiles="@(ModuleSettingFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
   </Target>
 
+  <Target Name="CopyModulePluginPublishOutputs" AfterTargets="Publish">
+    <ItemGroup>
+      <ModulePublishFiles Include="$(OutDir)ExamPrism.Modules.*" />
+      <ModulePublishSettings Include="$(OutDir)appsettings.*.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ModulePublishFiles)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ModulePublishSettings)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

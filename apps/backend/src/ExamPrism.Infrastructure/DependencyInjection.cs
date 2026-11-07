@@ -52,7 +52,7 @@ public static class DependencyInjection
         foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
         {
             var name = asm.GetName().Name;
-            if (name != null && (name == "ExamPrism" || name.StartsWith("ExamPrism.Modules.", StringComparison.OrdinalIgnoreCase)))
+            if (name != null && name == "ExamPrism")
             {
                 builder.Services.AddValidatorsFromAssembly(asm, includeInternalTypes: true);
             }
